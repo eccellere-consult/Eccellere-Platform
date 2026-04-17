@@ -2,10 +2,11 @@
   "name": "eccellere",
   "version": "0.1.0",
   "private": true,
+  "main": ".next/standalone/server.js",
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "prisma generate && next build",
-    "start": "next start",
+    "start": ".next/standalone/server.js",
     "lint": "eslint",
     "test": "playwright test",
     "test:ui": "playwright test --ui",
