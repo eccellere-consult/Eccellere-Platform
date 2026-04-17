@@ -1,6 +1,11 @@
 import type { Metadata } from "next";
 import { Cormorant_Garamond, DM_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import { ChatbotWidget } from "@/components/chatbot/ChatbotWidget";
+import { ThemeProvider } from "@/components/ThemeProvider";
+import { GoogleAnalytics } from "@/components/analytics/GoogleAnalytics";
+import { PostHogPageView } from "@/components/analytics/PostHogProvider";
+import { Suspense } from "react";
 
 const cormorant = Cormorant_Garamond({
   variable: "--font-cormorant",
@@ -23,6 +28,49 @@ const jetbrainsMono = JetBrains_Mono({
   weight: ["400"],
   display: "swap",
 });
+
+const organizationJsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://eccellere.in/#organization",
+      name: "Eccellere Consulting",
+      url: "https://eccellere.in",
+      logo: {
+        "@type": "ImageObject",
+        url: "https://eccellere.in/logo.png",
+      },
+      description:
+        "India's premier consulting platform for MSMEs and startups. Strategy, Process Transformation, Agentic AI, and 200+ business frameworks.",
+      address: {
+        "@type": "PostalAddress",
+        addressCountry: "IN",
+      },
+      sameAs: [
+        "https://www.linkedin.com/company/eccellere",
+        "https://twitter.com/eccellere",
+      ],
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://eccellere.in/#website",
+      url: "https://eccellere.in",
+      name: "Eccellere",
+      description:
+        "Strategy, AI & Consulting for India's MSMEs",
+      publisher: { "@id": "https://eccellere.in/#organization" },
+      potentialAction: {
+        "@type": "SearchAction",
+        target: {
+          "@type": "EntryPoint",
+          urlTemplate: "https://eccellere.in/marketplace?q={search_term_string}",
+        },
+        "query-input": "required name=search_term_string",
+      },
+    },
+  ],
+};
 
 export const metadata: Metadata = {
   title: {
@@ -69,11 +117,32 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="scroll-smooth">
+    <html lang="en" className="scroll-smooth" suppressHydrationWarning>
       <body
         className={`${cormorant.variable} ${dmSans.variable} ${jetbrainsMono.variable} antialiased`}
       >
-        {children}
+        <ThemeProvider>
+          <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-[100] focus:rounded focus:bg-eccellere-gold focus:px-4 focus:py-2 focus:text-white focus:outline-none">
+            Skip to content
+          </a>
+          {children}
+          <ChatbotWidget />
+          {process.env.NEXT_PUBLIC_POSTHOG_KEY && (
+            <Suspense fallback={null}>
+              <PostHogPageView
+                apiKey={process.env.NEXT_PUBLIC_POSTHOG_KEY}
+                apiHost={process.env.NEXT_PUBLIC_POSTHOG_HOST}
+              />
+            </Suspense>
+          )}
+        </ThemeProvider>
+        {process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID && (
+          <GoogleAnalytics measurementId={process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID} />
+        )}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
+        />
       </body>
     </html>
   );

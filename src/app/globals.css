@@ -86,12 +86,17 @@
 }
 
 /* Base styles */
+html {
+  overflow-x: hidden;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-body, "DM Sans", sans-serif);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
 }
 
 /* Typography utilities */
@@ -103,6 +108,77 @@ body {
 ::selection {
   background-color: var(--eccellere-gold);
   color: white;
+}
+
+/* ============================================
+   DARK MODE OVERRIDES
+   ============================================ */
+
+/* Header adapts via scrolled state already; dark body bg */
+.dark body {
+  background: var(--eccellere-ink);
+  color: var(--eccellere-cream);
+}
+
+.dark .bg-eccellere-cream {
+  background-color: #121210;
+}
+
+.dark .bg-white {
+  background-color: var(--eccellere-purple);
+}
+
+.dark .text-eccellere-ink {
+  color: var(--eccellere-cream);
+}
+
+.dark .text-ink-mid {
+  color: #C5C4BD;
+}
+
+.dark .text-ink-light {
+  color: #8A897F;
+}
+
+.dark .border-eccellere-ink\/5 {
+  border-color: rgba(250, 248, 244, 0.08);
+}
+
+.dark .border-eccellere-ink\/10 {
+  border-color: rgba(250, 248, 244, 0.12);
+}
+
+.dark .shadow-sm {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.dark .ring-1.ring-black\/5 {
+  --tw-ring-color: rgba(255, 255, 255, 0.08);
+}
+
+/* ============================================
+   ACCESSIBILITY — Focus Indicators
+   ============================================ */
+
+/* Visible focus ring for keyboard navigation */
+*:focus-visible {
+  outline: 2px solid var(--eccellere-gold);
+  outline-offset: 2px;
+}
+
+/* Remove default focus outline when using mouse */
+*:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Focus ring */

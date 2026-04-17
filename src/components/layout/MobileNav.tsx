@@ -93,7 +93,17 @@ export function MobileNav({ links, scrolled }: MobileNavProps) {
               </div>
             ))}
 
-            <div className="mt-6 border-t border-white/10 pt-6">
+            <div className="mt-6 border-t border-white/10 pt-6 flex flex-col gap-2">
+              <Button asChild className="w-full">
+                <Link href="/register" onClick={() => setOpen(false)}>
+                  Get Started Free
+                </Link>
+              </Button>
+              <Button asChild variant="ghostLight" className="w-full">
+                <Link href="/login" onClick={() => setOpen(false)}>
+                  Log In
+                </Link>
+              </Button>
               <Button asChild variant="ghostLight" className="w-full">
                 <Link href="/contact" onClick={() => setOpen(false)}>
                   Talk to Us

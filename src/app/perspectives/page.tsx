@@ -7,6 +7,7 @@ import { Search, Clock, User } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { cn } from "@/lib/utils";
+import { articles } from "@/lib/perspectives-data";
 
 const categories = [
   "All",
@@ -16,108 +17,6 @@ const categories = [
   "Retail",
   "Digital",
   "Leadership",
-];
-
-const articles = [
-  {
-    id: "1",
-    category: "Agentic AI",
-    title: "Why Indian MSMEs Should Adopt Agentic AI Before Their Competitors Do",
-    teaser:
-      "The window of advantage is narrow. Here's how early movers are gaining 30% efficiency improvements across manufacturing and logistics.",
-    author: "Eccellere Research",
-    date: "Mar 2026",
-    readTime: "6 min read",
-    featured: true,
-  },
-  {
-    id: "2",
-    category: "Strategy",
-    title: "5 Growth Frameworks Every MSME Founder Should Know",
-    teaser:
-      "From Ansoff to Blue Ocean — applied to the Indian context with real examples from sub-₹100Cr businesses.",
-    author: "Eccellere Editorial",
-    date: "Feb 2026",
-    readTime: "4 min read",
-    featured: false,
-  },
-  {
-    id: "3",
-    category: "Manufacturing",
-    title: "Lean Manufacturing in 2026: What's Changed for Indian Factories",
-    teaser:
-      "Digital twins, IoT sensors, and the new lean playbook — a practical guide for factory owners.",
-    author: "Eccellere Research",
-    date: "Feb 2026",
-    readTime: "5 min read",
-    featured: false,
-  },
-  {
-    id: "4",
-    category: "Agentic AI",
-    title: "The 10 Highest-ROI AI Use Cases for Mid-Size Businesses",
-    teaser:
-      "Forget chatbots. These AI applications deliver measurable returns in under 6 months for businesses doing ₹5–100Cr in revenue.",
-    author: "Eccellere AI Lab",
-    date: "Jan 2026",
-    readTime: "8 min read",
-    featured: false,
-  },
-  {
-    id: "5",
-    category: "Retail",
-    title: "Building a D2C Brand in India: From Zero to ₹1Cr Monthly Revenue",
-    teaser:
-      "A step-by-step playbook based on 12 Indian D2C success stories, including channel strategy, pricing, and fulfilment.",
-    author: "Eccellere Editorial",
-    date: "Jan 2026",
-    readTime: "7 min read",
-    featured: false,
-  },
-  {
-    id: "6",
-    category: "Digital",
-    title: "ERP for MSMEs: When to Implement and What to Choose in 2026",
-    teaser:
-      "The real cost of delayed ERP adoption, and a comparison framework for the top 5 options for Indian businesses.",
-    author: "Eccellere Research",
-    date: "Dec 2025",
-    readTime: "6 min read",
-    featured: false,
-  },
-  {
-    id: "7",
-    category: "Leadership",
-    title: "Hiring Your First CTO: A Guide for Non-Tech Founders",
-    teaser:
-      "What to look for, what to pay, and the 3 critical mistakes that kill your first tech hire.",
-    author: "Eccellere Editorial",
-    date: "Dec 2025",
-    readTime: "5 min read",
-    featured: false,
-  },
-  {
-    id: "8",
-    category: "Strategy",
-    title: "Competitive Analysis in 30 Minutes: The MSME Shortcut",
-    teaser:
-      "You don't need a 6-week study. Use this rapid framework to map your competitive landscape this afternoon.",
-    author: "Eccellere Research",
-    date: "Nov 2025",
-    readTime: "3 min read",
-    featured: false,
-  },
-  {
-    id: "9",
-    category: "Manufacturing",
-    title: "Supply Chain Resilience: Lessons from Indian Manufacturers Who Survived 2025",
-    teaser:
-      "What the best-prepared factories did differently when disruptions hit — and the frameworks they used.",
-    author: "Eccellere Research",
-    date: "Nov 2025",
-    readTime: "6 min read",
-    featured: false,
-  },
 ];
 
 export default function PerspectivesPage() {
@@ -200,7 +99,7 @@ export default function PerspectivesPage() {
                 className="mb-10"
               >
                 <Link
-                  href={`/perspectives/${featured.id}`}
+                  href={`/perspectives/${featured.slug}`}
                   className="group block rounded bg-white p-8 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md lg:p-10"
                 >
                   <span className="inline-block rounded-sm bg-eccellere-gold/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-eccellere-gold">
@@ -235,7 +134,7 @@ export default function PerspectivesPage() {
                   transition={{ delay: i * 0.06, duration: 0.4 }}
                 >
                   <Link
-                    href={`/perspectives/${article.id}`}
+                    href={`/perspectives/${article.slug}`}
                     className="group block h-full rounded bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md"
                   >
                     <span className="text-[10px] font-medium uppercase tracking-wider text-eccellere-gold">

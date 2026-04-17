@@ -27,6 +27,14 @@ const footerGetInTouch = [
   { label: "Become a Specialist", href: "/specialist/register" },
 ];
 
+const footerPortals = [
+  { label: "Log In", href: "/login" },
+  { label: "Register", href: "/register" },
+  { label: "Client Dashboard", href: "/dashboard" },
+  { label: "Specialist Portal", href: "/specialist" },
+  { label: "Pricing", href: "/pricing" },
+];
+
 const footerLegal = [
   { label: "Privacy Policy", href: "/privacy" },
   { label: "Terms", href: "/terms" },
@@ -61,7 +69,7 @@ export function Footer() {
       </div>
 
       {/* Main footer columns */}
-      <div className="mx-auto grid max-w-[1280px] gap-10 px-6 py-16 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mx-auto grid max-w-[1280px] gap-10 px-6 py-16 sm:grid-cols-2 lg:grid-cols-5">
         {/* Column 1: Brand */}
         <div className="space-y-4">
           <span className="font-display text-xl font-semibold tracking-wide">
@@ -72,8 +80,8 @@ export function Footer() {
             Strategy, AI, and business frameworks for growth.
           </p>
           <div className="space-y-1 text-sm text-white/50">
-            <p>hello@eccellere.in</p>
-            <p>+91 98000 00000</p>
+            <p>contact@eccellere.in</p>
+            <p>+91 9964694566</p>
             <p>Bengaluru, India</p>
           </div>
           {/* Social icons */}
@@ -136,6 +144,25 @@ export function Footer() {
           </h4>
           <ul className="space-y-2.5">
             {footerGetInTouch.map((link) => (
+              <li key={link.href}>
+                <Link
+                  href={link.href}
+                  className="text-sm text-white/70 transition-colors hover:text-eccellere-gold"
+                >
+                  {link.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* Column 5: Portals */}
+        <div>
+          <h4 className="mb-4 text-xs font-medium uppercase tracking-[0.15em] text-white/40">
+            Portals
+          </h4>
+          <ul className="space-y-2.5">
+            {footerPortals.map((link) => (
               <li key={link.href}>
                 <Link
                   href={link.href}

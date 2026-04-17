@@ -5,6 +5,8 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { MobileNav } from "./MobileNav";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { NotificationBell } from "@/components/NotificationBell";
 
 const navLinks = [
   { label: "Home", href: "/" },
@@ -24,6 +26,7 @@ const navLinks = [
   { label: "Marketplace", href: "/marketplace" },
   { label: "Perspectives", href: "/perspectives" },
   { label: "About", href: "/about" },
+  { label: "Pricing", href: "/pricing" },
 ];
 
 export function Header() {
@@ -102,13 +105,36 @@ export function Header() {
           ))}
         </nav>
 
-        {/* Right: CTA + Mobile toggle */}
-        <div className="flex items-center gap-4">
+        {/* Right: Auth + CTA + Theme + Mobile toggle */}
+        <div className="flex items-center gap-3">
+          <NotificationBell scrolled={scrolled} />
+          <ThemeToggle scrolled={scrolled} />
+          <Link
+            href="/login"
+            className={cn(
+              "hidden text-sm font-medium transition-colors lg:inline-flex",
+              scrolled
+                ? "text-ink-mid hover:text-eccellere-gold"
+                : "text-white/90 hover:text-eccellere-gold"
+            )}
+          >
+            Log in
+          </Link>
           <Button
             asChild
-            variant={scrolled ? "default" : "default"}
             size="sm"
             className="hidden lg:inline-flex"
+          >
+            <Link href="/register">Get Started</Link>
+          </Button>
+          <Button
+            asChild
+            variant="ghost"
+            size="sm"
+            className={cn(
+              "hidden lg:inline-flex",
+              scrolled ? "text-ink-mid" : "text-white/90"
+            )}
           >
             <Link href="/contact">Talk to Us</Link>
           </Button>

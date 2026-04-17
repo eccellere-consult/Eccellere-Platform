@@ -8,6 +8,7 @@ import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { assets } from "@/lib/marketplace-data";
 
 const categories = [
   "All",
@@ -23,165 +24,6 @@ const sectors = ["All Sectors", "Manufacturing", "Retail", "Consumer Products", 
 const formats = ["All Formats", "PDF", "Excel", "Template", "Toolkit", "Playbook"];
 
 const sortOptions = ["Most Popular", "Newest", "Price: Low to High", "Price: High to Low", "Highest Rated"];
-
-const assets = [
-  {
-    id: "1",
-    category: "Strategy",
-    categoryColor: "bg-eccellere-gold/20 text-eccellere-gold",
-    title: "MSME Growth Strategy Playbook",
-    description: "Complete playbook for market entry, competitive analysis, and growth planning tailored to Indian MSMEs.",
-    format: "PDF",
-    price: 2499,
-    rating: 4.8,
-    reviews: 124,
-    sectors: ["Manufacturing", "Retail"],
-    bestseller: true,
-  },
-  {
-    id: "2",
-    category: "Agentic AI",
-    categoryColor: "bg-eccellere-purple/20 text-eccellere-purple",
-    title: "AI Readiness Assessment Toolkit",
-    description: "Self-assessment tool with scoring framework, sector benchmarks, and personalised recommendations.",
-    format: "Excel",
-    price: 1999,
-    rating: 4.9,
-    reviews: 89,
-    sectors: ["Manufacturing", "Retail", "Logistics"],
-    bestseller: true,
-  },
-  {
-    id: "3",
-    category: "Process Transformation",
-    categoryColor: "bg-eccellere-teal/20 text-eccellere-teal",
-    title: "Lean Manufacturing Implementation Guide",
-    description: "Step-by-step lean transformation for Indian factories, including 5S, Kaizen, and value stream mapping.",
-    format: "PDF + Template",
-    price: 3499,
-    rating: 4.7,
-    reviews: 67,
-    sectors: ["Manufacturing"],
-    bestseller: false,
-  },
-  {
-    id: "4",
-    category: "Digital",
-    categoryColor: "bg-eccellere-info/20 text-eccellere-info",
-    title: "E‑Commerce Launch Checklist",
-    description: "Everything you need to launch a D2C or marketplace presence — from platform choice to first 100 orders.",
-    format: "Template",
-    price: 999,
-    rating: 4.6,
-    reviews: 203,
-    sectors: ["Retail", "Consumer Products"],
-    bestseller: false,
-  },
-  {
-    id: "5",
-    category: "Agentic AI",
-    categoryColor: "bg-eccellere-purple/20 text-eccellere-purple",
-    title: "AI Use Case Prioritisation Matrix",
-    description: "Framework to identify, score, and prioritise AI use cases by ROI, feasibility, and strategic impact.",
-    format: "Excel",
-    price: 1499,
-    rating: 4.5,
-    reviews: 56,
-    sectors: ["Manufacturing", "Logistics"],
-    bestseller: false,
-  },
-  {
-    id: "6",
-    category: "Strategy",
-    categoryColor: "bg-eccellere-gold/20 text-eccellere-gold",
-    title: "Competitive Landscape Analyzer",
-    description: "Porter's Five Forces, SWOT, and PESTLE analysis templates pre-configured for Indian market context.",
-    format: "Toolkit",
-    price: 2999,
-    rating: 4.8,
-    reviews: 91,
-    sectors: ["All Sectors"],
-    bestseller: true,
-  },
-  {
-    id: "7",
-    category: "Organisation",
-    categoryColor: "bg-amber-100 text-amber-700",
-    title: "Employee Capability Building Roadmap",
-    description: "Competency mapping, training needs analysis, and L&D strategy template for scaling teams.",
-    format: "Playbook",
-    price: 1999,
-    rating: 4.4,
-    reviews: 43,
-    sectors: ["Manufacturing", "Retail"],
-    bestseller: false,
-  },
-  {
-    id: "8",
-    category: "Process Transformation",
-    categoryColor: "bg-eccellere-teal/20 text-eccellere-teal",
-    title: "Supply Chain Optimisation Toolkit",
-    description: "End-to-end supply chain diagnostic, KPI dashboards, and improvement roadmap for mid-size businesses.",
-    format: "Toolkit",
-    price: 4499,
-    rating: 4.9,
-    reviews: 78,
-    sectors: ["Manufacturing", "Logistics", "Consumer Products"],
-    bestseller: true,
-  },
-  {
-    id: "9",
-    category: "Digital",
-    categoryColor: "bg-eccellere-info/20 text-eccellere-info",
-    title: "Data Analytics Starter Kit for MSMEs",
-    description: "BI dashboards, data collection templates, and analytics playbook for businesses with no data team.",
-    format: "Excel + PDF",
-    price: 1799,
-    rating: 4.3,
-    reviews: 34,
-    sectors: ["All Sectors"],
-    bestseller: false,
-  },
-  {
-    id: "10",
-    category: "Strategy",
-    categoryColor: "bg-eccellere-gold/20 text-eccellere-gold",
-    title: "Pricing Strategy Workshop Kit",
-    description: "Value-based pricing models, competitor benchmarking, and margin optimisation frameworks.",
-    format: "Playbook",
-    price: 2499,
-    rating: 4.7,
-    reviews: 62,
-    sectors: ["Retail", "Consumer Products"],
-    bestseller: false,
-  },
-  {
-    id: "11",
-    category: "Agentic AI",
-    categoryColor: "bg-eccellere-purple/20 text-eccellere-purple",
-    title: "Prompt Engineering Playbook for Business",
-    description: "100+ tested prompts for sales, operations, HR, and finance — tailored for Indian business context.",
-    format: "PDF",
-    price: 799,
-    rating: 4.6,
-    reviews: 312,
-    sectors: ["All Sectors"],
-    bestseller: true,
-  },
-  {
-    id: "12",
-    category: "Process Transformation",
-    categoryColor: "bg-eccellere-teal/20 text-eccellere-teal",
-    title: "Quality Management System (QMS) Template Pack",
-    description: "ISO 9001-aligned SOPs, audit checklists, and CAPA templates for manufacturing units.",
-    format: "Template",
-    price: 3999,
-    rating: 4.8,
-    reviews: 55,
-    sectors: ["Manufacturing"],
-    bestseller: false,
-  },
-];
 
 export default function MarketplacePage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -374,7 +216,7 @@ export default function MarketplacePage() {
                     transition={{ delay: i * 0.04, duration: 0.4 }}
                   >
                     <Link
-                      href={`/marketplace/${asset.id}`}
+                      href={`/marketplace/${asset.slug}`}
                       className="group block h-full rounded bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md"
                     >
                       <div className="flex items-start justify-between">
