@@ -20,8 +20,6 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Header } from "@/components/layout/Header";
-import { Footer } from "@/components/layout/Footer";
 
 const kpis = [
   { label: "Total Earnings", value: "₹3,42,500", change: "+₹48K this month", icon: IndianRupee },
@@ -173,9 +171,7 @@ export default function SpecialistDashboard() {
 
   return (
     <>
-      <Header />
-      <main className="bg-eccellere-cream pt-[72px]">
-        <div className="mx-auto max-w-[1280px] px-6 py-12 lg:py-16">
+      <div className="mx-auto max-w-[1280px]">
           {/* Header */}
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -492,8 +488,7 @@ export default function SpecialistDashboard() {
             )}
           </div>
         </div>
-      </main>
-      <Footer />
+      </div>
     </>
   );
 }

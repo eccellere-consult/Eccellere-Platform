@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-export async function POST() {
+async function seedUsers() {
   try {
     // ── Test Client ──
     const clientUser = await prisma.user.upsert({
@@ -166,4 +166,12 @@ export async function POST() {
     const message = error instanceof Error ? error.message : String(error);
     return NextResponse.json({ status: "error", error: message }, { status: 500 });
   }
+}
+
+export async function GET() {
+  return seedUsers();
+}
+
+export async function POST() {
+  return seedUsers();
 }

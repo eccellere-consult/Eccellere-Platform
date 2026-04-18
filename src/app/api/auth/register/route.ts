@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { email, password, name, role } = body;
+    const { email, password, name, phone, role, profile } = body;
 
     if (!email || !password || !name) {
       return NextResponse.json(
@@ -30,13 +30,62 @@ export async function POST(request: Request) {
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
+    const isSpecialist = role === "SPECIALIST";
 
     const user = await prisma.user.create({
       data: {
         email,
         name,
         passwordHash,
-        role: role === "SPECIALIST" ? "SPECIALIST" : "CLIENT",
+        phone: phone || undefined,
+        role: isSpecialist ? "SPECIALIST" : "CLIENT",
+        ...(isSpecialist && profile
+          ? {
+              specialistProfile: {
+                create: {
+                  linkedinUrl: profile.linkedinUrl || "",
+                  currentRole: profile.currentRole || "",
+                  experienceYears: profile.experienceYears || "",
+                  organisation: profile.organisation || undefined,
+                  bio: profile.bio || undefined,
+                  headline: profile.currentRole
+                    ? `${profile.currentRole}${profile.organisation ? ` at ${profile.organisation}` : ""}`
+                    : undefined,
+                  serviceDomains: JSON.stringify(profile.serviceDomains || []),
+                  sectorExpertise: JSON.stringify(profile.sectorExpertise || []),
+                  engagementTypes: JSON.stringify(profile.engagementTypes || []),
+                  challengesAddressed: JSON.stringify([]),
+                  languages: JSON.stringify(["English"]),
+                  education: JSON.stringify([]),
+                  certifications: JSON.stringify([]),
+                  portfolioFiles: JSON.stringify([]),
+                  availability: profile.availability || "part_time",
+                  hourlyRateMin: profile.hourlyRateMin || undefined,
+                  hourlyRateMax: profile.hourlyRateMax || undefined,
+                  status: "APPLIED",
+                },
+              },
+            }
+          : {}),
+        ...(!isSpecialist && profile
+          ? {
+              clientProfile: {
+                create: {
+                  companyName: profile.companyName || "",
+                  businessType: profile.businessType || "",
+                  sector: profile.sector || "",
+                  revenueRange: profile.revenueRange || "",
+                  employeeRange: profile.employeeRange || "",
+                  city: profile.city || "",
+                  state: profile.state || "",
+                  challenges: JSON.stringify(profile.challenges || []),
+                  priorities: JSON.stringify([]),
+                  referralSource: profile.referralSource || undefined,
+                  onboardingComplete: true,
+                },
+              },
+            }
+          : {}),
       },
       select: {
         id: true,

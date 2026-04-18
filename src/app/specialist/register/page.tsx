@@ -1,3 +1,8 @@
+import { redirect } from "next/navigation";
+
+export default function SpecialistRegisterRedirect() {
+  redirect("/register");
+}
 "use client";
 
 import { useState } from "react";
