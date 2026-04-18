@@ -17,6 +17,7 @@ import {
   Menu,
   X,
 } from "lucide-react";
+import { signOut } from "next-auth/react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -95,13 +96,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* Bottom */}
       <div className="border-t border-white/10 p-3">
-        <Link
-          href="/login"
-          className="flex items-center gap-3 rounded px-3 py-2.5 text-sm text-white/50 transition-colors hover:text-white/80"
+        <button
+          onClick={() => signOut({ callbackUrl: "/login" })}
+          className="flex w-full items-center gap-3 rounded px-3 py-2.5 text-sm text-white/50 transition-colors hover:text-white/80"
         >
           <LogOut className="h-4 w-4" />
           Sign Out
-        </Link>
+        </button>
       </div>
     </aside>
   );
