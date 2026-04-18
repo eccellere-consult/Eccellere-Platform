@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { User, Linkedin, Mail, Phone, MapPin, Briefcase } from "lucide-react";
+import { User, ExternalLink, Mail, Phone, MapPin, Briefcase } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function SpecialistProfilePage() {
@@ -46,7 +46,7 @@ export default function SpecialistProfilePage() {
               <p className="mt-1 text-sm text-ink-mid">{profile.headline}</p>
               <div className="mt-3 flex flex-wrap gap-4 text-xs text-ink-light">
                 <span className="flex items-center gap-1"><Mail className="h-3 w-3" />{profile.email}</span>
-                <span className="flex items-center gap-1"><Linkedin className="h-3 w-3" />LinkedIn</span>
+                <span className="flex items-center gap-1"><ExternalLink className="h-3 w-3" />LinkedIn</span>
                 <span className="flex items-center gap-1"><Briefcase className="h-3 w-3" />{profile.currentRole}</span>
               </div>
             </div>
