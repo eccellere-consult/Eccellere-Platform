@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Upload, PlusCircle, X } from "lucide-react";
+import { ArrowLeft, Upload, PlusCircle, X, FileCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const CATEGORIES = [
@@ -38,6 +38,9 @@ export default function SubmitNewAssetPage() {
   });
 
   const [submitted, setSubmitted] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
 
   function handleChange(
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -47,6 +50,11 @@ export default function SubmitNewAssetPage() {
       ...prev,
       [name]: type === "checkbox" ? (e.target as HTMLInputElement).checked : value,
     }));
+  }
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0] ?? null;
+    setSelectedFile(file);
   }
 
   function addTag() {
@@ -60,9 +68,36 @@ export default function SubmitNewAssetPage() {
     setForm((prev) => ({ ...prev, tags: prev.tags.filter((t) => t !== tag) }));
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setSubmitted(true);
+    setSubmitError("");
+    setIsSubmitting(true);
+    try {
+      const data = new FormData();
+      data.set("title", form.title);
+      data.set("tagline", form.tagline);
+      data.set("category", form.category);
+      data.set("format", form.format);
+      data.set("price", form.price);
+      data.set("description", form.description);
+      data.set("targetAudience", form.targetAudience);
+      data.set("tags", JSON.stringify(form.tags));
+      if (selectedFile) data.set("file", selectedFile);
+
+      const res = await fetch("/api/specialist/assets", {
+        method: "POST",
+        body: data,
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error || "Submission failed");
+      }
+      setSubmitted(true);
+    } catch (err: unknown) {
+      setSubmitError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   if (submitted) {
@@ -356,16 +391,36 @@ export default function SubmitNewAssetPage() {
               </h2>
               <div className="mt-5">
                 <label className="flex cursor-pointer flex-col items-center justify-center gap-3 rounded border-2 border-dashed border-eccellere-ink/20 bg-eccellere-cream p-10 transition-colors hover:border-eccellere-gold/50">
-                  <Upload className="h-8 w-8 text-ink-light" />
+                  {selectedFile ? (
+                    <FileCheck className="h-8 w-8 text-eccellere-gold" />
+                  ) : (
+                    <Upload className="h-8 w-8 text-ink-light" />
+                  )}
                   <div className="text-center">
-                    <p className="text-sm font-medium text-eccellere-ink">
-                      Click to upload or drag and drop
-                    </p>
-                    <p className="mt-1 text-xs text-ink-light">
-                      PDF, Excel, PowerPoint, Word or ZIP — max 50 MB
-                    </p>
+                    {selectedFile ? (
+                      <>
+                        <p className="text-sm font-medium text-eccellere-ink">{selectedFile.name}</p>
+                        <p className="mt-1 text-xs text-ink-light">
+                          {(selectedFile.size / 1024 / 1024).toFixed(2)} MB — click to change
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-sm font-medium text-eccellere-ink">
+                          Click to upload or drag and drop
+                        </p>
+                        <p className="mt-1 text-xs text-ink-light">
+                          PDF, Excel, PowerPoint, Word or ZIP — max 50 MB
+                        </p>
+                      </>
+                    )}
                   </div>
-                  <input type="file" className="sr-only" accept=".pdf,.xlsx,.xls,.pptx,.ppt,.docx,.doc,.zip" />
+                  <input
+                    type="file"
+                    className="sr-only"
+                    accept=".pdf,.xlsx,.xls,.pptx,.ppt,.docx,.doc,.zip"
+                    onChange={handleFileChange}
+                  />
                 </label>
               </div>
             </section>
@@ -390,14 +445,20 @@ export default function SubmitNewAssetPage() {
                 </span>
               </label>
 
+              {submitError && (
+                <p className="rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {submitError}
+                </p>
+              )}
               <div className="flex items-center gap-3">
-                <Button type="submit" size="lg" disabled={!form.termsAccepted}>
-                  Submit for Review
+                <Button type="submit" size="lg" disabled={!form.termsAccepted || isSubmitting}>
+                  {isSubmitting ? "Submitting…" : "Submit for Review"}
                 </Button>
                 <Button
                   type="button"
                   variant="outline"
                   size="lg"
+                  disabled={isSubmitting}
                   onClick={() => router.push("/specialist")}
                 >
                   Cancel
