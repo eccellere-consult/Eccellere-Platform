@@ -43,6 +43,7 @@ const nextConfig: NextConfig = {
     "@aws-sdk/s3-request-presigner",
     "bcryptjs",
     "nodemailer",
+    "officeparser",
   ],
 
   // Security + performance headers

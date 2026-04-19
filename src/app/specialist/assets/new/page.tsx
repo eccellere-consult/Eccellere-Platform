@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Upload, PlusCircle, X, FileCheck, Sparkles, Loader2 } from "lucide-react";
+import { ArrowLeft, Upload, PlusCircle, X, FileCheck, Sparkles, Loader2, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const CATEGORIES = [
@@ -42,11 +42,48 @@ export default function SubmitNewAssetPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
 
-  // AI fill state
+  // AI file analysis state
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [aiFilled, setAiFilled] = useState(false);
+  const [analyzeError, setAnalyzeError] = useState("");
+
+  // Fallback: manual text description modal
   const [showAiModal, setShowAiModal] = useState(false);
   const [aiPrompt, setAiPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [aiError, setAiError] = useState("");
+
+  async function analyzeFile(file: File) {
+    setIsAnalyzing(true);
+    setAnalyzeError("");
+    setAiFilled(false);
+    try {
+      const data = new FormData();
+      data.set("file", file);
+      const res = await fetch("/api/specialist/assets/analyze", {
+        method: "POST",
+        body: data,
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Analysis failed");
+      setForm((prev) => ({
+        ...prev,
+        title: json.title || prev.title,
+        tagline: json.tagline || prev.tagline,
+        category: json.category || prev.category,
+        format: json.format || prev.format,
+        price: json.price || prev.price,
+        description: json.description || prev.description,
+        targetAudience: json.targetAudience || prev.targetAudience,
+        tags: json.tags?.length ? json.tags : prev.tags,
+      }));
+      setAiFilled(true);
+    } catch (err: unknown) {
+      setAnalyzeError(err instanceof Error ? err.message : "Could not analyze file. Please fill the form manually.");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  }
 
   async function handleAiGenerate() {
     setAiError("");
@@ -72,6 +109,7 @@ export default function SubmitNewAssetPage() {
       }));
       setShowAiModal(false);
       setAiPrompt("");
+      setAiFilled(true);
     } catch (err: unknown) {
       setAiError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
     } finally {
@@ -92,6 +130,9 @@ export default function SubmitNewAssetPage() {
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0] ?? null;
     setSelectedFile(file);
+    setAiFilled(false);
+    setAnalyzeError("");
+    if (file) analyzeFile(file);
   }
 
   function addTag() {
@@ -179,37 +220,114 @@ export default function SubmitNewAssetPage() {
           </Link>
 
           {/* Page heading */}
-          <div className="mt-6 flex items-start justify-between gap-4">
-            <div>
-              <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-eccellere-gold">
-                Specialist Portal
-              </p>
-              <h1 className="mt-2 font-display text-3xl font-light text-eccellere-ink lg:text-4xl">
-                Submit New Asset
-              </h1>
-              <p className="mt-2 text-sm text-ink-light">
-                Share your expertise. Submitted assets go through a quality review before
-                being listed on the Eccellere Marketplace.
-              </p>
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              className="mt-8 shrink-0 gap-2 border-eccellere-gold/40 text-eccellere-gold hover:bg-eccellere-gold/5"
-              onClick={() => { setAiError(""); setShowAiModal(true); }}
-            >
-              <Sparkles className="h-4 w-4" />
-              AI Fill
-            </Button>
+          <div className="mt-6">
+            <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-eccellere-gold">
+              Specialist Portal
+            </p>
+            <h1 className="mt-2 font-display text-3xl font-light text-eccellere-ink lg:text-4xl">
+              Submit New Asset
+            </h1>
+            <p className="mt-2 text-sm text-ink-light">
+              Upload your file — AI will read it and fill in the details automatically. Review,
+              adjust, and submit for quality review.
+            </p>
           </div>
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="mt-10 space-y-8">
-            {/* ── Section 1: Core Details ── */}
+            {/* ── Section 1: File Upload (top) ── */}
+            <section className="rounded-lg bg-white p-6 shadow-sm">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-eccellere-ink">
+                Upload Your Asset
+              </h2>
+              <p className="mt-1 text-xs text-ink-light">
+                PDF, Excel, PowerPoint or Word files will be read by AI to auto-fill the form
+                below. ZIP files require manual description.
+              </p>
+              <div className="mt-4">
+                <label className={`flex cursor-pointer flex-col items-center justify-center gap-3 rounded border-2 border-dashed p-10 transition-colors ${isAnalyzing ? "border-eccellere-gold/50 bg-eccellere-gold/5" : selectedFile ? "border-eccellere-gold/40 bg-eccellere-cream hover:border-eccellere-gold/60" : "border-eccellere-ink/20 bg-eccellere-cream hover:border-eccellere-gold/50"}`}>
+                  {isAnalyzing ? (
+                    <Loader2 className="h-8 w-8 animate-spin text-eccellere-gold" />
+                  ) : selectedFile ? (
+                    <FileCheck className="h-8 w-8 text-eccellere-gold" />
+                  ) : (
+                    <Upload className="h-8 w-8 text-ink-light" />
+                  )}
+                  <div className="text-center">
+                    {isAnalyzing ? (
+                      <>
+                        <p className="text-sm font-medium text-eccellere-ink">
+                          AI is reading your file…
+                        </p>
+                        <p className="mt-1 text-xs text-ink-light">
+                          Extracting content and filling in the form
+                        </p>
+                      </>
+                    ) : selectedFile ? (
+                      <>
+                        <p className="text-sm font-medium text-eccellere-ink">{selectedFile.name}</p>
+                        <p className="mt-1 text-xs text-ink-light">
+                          {(selectedFile.size / 1024 / 1024).toFixed(2)} MB — click to change
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-sm font-medium text-eccellere-ink">
+                          Click to upload or drag and drop
+                        </p>
+                        <p className="mt-1 text-xs text-ink-light">
+                          PDF, Excel, PowerPoint, Word or ZIP — max 50 MB
+                        </p>
+                      </>
+                    )}
+                  </div>
+                  <input
+                    type="file"
+                    className="sr-only"
+                    accept=".pdf,.xlsx,.xls,.pptx,.ppt,.docx,.doc,.zip"
+                    onChange={handleFileChange}
+                    disabled={isAnalyzing}
+                  />
+                </label>
+
+                {/* AI filled success banner */}
+                {aiFilled && !analyzeError && (
+                  <div className="mt-3 flex items-start gap-2.5 rounded border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                    <p>
+                      AI has filled in the form based on your file.{" "}
+                      <strong>Please review and edit below before submitting.</strong>
+                    </p>
+                  </div>
+                )}
+
+                {/* Analyze error */}
+                {analyzeError && (
+                  <div className="mt-3 rounded border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                    <p>{analyzeError}</p>
+                    <button
+                      type="button"
+                      onClick={() => { setAnalyzeError(""); setAiError(""); setShowAiModal(true); }}
+                      className="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-eccellere-gold underline-offset-2 hover:underline"
+                    >
+                      <Sparkles className="h-3 w-3" />
+                      Describe your asset manually instead →
+                    </button>
+                  </div>
+                )}
+              </div>
+            </section>
+
+            {/* ── Section 2: Core Details ── */}
             <section className="rounded-lg bg-white p-6 shadow-sm">
               <h2 className="text-sm font-semibold uppercase tracking-wider text-eccellere-ink">
                 Core Details
               </h2>
+              {aiFilled && (
+                <p className="mt-1 text-xs text-eccellere-gold">
+                  Review the AI-generated values below and adjust as needed.
+                </p>
+              )}
               <div className="mt-5 space-y-5">
                 {/* Title */}
                 <div>
@@ -339,7 +457,7 @@ export default function SubmitNewAssetPage() {
               </div>
             </section>
 
-            {/* ── Section 2: Description ── */}
+            {/* ── Section 3: Description ── */}
             <section className="rounded-lg bg-white p-6 shadow-sm">
               <h2 className="text-sm font-semibold uppercase tracking-wider text-eccellere-ink">
                 Description
@@ -432,47 +550,6 @@ export default function SubmitNewAssetPage() {
               </div>
             </section>
 
-            {/* ── Section 3: File Upload ── */}
-            <section className="rounded-lg bg-white p-6 shadow-sm">
-              <h2 className="text-sm font-semibold uppercase tracking-wider text-eccellere-ink">
-                File Upload
-              </h2>
-              <div className="mt-5">
-                <label className="flex cursor-pointer flex-col items-center justify-center gap-3 rounded border-2 border-dashed border-eccellere-ink/20 bg-eccellere-cream p-10 transition-colors hover:border-eccellere-gold/50">
-                  {selectedFile ? (
-                    <FileCheck className="h-8 w-8 text-eccellere-gold" />
-                  ) : (
-                    <Upload className="h-8 w-8 text-ink-light" />
-                  )}
-                  <div className="text-center">
-                    {selectedFile ? (
-                      <>
-                        <p className="text-sm font-medium text-eccellere-ink">{selectedFile.name}</p>
-                        <p className="mt-1 text-xs text-ink-light">
-                          {(selectedFile.size / 1024 / 1024).toFixed(2)} MB — click to change
-                        </p>
-                      </>
-                    ) : (
-                      <>
-                        <p className="text-sm font-medium text-eccellere-ink">
-                          Click to upload or drag and drop
-                        </p>
-                        <p className="mt-1 text-xs text-ink-light">
-                          PDF, Excel, PowerPoint, Word or ZIP — max 50 MB
-                        </p>
-                      </>
-                    )}
-                  </div>
-                  <input
-                    type="file"
-                    className="sr-only"
-                    accept=".pdf,.xlsx,.xls,.pptx,.ppt,.docx,.doc,.zip"
-                    onChange={handleFileChange}
-                  />
-                </label>
-              </div>
-            </section>
-
             {/* ── Terms + Submit ── */}
             <div className="space-y-4">
               <label className="flex cursor-pointer items-start gap-3">
@@ -499,7 +576,7 @@ export default function SubmitNewAssetPage() {
                 </p>
               )}
               <div className="flex items-center gap-3">
-                <Button type="submit" size="lg" disabled={!form.termsAccepted || isSubmitting}>
+                <Button type="submit" size="lg" disabled={!form.termsAccepted || isSubmitting || isAnalyzing}>
                   {isSubmitting ? "Submitting…" : "Submit for Review"}
                 </Button>
                 <Button
