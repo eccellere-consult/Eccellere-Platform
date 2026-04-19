@@ -89,7 +89,9 @@ export async function POST(req: NextRequest) {
     // Dynamic require to avoid bundling issues — officeparser is in serverExternalPackages
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const officeparser = require("officeparser");
-    extractedText = await officeparser.parseOfficeAsync(buffer);
+    // v6 API: parseOffice returns a Promise<AST>; call .toText() for plain text
+    const ast = await officeparser.parseOffice(buffer);
+    extractedText = ast.toText();
   } catch (err: unknown) {
     console.error("[AI analyze] Text extraction failed:", err);
     return NextResponse.json(
