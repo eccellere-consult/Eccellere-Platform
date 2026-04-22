@@ -217,7 +217,7 @@ export default function AdminAssets() {
           <div className="mb-4 flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
             <AlertCircle className="h-4 w-4 shrink-0" />
             <span>
-              Could not load live data — showing illustration data only.{" "}
+              Could not load live data ({error}) — showing illustration data only.{" "}
               <button onClick={fetchAssets} className="underline hover:no-underline">
                 Retry
               </button>
