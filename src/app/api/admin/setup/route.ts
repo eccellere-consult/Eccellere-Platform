@@ -1,16 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+/** Accepts ADMIN_SETUP_TOKEN (if set) OR NEXTAUTH_SECRET as the auth token */
+function getValidToken(): string | null {
+  return process.env.ADMIN_SETUP_TOKEN ?? process.env.NEXTAUTH_SECRET ?? null;
+}
+
 /**
  * POST /api/admin/setup
  * One-time endpoint to grant ADMIN role to a user.
- * Protected by ADMIN_SETUP_TOKEN env var — remove from env after use.
+ * Token = ADMIN_SETUP_TOKEN env var (or NEXTAUTH_SECRET as fallback).
  *
  * Body: { email: string, token: string }
  */
 export async function POST(req: NextRequest) {
-  const setupToken = process.env.ADMIN_SETUP_TOKEN;
-  if (!setupToken) {
+  const validToken = getValidToken();
+  if (!validToken) {
     return NextResponse.json({ error: "Setup endpoint disabled" }, { status: 403 });
   }
 
@@ -21,7 +26,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  if (!body.token || body.token !== setupToken) {
+  if (!body.token || body.token !== validToken) {
     return NextResponse.json({ error: "Invalid token" }, { status: 403 });
   }
 
@@ -47,15 +52,15 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ success: true, user: updated });
 }
 
-/** GET /api/admin/setup — list all users and their roles (setup token required as query param) */
+/** GET /api/admin/setup — list all users and their roles (token required as query param) */
 export async function GET(req: NextRequest) {
-  const setupToken = process.env.ADMIN_SETUP_TOKEN;
-  if (!setupToken) {
+  const validToken = getValidToken();
+  if (!validToken) {
     return NextResponse.json({ error: "Setup endpoint disabled" }, { status: 403 });
   }
 
   const { searchParams } = new URL(req.url);
-  if (searchParams.get("token") !== setupToken) {
+  if (searchParams.get("token") !== validToken) {
     return NextResponse.json({ error: "Invalid token" }, { status: 403 });
   }
 
