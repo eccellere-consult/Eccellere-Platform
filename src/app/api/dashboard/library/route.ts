@@ -32,6 +32,7 @@ export async function GET() {
                     category: true,
                     serviceDomain: true,
                     components: true,
+                    fileUrls: true,
                     averageRating: true,
                     updatedAt: true,
                   },
@@ -67,6 +68,7 @@ export async function GET() {
           Array.isArray(asset.components) && (asset.components as unknown[]).length > 0
             ? (asset.components as string[])[0]
             : "PDF";
+        const fileUrls = Array.isArray(asset.fileUrls) ? (asset.fileUrls as string[]) : [];
         return {
           id: asset.id,
           slug: asset.slug,
@@ -85,6 +87,8 @@ export async function GET() {
             month: "short",
             year: "numeric",
           }),
+          hasFile: fileUrls.length > 0,
+          downloadUrl: `/api/dashboard/download/${asset.id}`,
         };
       });
 

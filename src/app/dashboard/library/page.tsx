@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { Search, Download, Star, Eye, Filter, BookOpen } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 
@@ -19,6 +18,8 @@ type LibraryAsset = {
   orderNumber: string;
   purchasedAt: string;
   lastUpdated: string;
+  hasFile: boolean;
+  downloadUrl: string;
 };
 
 export default function LibraryPage() {
@@ -133,16 +134,38 @@ export default function LibraryPage() {
                 Purchased {asset.purchasedAt} · {asset.orderNumber}
               </p>
               <div className="mt-4 flex gap-2">
-                <Button size="sm" className="flex flex-1 items-center gap-1.5 text-xs" disabled>
-                  <Download className="h-3.5 w-3.5" />
-                  Download
-                </Button>
-                <Link href={`/marketplace/${asset.slug}`}>
-                  <Button size="sm" variant="outline" className="flex items-center gap-1.5 text-xs">
-                    <Eye className="h-3.5 w-3.5" />
-                    View
-                  </Button>
-                </Link>
+                {asset.hasFile ? (
+                  <a
+                    href={asset.downloadUrl}
+                    download
+                    className="flex flex-1 items-center justify-center gap-1.5 rounded bg-eccellere-gold px-3 py-1.5 text-xs font-medium text-white hover:bg-eccellere-gold/90"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    Download
+                  </a>
+                ) : (
+                  <span
+                    title="The specialist has not uploaded the file yet"
+                    className="flex flex-1 cursor-not-allowed items-center justify-center gap-1.5 rounded border border-eccellere-ink/10 bg-eccellere-ink/5 px-3 py-1.5 text-xs text-ink-light"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    Pending upload
+                  </span>
+                )}
+                <a
+                  href={asset.hasFile ? asset.downloadUrl : undefined}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={cn(
+                    "flex items-center gap-1.5 rounded border px-3 py-1.5 text-xs font-medium transition-colors",
+                    asset.hasFile
+                      ? "border-eccellere-ink/20 text-eccellere-ink hover:border-eccellere-gold hover:text-eccellere-gold"
+                      : "cursor-not-allowed border-eccellere-ink/10 text-ink-light/40"
+                  )}
+                >
+                  <Eye className="h-3.5 w-3.5" />
+                  View
+                </a>
               </div>
             </div>
           ))}
