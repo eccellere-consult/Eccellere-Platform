@@ -97,9 +97,10 @@ export async function middleware(request: NextRequest) {
   );
 
   // Cross-Origin policies
-  response.headers.set("Cross-Origin-Opener-Policy", "same-origin");
-  response.headers.set("Cross-Origin-Embedder-Policy", "require-corp");
-  response.headers.set("Cross-Origin-Resource-Policy", "same-site");
+  // Note: Cross-Origin-Embedder-Policy is intentionally omitted — setting
+  // require-corp blocks third-party scripts/iframes (e.g. Razorpay checkout)
+  // that don't opt in with Cross-Origin-Resource-Policy: cross-origin.
+  response.headers.set("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
 
   return response;
 }
