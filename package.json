@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "prisma generate && next build && node scripts/post-build.mjs",
-    "start": "node .next/standalone/server.js",
+    "start": "node scripts/start.mjs",
     "lint": "eslint",
     "test": "playwright test",
     "test:ui": "playwright test --ui",
