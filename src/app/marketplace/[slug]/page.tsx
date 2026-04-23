@@ -7,7 +7,9 @@ import { assets as staticAssets, type Asset } from "@/lib/marketplace-data";
 import { prisma } from "@/lib/prisma";
 import { PurchaseCard } from "@/components/marketplace/PurchaseCard";
 
-export const dynamic = "force-dynamic";
+// Cache each slug page for 5 minutes; revalidate in background.
+// Avoids a live DB round-trip on every request which caused 503 hangs.
+export const revalidate = 300;
 
 const CATEGORY_DISPLAY: Record<string, { label: string; color: string }> = {
   AI_TOOLKIT:            { label: "Agentic AI",             color: "bg-eccellere-teal/20 text-eccellere-teal" },
@@ -24,10 +26,20 @@ const CATEGORY_DISPLAY: Record<string, { label: string; color: string }> = {
   CASE_STUDY:            { label: "Strategy",               color: "bg-eccellere-gold/20 text-eccellere-gold" },
 };
 
+/** Wraps a promise with a hard timeout — prevents DB hangs from stalling the page */
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`DB timeout after ${ms}ms`)), ms)
+    ),
+  ]);
+}
+
 async function getAsset(slug: string): Promise<Asset | null> {
-  // Try DB first
+  // Try DB first (4s hard timeout — fail fast rather than hang)
   try {
-    const a = await prisma.asset.findUnique({
+    const a = await withTimeout(prisma.asset.findUnique({
       where: { slug },
       select: {
         id: true, slug: true, title: true, description: true,
@@ -36,7 +48,7 @@ async function getAsset(slug: string): Promise<Asset | null> {
         averageRating: true, totalPurchases: true, isFeatured: true,
         updatedAt: true, status: true,
       },
-    });
+    }), 4000);
     if (a && a.status === "PUBLISHED") {
       const catInfo = CATEGORY_DISPLAY[a.category as string] ?? { label: a.serviceDomain, color: "bg-eccellere-gold/20 text-eccellere-gold" };
       const sectors = Array.isArray(a.targetSectors) && (a.targetSectors as unknown[]).length > 0

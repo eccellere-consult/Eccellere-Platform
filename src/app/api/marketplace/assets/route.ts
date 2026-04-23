@@ -21,42 +21,50 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const search = searchParams.get("search") ?? "";
 
+  // Hard 5-second timeout — prevents a stale DB connection from hanging the request
+  const timeoutPromise = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error("DB timeout")), 5000)
+  );
+
   let rawAssets;
   try {
-    rawAssets = await prisma.asset.findMany({
-      where: {
-        status: { in: ["PUBLISHED", "APPROVED"] as never[] },
-        ...(search
-          ? {
-              OR: [
-                { title: { contains: search } },
-                { description: { contains: search } },
-              ],
-            }
-          : {}),
-      },
-      orderBy: [
-        { isFeatured: "desc" },
-        { totalPurchases: "desc" },
-        { createdAt: "desc" },
-      ],
-      select: {
-        id: true,
-        slug: true,
-        title: true,
-        description: true,
-        category: true,
-        serviceDomain: true,
-        targetSectors: true,
-        components: true,
-        tags: true,
-        price: true,
-        averageRating: true,
-        totalPurchases: true,
-        isFeatured: true,
-        updatedAt: true,
-      },
-    });
+    rawAssets = await Promise.race([
+      prisma.asset.findMany({
+        where: {
+          status: { in: ["PUBLISHED", "APPROVED"] as never[] },
+          ...(search
+            ? {
+                OR: [
+                  { title: { contains: search } },
+                  { description: { contains: search } },
+                ],
+              }
+            : {}),
+        },
+        orderBy: [
+          { isFeatured: "desc" },
+          { totalPurchases: "desc" },
+          { createdAt: "desc" },
+        ],
+        select: {
+          id: true,
+          slug: true,
+          title: true,
+          description: true,
+          category: true,
+          serviceDomain: true,
+          targetSectors: true,
+          components: true,
+          tags: true,
+          price: true,
+          averageRating: true,
+          totalPurchases: true,
+          isFeatured: true,
+          updatedAt: true,
+        },
+      }),
+      timeoutPromise,
+    ]);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("[marketplace/assets] DB error:", message);

@@ -16,7 +16,17 @@ function getPrismaClient(): PrismaClient {
     );
   }
 
-  const adapter = new PrismaMariaDb(process.env.DATABASE_URL);
+  // Add connection_limit and socket_timeout to the URL to prevent idle
+  // connection drops from causing request hangs on Hostinger's MariaDB.
+  const url = new URL(process.env.DATABASE_URL);
+  if (!url.searchParams.has("connection_limit")) {
+    url.searchParams.set("connection_limit", "5");
+  }
+  if (!url.searchParams.has("socket_timeout")) {
+    url.searchParams.set("socket_timeout", "10");
+  }
+
+  const adapter = new PrismaMariaDb(url.toString());
   const client = new PrismaClient({
     adapter,
     errorFormat: "minimal",
