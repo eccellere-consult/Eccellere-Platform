@@ -1,15 +1,20 @@
 /**
  * maybe-migrate.mjs
- * Runs `prisma migrate deploy`. If the database is unreachable (P1001 / ECONNREFUSED),
- * warns and exits 0 so local builds are not blocked.
- * In production (Hostinger) the DB is always reachable, so the migration runs normally.
+ * Runs `prisma db push` to sync the schema to the live DB.
+ * Uses db push (not migrate deploy) because the DB was originally bootstrapped
+ * with db push and has no migrations history table.
+ * If the database is unreachable (local dev), warns and exits 0 silently.
  */
 import { spawnSync } from "child_process";
 
-const result = spawnSync("npx", ["prisma", "migrate", "deploy"], {
-  stdio: ["inherit", "inherit", "pipe"],
-  shell: true,
-});
+const result = spawnSync(
+  "npx",
+  ["prisma", "db", "push", "--accept-data-loss"],
+  {
+    stdio: ["inherit", "inherit", "pipe"],
+    shell: true,
+  }
+);
 
 const stderr = result.stderr ? result.stderr.toString() : "";
 
@@ -23,11 +28,11 @@ if (
   stderr.includes("Can't reach database")
 ) {
   console.warn(
-    "[maybe-migrate] DB not reachable locally — skipping migration. Will run on Hostinger deploy."
+    "[maybe-migrate] DB not reachable locally — skipping schema push. Will run on Hostinger deploy."
   );
   process.exit(0);
 }
 
-// Real migration error — print it and fail the build
+// Real error — print it and fail the build
 console.error(stderr);
 process.exit(result.status ?? 1);
