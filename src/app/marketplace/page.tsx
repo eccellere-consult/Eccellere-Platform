@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Search, Star, Filter } from "lucide-react";
@@ -8,7 +8,7 @@ import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { assets } from "@/lib/marketplace-data";
+import { assets as staticAssets, type Asset } from "@/lib/marketplace-data";
 
 const categories = [
   "All",
@@ -32,8 +32,31 @@ export default function MarketplacePage() {
   const [selectedFormat, setSelectedFormat] = useState("All Formats");
   const [sortBy, setSortBy] = useState("Most Popular");
   const [showFilters, setShowFilters] = useState(false);
+  const [dbAssets, setDbAssets] = useState<Asset[]>([]);
+  const [dbLoading, setDbLoading] = useState(true);
 
-  const filtered = assets.filter((a) => {
+  const fetchDbAssets = useCallback(async () => {
+    try {
+      const res = await fetch("/api/marketplace/assets");
+      if (res.ok) {
+        const data = await res.json();
+        setDbAssets(data.assets ?? []);
+      }
+    } catch {
+      // silently fall back to static data
+    } finally {
+      setDbLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchDbAssets(); }, [fetchDbAssets]);
+
+  // DB assets take priority; supplement with static assets not already in DB
+  const allAssets: Asset[] = dbAssets.length > 0
+    ? [...dbAssets, ...staticAssets.filter((s) => !dbAssets.find((d) => d.slug === s.slug))]
+    : staticAssets;
+
+  const filtered = allAssets.filter((a) => {
     const matchCategory = selectedCategory === "All" || a.category === selectedCategory;
     const matchSector =
       selectedSector === "All Sectors" ||
@@ -205,8 +228,16 @@ export default function MarketplacePage() {
             {/* Asset grid */}
             <div className="flex-1">
               <p className="mb-6 text-sm text-ink-light">
-                {sorted.length} asset{sorted.length !== 1 && "s"} found
+                {dbLoading ? "Loading…" : `${sorted.length} asset${sorted.length !== 1 ? "s" : ""} found`}
               </p>
+              {dbLoading ? (
+                <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+                  {[...Array(6)].map((_, i) => (
+                    <div key={i} className="h-64 animate-pulse rounded bg-eccellere-ink/5" />
+                  ))}
+                </div>
+              ) : (
+              <>
               <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
                 {sorted.map((asset, i) => (
                   <motion.div
@@ -283,6 +314,8 @@ export default function MarketplacePage() {
                     Clear all filters
                   </button>
                 </div>
+              )}
+              </>
               )}
             </div>
           </div>

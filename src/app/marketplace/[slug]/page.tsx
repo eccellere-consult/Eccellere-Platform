@@ -4,20 +4,78 @@ import { Star, Download, Shield, Clock, FileText, ChevronRight, ArrowLeft, Check
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
-import { assets } from "@/lib/marketplace-data";
+import { assets as staticAssets, type Asset } from "@/lib/marketplace-data";
+import { prisma } from "@/lib/prisma";
 
-export function generateStaticParams() {
-  return assets.map((a) => ({ slug: a.slug }));
+export const dynamic = "force-dynamic";
+
+const CATEGORY_DISPLAY: Record<string, { label: string; color: string }> = {
+  AI_TOOLKIT:            { label: "Agentic AI",             color: "bg-eccellere-teal/20 text-eccellere-teal" },
+  STRATEGY_FRAMEWORK:    { label: "Strategy",               color: "bg-eccellere-gold/20 text-eccellere-gold" },
+  OPERATIONS_TEMPLATE:   { label: "Process Transformation", color: "bg-blue-100 text-blue-700" },
+  MSME_GROWTH_KIT:       { label: "Strategy",               color: "bg-eccellere-gold/20 text-eccellere-gold" },
+  FINANCIAL_MODEL:       { label: "Digital",                color: "bg-purple-100 text-purple-700" },
+  HR_PEOPLE:             { label: "Organisation",           color: "bg-green-100 text-green-700" },
+  CONSULTING_ENGAGEMENT: { label: "Strategy",               color: "bg-eccellere-gold/20 text-eccellere-gold" },
+  WEBINAR:               { label: "Digital",                color: "bg-blue-100 text-blue-700" },
+  PLAYBOOK:              { label: "Strategy",               color: "bg-eccellere-gold/20 text-eccellere-gold" },
+  DIAGNOSTIC:            { label: "Strategy",               color: "bg-eccellere-gold/20 text-eccellere-gold" },
+  CALCULATOR:            { label: "Digital",                color: "bg-purple-100 text-purple-700" },
+  CASE_STUDY:            { label: "Strategy",               color: "bg-eccellere-gold/20 text-eccellere-gold" },
+};
+
+async function getAsset(slug: string): Promise<Asset | null> {
+  // Try DB first
+  try {
+    const a = await prisma.asset.findUnique({
+      where: { slug },
+      select: {
+        id: true, slug: true, title: true, description: true,
+        category: true, serviceDomain: true, targetSectors: true,
+        components: true, tags: true, price: true,
+        averageRating: true, totalPurchases: true, isFeatured: true,
+        updatedAt: true, status: true,
+      },
+    });
+    if (a && a.status === "PUBLISHED") {
+      const catInfo = CATEGORY_DISPLAY[a.category as string] ?? { label: a.serviceDomain, color: "bg-eccellere-gold/20 text-eccellere-gold" };
+      const sectors = Array.isArray(a.targetSectors) && (a.targetSectors as unknown[]).length > 0
+        ? (a.targetSectors as string[])
+        : ["All Sectors"];
+      const format = Array.isArray(a.components) && (a.components as unknown[]).length > 0
+        ? (a.components as string[])[0]
+        : "PDF";
+      return {
+        id: a.id,
+        slug: a.slug,
+        category: catInfo.label,
+        categoryColor: catInfo.color,
+        title: a.title,
+        description: a.description,
+        longDescription: a.description,
+        includes: Array.isArray(a.tags) ? (a.tags as string[]) : [],
+        format,
+        price: a.price,
+        rating: a.averageRating ?? 0,
+        reviews: a.totalPurchases ?? 0,
+        sectors,
+        bestseller: a.isFeatured,
+        lastUpdated: new Date(a.updatedAt).toLocaleDateString("en-IN", { month: "short", year: "numeric" }),
+        previewItems: [],
+      };
+    }
+  } catch {
+    // DB unavailable — fall through to static
+  }
+  // Fall back to static data
+  return staticAssets.find((a) => a.slug === slug) ?? null;
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const asset = assets.find((a) => a.slug === slug);
+  const asset = await getAsset(slug);
   if (!asset) return {};
-  return {
-    title: asset.title,
-    description: asset.description,
-  };
+  return { title: asset.title, description: asset.description };
 }
 
 function formatPrice(p: number) {
@@ -26,11 +84,11 @@ function formatPrice(p: number) {
 
 export default async function AssetDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const asset = assets.find((a) => a.slug === slug);
+  const asset = await getAsset(slug);
   if (!asset) notFound();
 
-  const related = assets
-    .filter((a) => a.id !== asset.id && (a.category === asset.category || a.sectors.some((s) => asset.sectors.includes(s))))
+  const related = staticAssets
+    .filter((a) => a.slug !== asset!.slug && (a.category === asset!.category || a.sectors.some((s) => asset!.sectors.includes(s))))
     .slice(0, 3);
 
   const discount = asset.originalPrice
