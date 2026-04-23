@@ -3,12 +3,13 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Search, Star, Filter } from "lucide-react";
+import { Search, Star, Filter, Eye } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { assets as staticAssets, type Asset } from "@/lib/marketplace-data";
+import { AssetPreviewModal } from "@/components/marketplace/AssetPreviewModal";
 
 const categories = [
   "All",
@@ -34,6 +35,7 @@ export default function MarketplacePage() {
   const [showFilters, setShowFilters] = useState(false);
   const [dbAssets, setDbAssets] = useState<Asset[]>([]);
   const [dbLoading, setDbLoading] = useState(true);
+  const [previewAsset, setPreviewAsset] = useState<Asset | null>(null);
 
   const fetchDbAssets = useCallback(async () => {
     try {
@@ -83,6 +85,9 @@ export default function MarketplacePage() {
 
   return (
     <>
+      {previewAsset && (
+        <AssetPreviewModal asset={previewAsset} onClose={() => setPreviewAsset(null)} />
+      )}
       <Header />
       <main className="bg-eccellere-cream pt-[72px]">
         {/* Hero */}
@@ -248,8 +253,15 @@ export default function MarketplacePage() {
                   >
                     <Link
                       href={`/marketplace/${asset.slug}`}
-                      className="group block h-full rounded bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md"
+                      className="group relative block h-full rounded bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md"
                     >
+                      {/* Quick preview button — appears on hover */}
+                      <button
+                        onClick={(e) => { e.preventDefault(); setPreviewAsset(asset); }}
+                        className="absolute right-3 top-3 hidden items-center gap-1 rounded bg-eccellere-ink/5 px-2 py-1 text-[10px] font-medium text-ink-mid opacity-0 transition-opacity group-hover:flex group-hover:opacity-100 hover:bg-eccellere-gold/10 hover:text-eccellere-gold"
+                      >
+                        <Eye className="h-3 w-3" /> Preview
+                      </button>
                       <div className="flex items-start justify-between">
                         <span
                           className={cn(

@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Star, Download, Shield, Clock, FileText, ChevronRight, ArrowLeft, Check } from "lucide-react";
+import { Star, Clock, FileText, ChevronRight, ArrowLeft, Check, Shield, Download } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
-import { Button } from "@/components/ui/button";
 import { assets as staticAssets, type Asset } from "@/lib/marketplace-data";
 import { prisma } from "@/lib/prisma";
+import { PurchaseCard } from "@/components/marketplace/PurchaseCard";
 
 export const dynamic = "force-dynamic";
 
@@ -209,76 +209,7 @@ export default async function AssetDetailPage({ params }: { params: Promise<{ sl
 
             {/* Right: purchase card */}
             <div className="lg:sticky lg:top-24 h-fit">
-              <div className="rounded-lg bg-white p-6 shadow-md">
-                {/* Price */}
-                <div className="flex items-end gap-3">
-                  <span className="font-mono text-3xl font-light text-eccellere-ink">
-                    {formatPrice(asset.price)}
-                  </span>
-                  {asset.originalPrice && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-ink-light line-through">{formatPrice(asset.originalPrice)}</span>
-                      <span className="rounded bg-eccellere-teal/10 px-1.5 py-0.5 text-xs font-medium text-eccellere-teal">
-                        {discount}% off
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="mt-1 text-xs text-ink-light">Inclusive of GST</div>
-
-                <Button className="mt-5 w-full" size="lg">
-                  Buy Now — {formatPrice(asset.price)}
-                </Button>
-                <Button variant="outline" className="mt-3 w-full" size="lg">
-                  Preview Sample
-                </Button>
-
-                <div className="mt-5 space-y-2.5 border-t border-eccellere-ink/5 pt-5 text-xs text-ink-mid">
-                  <div className="flex items-center gap-2">
-                    <Shield className="h-3.5 w-3.5 text-eccellere-teal" />
-                    14-day money-back guarantee
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Download className="h-3.5 w-3.5 text-eccellere-teal" />
-                    Instant access after purchase
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-3.5 w-3.5 text-eccellere-teal" />
-                    {asset.format} format
-                  </div>
-                </div>
-
-                <div className="mt-5 border-t border-eccellere-ink/5 pt-5">
-                  <p className="text-xs font-medium uppercase tracking-wider text-ink-light">
-                    Need a custom solution?
-                  </p>
-                  <p className="mt-1 text-xs text-ink-mid">
-                    Talk to our team for bespoke consulting or group licensing.
-                  </p>
-                  <Link href="/contact" className="mt-2 block text-xs text-eccellere-gold hover:underline">
-                    Book a discovery call →
-                  </Link>
-                </div>
-              </div>
-
-              {/* Rating breakdown */}
-              <div className="mt-4 rounded-lg bg-white p-5 shadow-sm">
-                <div className="flex items-center gap-3">
-                  <span className="font-mono text-4xl font-light text-eccellere-ink">{asset.rating}</span>
-                  <div>
-                    <div className="flex gap-0.5">
-                      {[1, 2, 3, 4, 5].map((s) => (
-                        <Star
-                          key={s}
-                          className={`h-4 w-4 ${s <= Math.round(asset.rating) ? "fill-eccellere-gold text-eccellere-gold" : "text-eccellere-ink/10"}`}
-                        />
-                      ))}
-                    </div>
-                    <p className="mt-0.5 text-xs text-ink-light">{asset.reviews} verified reviews</p>
-                  </div>
-                </div>
-              </div>
+              <PurchaseCard asset={asset!} formatPrice={formatPrice} discount={discount} />
             </div>
           </div>
 
