@@ -84,6 +84,12 @@ export function CheckoutButton({
         }),
       });
 
+      if (orderRes.status === 401) {
+        // Not logged in — redirect to sign in
+        window.location.href = `/api/auth/signin?callbackUrl=${encodeURIComponent(window.location.pathname)}`;
+        return;
+      }
+
       if (!orderRes.ok) {
         const err = await orderRes.json().catch(() => ({ error: "Payment initiation failed" }));
         throw new Error(err.error ?? "Payment initiation failed");

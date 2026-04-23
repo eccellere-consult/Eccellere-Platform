@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Shield, Download, FileText } from "lucide-react";
+import { Shield, Download, FileText, CheckCircle, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { CheckoutButton } from "@/components/marketplace/CheckoutButton";
 import { AssetPreviewModal } from "@/components/marketplace/AssetPreviewModal";
@@ -19,6 +19,29 @@ function formatPrice(p: number) {
 
 export function PurchaseCard({ asset, discount }: PurchaseCardProps) {
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [purchased, setPurchased] = useState<string | null>(null); // order id after success
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+
+  if (purchased) {
+    return (
+      <div className="rounded-lg bg-white p-6 shadow-md">
+        <div className="flex flex-col items-center gap-3 py-4 text-center">
+          <CheckCircle className="h-10 w-10 text-eccellere-teal" />
+          <p className="font-medium text-eccellere-ink">Payment Successful!</p>
+          <p className="text-xs text-ink-light">Order {purchased}</p>
+          <Link
+            href="/dashboard/orders"
+            className="mt-2 inline-block rounded bg-eccellere-gold px-5 py-2 text-sm font-medium text-white hover:bg-eccellere-gold/90"
+          >
+            View My Orders
+          </Link>
+          <Link href="/dashboard/library" className="text-xs text-eccellere-gold hover:underline">
+            Access My Library
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -46,12 +69,26 @@ export function PurchaseCard({ asset, discount }: PurchaseCardProps) {
 
         <div className="mt-1 text-xs text-ink-light">Inclusive of GST</div>
 
+        {checkoutError && (
+          <div className="mt-3 flex items-start gap-2 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+            <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            {checkoutError}
+          </div>
+        )}
+
         <CheckoutButton
           assetSlug={asset.slug}
           assetTitle={asset.title}
           assetFormat={asset.format}
           price={asset.price}
           className="mt-5 w-full"
+          onSuccess={(orderId) => {
+            setCheckoutError(null);
+            setPurchased(orderId);
+          }}
+          onError={(msg) => {
+            setCheckoutError(msg);
+          }}
         >
           Buy Now — {formatPrice(asset.price)}
         </CheckoutButton>
