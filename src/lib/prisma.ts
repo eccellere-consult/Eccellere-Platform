@@ -22,7 +22,7 @@ function getPrismaClient(): PrismaClient {
     errorFormat: "minimal",
   });
 
-  if (process.env.NODE_ENV !== "production") {
+  if (process.env.NODE_ENV !== "test") {
     global.prismaClient = client;
   }
 
