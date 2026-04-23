@@ -5,11 +5,12 @@ import { prisma } from "@/lib/prisma";
 import fs from "fs";
 import path from "path";
 
+export const dynamic = "force-dynamic";
+
 // GET /api/dashboard/download/[assetId]
-// Returns the asset file — only if the logged-in user has a PAID order for it.
-// Redirects to the public file URL (for files stored in /public/uploads/assets/).
+// Streams the purchased asset file to the client — only for users with a PAID order.
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ assetId: string }> }
 ) {
   const session = await getServerSession(authOptions);
@@ -19,38 +20,54 @@ export async function GET(
 
   const { assetId } = await params;
 
-  // Verify the user has a paid order for this asset
-  const user = await prisma.user.findUnique({
-    where: { email: session.user.email },
-    select: {
-      id: true,
-      orders: {
-        where: {
-          status: "PAID",
-          items: { some: { assetId } },
-        },
-        select: { id: true },
-        take: 1,
-      },
-    },
-  });
+  // Wrap DB lookups in a timeout to prevent 503s on slow connections
+  const dbTimeout = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error("DB timeout")), 8000)
+  );
+
+  let user: { id: string; orders: { id: string }[] } | null;
+  let asset: { title: string; fileUrls: unknown; downloadEnabled: boolean } | null;
+
+  try {
+    [user, asset] = await Promise.race([
+      Promise.all([
+        prisma.user.findUnique({
+          where: { email: session.user.email },
+          select: {
+            id: true,
+            orders: {
+              where: { status: "PAID", items: { some: { assetId } } },
+              select: { id: true },
+              take: 1,
+            },
+          },
+        }),
+        prisma.asset.findUnique({
+          where: { id: assetId },
+          select: { title: true, fileUrls: true, downloadEnabled: true },
+        }),
+      ]),
+      dbTimeout,
+    ]);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "DB error";
+    return NextResponse.json({ error: msg }, { status: 503 });
+  }
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-
   if (user.orders.length === 0) {
     return NextResponse.json({ error: "You have not purchased this asset" }, { status: 403 });
   }
-
-  // Fetch the asset's file URLs
-  const asset = await prisma.asset.findUnique({
-    where: { id: assetId },
-    select: { title: true, fileUrls: true },
-  });
-
   if (!asset) {
     return NextResponse.json({ error: "Asset not found" }, { status: 404 });
+  }
+  if (!asset.downloadEnabled) {
+    return NextResponse.json(
+      { error: "Downloads for this asset are currently disabled by the administrator." },
+      { status: 403 }
+    );
   }
 
   const fileUrls = Array.isArray(asset.fileUrls) ? (asset.fileUrls as string[]) : [];
@@ -58,13 +75,12 @@ export async function GET(
 
   if (!fileUrl) {
     return NextResponse.json(
-      { error: "No file attached to this asset yet. Please contact support." },
+      { error: "No file is attached to this asset yet. Please contact support." },
       { status: 404 }
     );
   }
 
-  // For files stored in /public/uploads/assets/ — read & stream directly
-  // so they are protected (not accessible without this auth check).
+  // ── Files stored in /public/uploads/ (local / Hostinger disk) ──────────────
   if (fileUrl.startsWith("/uploads/")) {
     const relativePath = fileUrl.replace(/^\//, "");
     const absPath = path.join(process.cwd(), "public", relativePath);
@@ -96,13 +112,26 @@ export async function GET(
     };
     const contentType = contentTypeMap[ext] ?? "application/octet-stream";
 
-    // Sanitize the filename for the Content-Disposition header
+    // Sanitize filename for Content-Disposition header
     const safeTitle = asset.title.replace(/[^\w\s.-]/g, "").trim().replace(/\s+/g, "_");
     const filename = `${safeTitle}${ext}`;
 
-    const fileBuffer = fs.readFileSync(absPath);
+    // Stream the file instead of loading it all into memory
+    const nodeStream = fs.createReadStream(absPath);
+    const webStream = new ReadableStream({
+      start(controller) {
+        nodeStream.on("data", (chunk) =>
+          controller.enqueue(chunk instanceof Buffer ? chunk : Buffer.from(chunk))
+        );
+        nodeStream.on("end", () => controller.close());
+        nodeStream.on("error", (err) => controller.error(err));
+      },
+      cancel() {
+        nodeStream.destroy();
+      },
+    });
 
-    return new NextResponse(fileBuffer, {
+    return new NextResponse(webStream, {
       status: 200,
       headers: {
         "Content-Type": contentType,
@@ -113,6 +142,7 @@ export async function GET(
     });
   }
 
-  // For external URLs (S3/CDN) — redirect to the URL
+  // ── External URLs (S3 / CDN) — redirect ────────────────────────────────────
   return NextResponse.redirect(fileUrl);
 }
+

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
   Search, ChevronLeft, Filter, Eye, CheckCircle, Clock,
-  XCircle, Star, Loader2, AlertCircle,
+  XCircle, Star, Loader2, AlertCircle, Download, DownloadCloud,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -40,6 +40,7 @@ interface DbAsset {
   averageRating: number;
   createdAt: string;
   components: string[];
+  downloadEnabled: boolean;
   author: { user: { name: string | null; email: string } };
 }
 
@@ -62,6 +63,7 @@ interface DisplayAsset {
   submitted: string;
   isStatic: boolean;
   canAct: boolean;
+  downloadEnabled: boolean;
 }
 
 const DB_STATUS_CFG: Record<string, {
@@ -111,6 +113,7 @@ function dbToDisplay(a: DbAsset): DisplayAsset {
     submitted: formatDate(a.createdAt),
     isStatic: false,
     canAct: cfg.canAct,
+    downloadEnabled: a.downloadEnabled,
   };
 }
 
@@ -133,6 +136,7 @@ function staticToDisplay(a: StaticAsset): DisplayAsset {
     submitted: a.submitted,
     isStatic: true,
     canAct: false,
+    downloadEnabled: true,
   };
 }
 
@@ -170,6 +174,22 @@ export default function AdminAssets() {
         body: JSON.stringify({ id: dbId, action }),
       });
       if (!res.ok) throw new Error("Action failed");
+    } finally {
+      setActionLoading(null);
+      await fetchAssets();
+    }
+  }
+
+  async function handleToggleDownload(dbId: string, currentlyEnabled: boolean) {
+    const action = currentlyEnabled ? "disable-download" : "enable-download";
+    setActionLoading(dbId + action);
+    try {
+      const res = await fetch("/api/admin/assets", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: dbId, action }),
+      });
+      if (!res.ok) throw new Error("Toggle failed");
     } finally {
       setActionLoading(null);
       await fetchAssets();
@@ -328,6 +348,28 @@ export default function AdminAssets() {
                       </td>
                       <td className="px-4 py-4">
                         <div className="flex items-center justify-end gap-1">
+                          {/* Download enable/disable toggle — only for real DB assets */}
+                          {!asset.isStatic && (
+                            <button
+                              title={asset.downloadEnabled ? "Disable client downloads" : "Enable client downloads"}
+                              disabled={actionLoading !== null}
+                              onClick={() => handleToggleDownload(asset.dbId!, asset.downloadEnabled)}
+                              className={cn(
+                                "rounded p-1 transition-colors",
+                                asset.downloadEnabled
+                                  ? "text-eccellere-teal hover:bg-eccellere-teal/10"
+                                  : "text-eccellere-error hover:bg-eccellere-error/10"
+                              )}
+                            >
+                              {actionLoading === asset.dbId + (asset.downloadEnabled ? "disable-download" : "enable-download")
+                                ? <Loader2 className="h-4 w-4 animate-spin" />
+                                : asset.downloadEnabled
+                                  ? <DownloadCloud className="h-4 w-4" />
+                                  : <Download className="h-4 w-4 opacity-40" />
+                              }
+                            </button>
+                          )}
+
                           {!asset.isStatic && asset.canAct ? (
                             <>
                               <Button

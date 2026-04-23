@@ -171,9 +171,10 @@ model Asset {
   previewUrl      String?
   version         String        @default("1.0")
   status          AssetStatus   @default(DRAFT)
-  isFeatured      Boolean       @default(false)
-  licenceType     String        @default("single-use")
-  exclusivity     String        @default("exclusive")
+  isFeatured        Boolean       @default(false)
+  downloadEnabled   Boolean       @default(true)
+  licenceType       String        @default("single-use")
+  exclusivity       String        @default("exclusive")
 
   authorId String
   author   SpecialistProfile @relation(fields: [authorId], references: [id])

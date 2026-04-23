@@ -31,6 +31,7 @@ export async function GET(req: NextRequest) {
       averageRating: true,
       createdAt: true,
       components: true,
+      downloadEnabled: true,
       author: {
         select: {
           user: { select: { name: true, email: true } },
@@ -61,8 +62,18 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "Missing id or action" }, { status: 400 });
   }
 
+  // ── Toggle download access ──────────────────────────────────────────────────
+  if (action === "enable-download" || action === "disable-download") {
+    const asset = await prisma.asset.update({
+      where: { id },
+      data: { downloadEnabled: action === "enable-download" },
+      select: { id: true, title: true, downloadEnabled: true },
+    });
+    return NextResponse.json({ success: true, asset });
+  }
+
   if (action !== "approve" && action !== "reject") {
-    return NextResponse.json({ error: "action must be 'approve' or 'reject'" }, { status: 400 });
+    return NextResponse.json({ error: "action must be 'approve', 'reject', 'enable-download', or 'disable-download'" }, { status: 400 });
   }
 
   const newStatus = action === "approve" ? "PUBLISHED" : "REVISIONS_REQUESTED";

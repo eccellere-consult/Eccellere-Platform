@@ -19,6 +19,7 @@ type LibraryAsset = {
   purchasedAt: string;
   lastUpdated: string;
   hasFile: boolean;
+  downloadEnabled: boolean;
   downloadUrl: string;
 };
 
@@ -134,7 +135,7 @@ export default function LibraryPage() {
                 Purchased {asset.purchasedAt} · {asset.orderNumber}
               </p>
               <div className="mt-4 flex gap-2">
-                {asset.hasFile ? (
+                {asset.hasFile && asset.downloadEnabled ? (
                   <a
                     href={asset.downloadUrl}
                     download
@@ -145,20 +146,24 @@ export default function LibraryPage() {
                   </a>
                 ) : (
                   <span
-                    title="The specialist has not uploaded the file yet"
+                    title={
+                      !asset.hasFile
+                        ? "The specialist has not uploaded the file yet"
+                        : "Downloads for this asset are currently disabled"
+                    }
                     className="flex flex-1 cursor-not-allowed items-center justify-center gap-1.5 rounded border border-eccellere-ink/10 bg-eccellere-ink/5 px-3 py-1.5 text-xs text-ink-light"
                   >
                     <Download className="h-3.5 w-3.5" />
-                    Pending upload
+                    {!asset.hasFile ? "Pending upload" : "Downloads disabled"}
                   </span>
                 )}
                 <a
-                  href={asset.hasFile ? asset.downloadUrl : undefined}
+                  href={asset.hasFile && asset.downloadEnabled ? asset.downloadUrl : undefined}
                   target="_blank"
                   rel="noopener noreferrer"
                   className={cn(
                     "flex items-center gap-1.5 rounded border px-3 py-1.5 text-xs font-medium transition-colors",
-                    asset.hasFile
+                    asset.hasFile && asset.downloadEnabled
                       ? "border-eccellere-ink/20 text-eccellere-ink hover:border-eccellere-gold hover:text-eccellere-gold"
                       : "cursor-not-allowed border-eccellere-ink/10 text-ink-light/40"
                   )}

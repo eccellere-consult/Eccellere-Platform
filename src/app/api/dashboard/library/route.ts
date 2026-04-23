@@ -33,6 +33,7 @@ export async function GET() {
                     serviceDomain: true,
                     components: true,
                     fileUrls: true,
+                    downloadEnabled: true,
                     averageRating: true,
                     updatedAt: true,
                   },
@@ -88,6 +89,7 @@ export async function GET() {
             year: "numeric",
           }),
           hasFile: fileUrls.length > 0,
+          downloadEnabled: (asset as unknown as { downloadEnabled: boolean }).downloadEnabled ?? true,
           downloadUrl: `/api/dashboard/download/${asset.id}`,
         };
       });

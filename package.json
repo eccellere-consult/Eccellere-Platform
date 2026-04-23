@@ -5,7 +5,8 @@
   "main": ".next/standalone/server.js",
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "prisma generate && next build && node scripts/post-build.mjs",
+    "build": "prisma generate && node scripts/maybe-migrate.mjs && next build && node scripts/post-build.mjs",
+    "deploy:migrate": "prisma migrate deploy",
     "start": "node scripts/start.mjs",
     "lint": "eslint",
     "test": "playwright test",
