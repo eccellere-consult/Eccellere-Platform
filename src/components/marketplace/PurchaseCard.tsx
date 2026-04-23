@@ -10,11 +10,14 @@ import type { Asset } from "@/lib/marketplace-data";
 
 interface PurchaseCardProps {
   asset: Asset;
-  formatPrice: (p: number) => string;
   discount: number | null;
 }
 
-export function PurchaseCard({ asset, formatPrice, discount }: PurchaseCardProps) {
+function formatPrice(p: number) {
+  return "\u20b9" + p.toLocaleString("en-IN");
+}
+
+export function PurchaseCard({ asset, discount }: PurchaseCardProps) {
   const [previewOpen, setPreviewOpen] = useState(false);
 
   return (

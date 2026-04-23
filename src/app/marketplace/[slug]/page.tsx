@@ -209,7 +209,7 @@ export default async function AssetDetailPage({ params }: { params: Promise<{ sl
 
             {/* Right: purchase card */}
             <div className="lg:sticky lg:top-24 h-fit">
-              <PurchaseCard asset={asset!} formatPrice={formatPrice} discount={discount} />
+              <PurchaseCard asset={asset!} discount={discount} />
             </div>
           </div>
 
