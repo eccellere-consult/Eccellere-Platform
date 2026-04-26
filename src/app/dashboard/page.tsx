@@ -27,6 +27,7 @@ interface DashboardStats {
   }[];
   recentAssets: {
     id: string;
+    slug: string;
     title: string;
     category: string;
     components: string[];
@@ -278,10 +279,15 @@ export default function DashboardPage() {
                   <div className="flex items-center gap-3">
                     <span className="text-xs text-ink-light">{fmtDate(asset.purchasedAt)}</span>
                     <Button asChild size="sm" variant="outline" className="flex items-center gap-1.5 text-xs">
-                      <Link href="/dashboard/library">
+                      <Link href={`/marketplace/${asset.slug}`}>
+                        View Details
+                      </Link>
+                    </Button>
+                    <Button asChild size="sm" className="flex items-center gap-1.5 bg-eccellere-gold text-xs text-white hover:bg-eccellere-gold/90">
+                      <a href={`/api/dashboard/download/${asset.id}`} download>
                         <Download className="h-3.5 w-3.5" />
                         {format}
-                      </Link>
+                      </a>
                     </Button>
                   </div>
                 </div>

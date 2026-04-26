@@ -157,20 +157,13 @@ export default function LibraryPage() {
                     {!asset.hasFile ? "Pending upload" : "Downloads disabled"}
                   </span>
                 )}
-                <a
-                  href={asset.hasFile && asset.downloadEnabled ? asset.downloadUrl : undefined}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={cn(
-                    "flex items-center gap-1.5 rounded border px-3 py-1.5 text-xs font-medium transition-colors",
-                    asset.hasFile && asset.downloadEnabled
-                      ? "border-eccellere-ink/20 text-eccellere-ink hover:border-eccellere-gold hover:text-eccellere-gold"
-                      : "cursor-not-allowed border-eccellere-ink/10 text-ink-light/40"
-                  )}
+                <Link
+                  href={`/marketplace/${asset.slug}`}
+                  className="flex items-center gap-1.5 rounded border border-eccellere-ink/20 px-3 py-1.5 text-xs font-medium text-eccellere-ink transition-colors hover:border-eccellere-gold hover:text-eccellere-gold"
                 >
                   <Eye className="h-3.5 w-3.5" />
                   View
-                </a>
+                </Link>
               </div>
             </div>
           ))}

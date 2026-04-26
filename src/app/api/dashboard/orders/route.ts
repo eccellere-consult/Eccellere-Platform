@@ -36,6 +36,7 @@ export async function GET() {
           select: {
             asset: {
               select: {
+                id: true,
                 title: true,
                 slug: true,
                 serviceDomain: true,
@@ -54,6 +55,7 @@ export async function GET() {
         dbId: o.id,
         asset: firstItem?.asset?.title ?? "Unknown Asset",
         assetSlug: firstItem?.asset?.slug ?? "",
+        assetId: firstItem?.asset?.id ?? "",
         category: firstItem?.asset?.serviceDomain ?? firstItem?.asset?.category ?? "General",
         date: new Date(o.createdAt).toLocaleDateString("en-IN", {
           day: "2-digit",

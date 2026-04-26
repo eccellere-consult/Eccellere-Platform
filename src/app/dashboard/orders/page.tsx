@@ -10,6 +10,7 @@ const STATUS_FILTERS = ["All", "Completed", "Processing", "Refunded"];
 type Order = {
   id: string;
   dbId?: string;
+  assetId?: string;
   asset: string;
   assetSlug?: string;
   category: string;
@@ -161,16 +162,33 @@ export default function OrdersPage() {
                   </td>
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-2">
-                      <Link
-                        href={`/dashboard/orders/${order.id}`}
-                        className="flex items-center gap-0.5 text-xs text-eccellere-gold hover:underline"
-                      >
-                        View <ArrowUpRight className="h-3 w-3" />
-                      </Link>
-                      {order.invoice && (
-                        <button className="text-xs text-ink-light hover:text-eccellere-ink">
+                      {order.assetSlug && (
+                        <Link
+                          href={`/marketplace/${order.assetSlug}`}
+                          className="flex items-center gap-0.5 text-xs text-eccellere-gold hover:underline"
+                        >
+                          View <ArrowUpRight className="h-3 w-3" />
+                        </Link>
+                      )}
+                      {order.status === "completed" && (
+                        <a
+                          href={`/api/dashboard/download/${order.assetId}`}
+                          download
+                          className="flex items-center gap-1 text-xs text-eccellere-ink hover:text-eccellere-gold"
+                        >
+                          <Download className="h-3 w-3" />
+                          Download
+                        </a>
+                      )}
+                      {order.invoice && order.invoiceUrl && (
+                        <a
+                          href={order.invoiceUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-ink-light hover:text-eccellere-ink"
+                        >
                           Invoice
-                        </button>
+                        </a>
                       )}
                     </div>
                   </td>

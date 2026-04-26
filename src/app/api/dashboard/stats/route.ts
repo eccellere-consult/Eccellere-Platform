@@ -53,6 +53,7 @@ export async function GET() {
                   asset: {
                     select: {
                       id: true,
+                      slug: true,
                       title: true,
                       category: true,
                       components: true,
@@ -111,6 +112,7 @@ export async function GET() {
     const seenIds = new Set<string>();
     const recentAssets: {
       id: string;
+      slug: string;
       title: string;
       category: string;
       components: unknown;
@@ -124,6 +126,7 @@ export async function GET() {
           seenIds.add(item.asset.id);
           recentAssets.push({
             id: item.asset.id,
+            slug: item.asset.slug,
             title: item.asset.title,
             category: item.asset.category,
             components: item.asset.components,
