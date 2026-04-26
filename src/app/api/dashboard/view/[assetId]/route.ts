@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import fs from "fs";
 import path from "path";
+import { createRequire } from "module";
 
 export const dynamic = "force-dynamic";
 
@@ -95,14 +96,50 @@ export async function GET(
       );
     }
 
-    const stat = fs.statSync(absPath);
     const ext = path.extname(absPath).toLowerCase();
+
+    // ── DOCX / DOC → convert to HTML for inline browser viewing ──────────────
+    if (ext === ".docx" || ext === ".doc") {
+      const require = createRequire(import.meta.url);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const mammoth = require("mammoth") as any;
+      const buffer = fs.readFileSync(absPath);
+      const result = await mammoth.convertToHtml({ buffer });
+      const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${asset.title.replace(/</g, "&lt;")}</title>
+  <style>
+    body { font-family: Georgia, serif; max-width: 860px; margin: 40px auto; padding: 0 24px 80px; color: #1a1a1a; line-height: 1.7; font-size: 15px; }
+    h1,h2,h3,h4 { font-family: system-ui, sans-serif; margin-top: 1.6em; }
+    table { border-collapse: collapse; width: 100%; margin: 1em 0; }
+    td, th { border: 1px solid #d1d5db; padding: 8px 12px; }
+    th { background: #f9fafb; }
+    img { max-width: 100%; }
+    p { margin: 0.6em 0; }
+  </style>
+</head>
+<body>
+${result.value}
+</body>
+</html>`;
+      return new NextResponse(html, {
+        status: 200,
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": "private, no-store",
+        },
+      });
+    }
+
+    // ── PDF → serve inline (browsers render natively) ────────────────────────
+    const stat = fs.statSync(absPath);
     const contentTypeMap: Record<string, string> = {
       ".pdf":  "application/pdf",
       ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       ".xls":  "application/vnd.ms-excel",
-      ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      ".doc":  "application/msword",
       ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
       ".ppt":  "application/vnd.ms-powerpoint",
       ".zip":  "application/zip",
@@ -131,7 +168,6 @@ export async function GET(
       headers: {
         "Content-Type": contentType,
         "Content-Length": String(stat.size),
-        // inline — browser renders PDFs natively; others prompt save or use viewer
         "Content-Disposition": `inline; filename="${filename}"`,
         "Cache-Control": "private, no-store",
       },
