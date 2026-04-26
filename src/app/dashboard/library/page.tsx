@@ -21,6 +21,7 @@ type LibraryAsset = {
   hasFile: boolean;
   downloadEnabled: boolean;
   downloadUrl: string;
+  filePublicPath: string | null;
 };
 
 export default function LibraryPage() {
@@ -157,13 +158,25 @@ export default function LibraryPage() {
                     {!asset.hasFile ? "Pending upload" : "Downloads disabled"}
                   </span>
                 )}
-                <Link
-                  href={`/marketplace/${asset.slug}`}
-                  className="flex items-center gap-1.5 rounded border border-eccellere-ink/20 px-3 py-1.5 text-xs font-medium text-eccellere-ink transition-colors hover:border-eccellere-gold hover:text-eccellere-gold"
-                >
-                  <Eye className="h-3.5 w-3.5" />
-                  View
-                </Link>
+                {asset.hasFile && asset.filePublicPath ? (
+                  <a
+                    href={`https://docs.google.com/viewer?url=${encodeURIComponent(`https://www.eccellere.co.in${asset.filePublicPath}`)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 rounded border border-eccellere-ink/20 px-3 py-1.5 text-xs font-medium text-eccellere-ink transition-colors hover:border-eccellere-gold hover:text-eccellere-gold"
+                  >
+                    <Eye className="h-3.5 w-3.5" />
+                    View
+                  </a>
+                ) : (
+                  <Link
+                    href={`/marketplace/${asset.slug}`}
+                    className="flex items-center gap-1.5 rounded border border-eccellere-ink/20 px-3 py-1.5 text-xs font-medium text-eccellere-ink transition-colors hover:border-eccellere-gold hover:text-eccellere-gold"
+                  >
+                    <Eye className="h-3.5 w-3.5" />
+                    View
+                  </Link>
+                )}
               </div>
             </div>
           ))}

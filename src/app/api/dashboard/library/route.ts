@@ -91,6 +91,7 @@ export async function GET() {
           hasFile: fileUrls.length > 0,
           downloadEnabled: (asset as unknown as { downloadEnabled: boolean }).downloadEnabled ?? true,
           downloadUrl: `/api/dashboard/download/${asset.id}`,
+          filePublicPath: fileUrls[0] ?? null,
         };
       });
 
