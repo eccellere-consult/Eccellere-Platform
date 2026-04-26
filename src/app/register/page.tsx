@@ -64,7 +64,7 @@ export default function RegisterPage() {
     setSubmitting(true);
     setError("");
     try {
-      const res = await fetch("/api/auth/register", {
+      const res = await fetch("/api/account/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -79,8 +79,13 @@ export default function RegisterPage() {
         }),
       });
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Registration failed");
+        const contentType = res.headers.get("content-type") ?? "";
+        if (contentType.includes("application/json")) {
+          const err = await res.json();
+          throw new Error(err.error || "Registration failed");
+        } else {
+          throw new Error(`Registration failed (${res.status}). Please try again.`);
+        }
       }
       setStep(99);
     } catch (err: unknown) {
@@ -94,7 +99,7 @@ export default function RegisterPage() {
     setSubmitting(true);
     setError("");
     try {
-      const res = await fetch("/api/auth/register", {
+      const res = await fetch("/api/account/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -111,8 +116,13 @@ export default function RegisterPage() {
         }),
       });
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Registration failed");
+        const contentType = res.headers.get("content-type") ?? "";
+        if (contentType.includes("application/json")) {
+          const err = await res.json();
+          throw new Error(err.error || "Registration failed");
+        } else {
+          throw new Error(`Registration failed (${res.status}). Please try again.`);
+        }
       }
       setStep(99);
     } catch (err: unknown) {

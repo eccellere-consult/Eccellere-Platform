@@ -5,7 +5,7 @@ import { getToken } from "next-auth/jwt";
 const PROTECTED_PREFIXES = ["/dashboard", "/admin", "/specialist"];
 
 // Public exceptions within protected prefixes (no auth required)
-const PUBLIC_EXCEPTIONS = ["/specialist/register"];
+const PUBLIC_EXCEPTIONS = ["/specialist/register", "/api/account/register"];
 
 // Routes that redirect authenticated users away (login, register)
 const AUTH_REDIRECT_PATHS = ["/login", "/register"];
