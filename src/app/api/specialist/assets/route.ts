@@ -7,6 +7,7 @@ import { mkdir } from "fs/promises";
 import { pipeline } from "stream/promises";
 import { Readable } from "stream";
 import path from "path";
+import { getUploadsDir } from "@/lib/uploads";
 
 const CATEGORY_MAP: Record<string, string> = {
   "Strategy & Planning": "STRATEGY_FRAMEWORK",
@@ -44,10 +45,8 @@ async function saveUploadedFile(file: File): Promise<string> {
     .slice(0, 200);
   const uniqueName = `${Date.now()}-${safeName}`;
 
-  // APP_ROOT is set by start.mjs — use it so uploads land in the same location
-  // that the download/view routes resolve files from.
-  const appRoot = process.env.APP_ROOT ?? process.cwd();
-  const uploadDir = path.join(appRoot, "public", "uploads", "assets");
+  // Uploads dir — UPLOADS_DIR env var (production) or <APP_ROOT>/public/uploads (dev)
+  const uploadDir = path.join(getUploadsDir(), "assets");
   if (!existsSync(uploadDir)) {
     await mkdir(uploadDir, { recursive: true });
   }

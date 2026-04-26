@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import path from "path";
+import { resolveUploadPath } from "@/lib/uploads";
 import { existsSync } from "fs";
 import { readFile } from "fs/promises";
 
@@ -43,9 +44,12 @@ export async function GET(
   }
 
   // Resolve absolute path — fileUrl is like "/uploads/assets/filename.docx"
-  const relative = fileUrl.startsWith("/") ? fileUrl.slice(1) : fileUrl;
-  const appRoot = process.env.APP_ROOT ?? process.cwd();
-  const filePath = path.join(appRoot, "public", relative);
+  let filePath: string;
+  try {
+    filePath = resolveUploadPath(fileUrl);
+  } catch {
+    return NextResponse.json({ pages: [], title: asset.title });
+  }
 
   if (!existsSync(filePath)) {
     return NextResponse.json({ pages: [], title: asset.title });

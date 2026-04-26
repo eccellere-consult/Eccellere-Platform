@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import fs from "fs";
 import path from "path";
+import { resolveUploadPath } from "@/lib/uploads";
 import { createRequire } from "module";
 
 export const dynamic = "force-dynamic";
@@ -75,17 +76,12 @@ export async function GET(
     );
   }
 
-  // ── Files stored in /public/uploads/ (local / Hostinger disk) ──────────────
+  // ── Files stored in uploads dir (local / Hostinger persistent disk) ───────
   if (fileUrl.startsWith("/uploads/")) {
-    const relativePath = fileUrl.replace(/^\//, ""); // "uploads/assets/filename.docx"
-
-    // APP_ROOT is set by start.mjs so the path is reliable regardless of cwd
-    const appRoot = process.env.APP_ROOT ?? process.cwd();
-    const absPath = path.join(appRoot, "public", relativePath);
-
-    // Security: prevent path traversal
-    const uploadsBase = path.normalize(path.join(appRoot, "public", "uploads"));
-    if (!path.normalize(absPath).startsWith(uploadsBase)) {
+    let absPath: string;
+    try {
+      absPath = resolveUploadPath(fileUrl);
+    } catch {
       return NextResponse.json({ error: "Invalid file path" }, { status: 400 });
     }
 

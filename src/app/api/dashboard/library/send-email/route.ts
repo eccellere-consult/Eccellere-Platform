@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import fs from "fs";
 import path from "path";
+import { resolveUploadPath } from "@/lib/uploads";
 import { createRequire } from "module";
 
 export const dynamic = "force-dynamic";
@@ -72,13 +73,10 @@ export async function POST(request: NextRequest) {
   }
 
   // ── Resolve absolute path ─────────────────────────────────────────────────
-  const appRoot = process.env.APP_ROOT ?? process.cwd();
-  const relativePath = fileUrl.replace(/^\//, "");
-  const absPath = path.join(appRoot, "public", relativePath);
-
-  // Security: path traversal guard
-  const uploadsBase = path.normalize(path.join(appRoot, "public", "uploads"));
-  if (!path.normalize(absPath).startsWith(uploadsBase)) {
+  let absPath: string;
+  try {
+    absPath = resolveUploadPath(fileUrl);
+  } catch {
     return NextResponse.json({ error: "Invalid file path" }, { status: 400 });
   }
 

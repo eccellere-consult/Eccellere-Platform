@@ -164,19 +164,15 @@ export default function LibraryPage() {
                     <Download className="h-3.5 w-3.5" />
                     Download
                   </a>
-                ) : (
+                ) : !asset.hasFile ? (
                   <span
-                    title={
-                      !asset.hasFile
-                        ? "The specialist has not uploaded the file yet"
-                        : "Downloads for this asset are currently disabled"
-                    }
+                    title="The specialist has not uploaded the file yet"
                     className="flex flex-1 cursor-not-allowed items-center justify-center gap-1.5 rounded border border-eccellere-ink/10 bg-eccellere-ink/5 px-3 py-1.5 text-xs text-ink-light"
                   >
                     <Download className="h-3.5 w-3.5" />
-                    {!asset.hasFile ? "Pending upload" : "Downloads disabled"}
+                    Pending upload
                   </span>
-                )}
+                ) : null}
                 {asset.hasFile ? (
                   <a
                     href={`/api/dashboard/view/${asset.id}`}
