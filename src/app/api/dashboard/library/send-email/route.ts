@@ -120,26 +120,31 @@ export async function POST(request: NextRequest) {
     const nodemailer = require("nodemailer") as typeof import("nodemailer");
     const { SESClient, SendRawEmailCommand } = await import("@aws-sdk/client-ses");
 
-    const sesClient = new SESClient({
-      region: process.env.AWS_SES_REGION || process.env.AWS_REGION || "ap-south-1",
-    });
-
-    const transporter = nodemailer.createTransport({
-      SES: { ses: sesClient, aws: { SendRawEmailCommand } },
-    });
-
-    await transporter.sendMail({
+    // Build MIME message via nodemailer (stream transport), then send raw via SES
+    const streamTransport = nodemailer.createTransport({ streamTransport: true, newline: "unix" });
+    const mail = await streamTransport.sendMail({
       from: process.env.EMAIL_FROM || "noreply@eccellere.in",
       to: recipientEmail,
       subject: `Your Eccellere Asset: ${assetTitle}`,
       html: buildEmailHtml(recipientName, assetTitle, recipientEmail, ext),
-      attachments: [
-        {
-          filename: attachmentName,
-          content: attachmentBuffer,
-        },
-      ],
+      attachments: [{ filename: attachmentName, content: attachmentBuffer }],
     });
+
+    // Collect the MIME stream into a buffer
+    const chunks: Buffer[] = [];
+    await new Promise<void>((resolve, reject) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const stream = (mail as any).message;
+      stream.on("data", (chunk: Buffer) => chunks.push(chunk));
+      stream.on("end", () => resolve());
+      stream.on("error", reject);
+    });
+    const rawMessage = Buffer.concat(chunks);
+
+    const sesClient = new SESClient({
+      region: process.env.AWS_SES_REGION || process.env.AWS_REGION || "ap-south-1",
+    });
+    await sesClient.send(new SendRawEmailCommand({ RawMessage: { Data: rawMessage } }));
   } else {
     // Dev: log and skip actual send
     console.log(
