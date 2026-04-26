@@ -7,8 +7,9 @@ import path from "path";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/dashboard/download/[assetId]
-// Streams the purchased asset file to the client — only for users with a PAID order.
+// GET /api/dashboard/view/[assetId]
+// Streams the purchased asset file for inline browser viewing (not forced download).
+// Identical auth logic to download route; differs only in Content-Disposition header.
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ assetId: string }> }
@@ -20,13 +21,12 @@ export async function GET(
 
   const { assetId } = await params;
 
-  // Wrap DB lookups in a timeout to prevent 503s on slow connections
   const dbTimeout = new Promise<never>((_, reject) =>
     setTimeout(() => reject(new Error("DB timeout")), 8000)
   );
 
   let user: { id: string; orders: { id: string }[] } | null;
-  let asset: { title: string; fileUrls: unknown; downloadEnabled: boolean } | null;
+  let asset: { title: string; fileUrls: unknown } | null;
 
   try {
     [user, asset] = await Promise.race([
@@ -44,7 +44,7 @@ export async function GET(
         }),
         prisma.asset.findUnique({
           where: { id: assetId },
-          select: { title: true, fileUrls: true, downloadEnabled: true },
+          select: { title: true, fileUrls: true },
         }),
       ]),
       dbTimeout,
@@ -63,12 +63,6 @@ export async function GET(
   if (!asset) {
     return NextResponse.json({ error: "Asset not found" }, { status: 404 });
   }
-  if (!asset.downloadEnabled) {
-    return NextResponse.json(
-      { error: "Downloads for this asset are currently disabled by the administrator." },
-      { status: 403 }
-    );
-  }
 
   const fileUrls = Array.isArray(asset.fileUrls) ? (asset.fileUrls as string[]) : [];
   const fileUrl = fileUrls[0] ?? null;
@@ -82,7 +76,7 @@ export async function GET(
 
   // ── Files stored in /public/uploads/ (local / Hostinger disk) ──────────────
   if (fileUrl.startsWith("/uploads/")) {
-    const relativePath = fileUrl.replace(/^\//, "");
+    const relativePath = fileUrl.replace(/^\//, ""); // "uploads/assets/filename.docx"
 
     // APP_ROOT is set by start.mjs so the path is reliable regardless of cwd
     const appRoot = process.env.APP_ROOT ?? process.cwd();
@@ -115,11 +109,9 @@ export async function GET(
     };
     const contentType = contentTypeMap[ext] ?? "application/octet-stream";
 
-    // Sanitize filename for Content-Disposition header
     const safeTitle = asset.title.replace(/[^\w\s.-]/g, "").trim().replace(/\s+/g, "_");
     const filename = `${safeTitle}${ext}`;
 
-    // Stream the file instead of loading it all into memory
     const nodeStream = fs.createReadStream(absPath);
     const webStream = new ReadableStream({
       start(controller) {
@@ -127,7 +119,7 @@ export async function GET(
           controller.enqueue(chunk instanceof Buffer ? chunk : Buffer.from(chunk))
         );
         nodeStream.on("end", () => controller.close());
-        nodeStream.on("error", (err) => controller.error(err));
+        nodeStream.on("error", (e) => controller.error(e));
       },
       cancel() {
         nodeStream.destroy();
@@ -139,8 +131,9 @@ export async function GET(
       headers: {
         "Content-Type": contentType,
         "Content-Length": String(stat.size),
-        "Content-Disposition": `attachment; filename="${filename}"`,
-        "Cache-Control": "no-store",
+        // inline — browser renders PDFs natively; others prompt save or use viewer
+        "Content-Disposition": `inline; filename="${filename}"`,
+        "Cache-Control": "private, no-store",
       },
     });
   }
@@ -148,4 +141,3 @@ export async function GET(
   // ── External URLs (S3 / CDN) — redirect ────────────────────────────────────
   return NextResponse.redirect(fileUrl);
 }
-

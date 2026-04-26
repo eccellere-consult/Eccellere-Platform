@@ -26,6 +26,10 @@ if (!existsSync(serverPath)) {
 process.env.PORT = process.env.PORT || "3000";
 process.env.HOSTNAME = process.env.HOSTNAME || "0.0.0.0";
 
+// APP_ROOT lets all API routes resolve the uploads directory relative to the
+// real project root, regardless of what process.cwd() returns at runtime.
+process.env.APP_ROOT = root;
+
 console.log(`[start] Starting Next.js on ${process.env.HOSTNAME}:${process.env.PORT}`);
 
 // Load the standalone server

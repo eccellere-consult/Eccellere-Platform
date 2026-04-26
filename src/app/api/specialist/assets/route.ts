@@ -44,7 +44,10 @@ async function saveUploadedFile(file: File): Promise<string> {
     .slice(0, 200);
   const uniqueName = `${Date.now()}-${safeName}`;
 
-  const uploadDir = path.join(process.cwd(), "public", "uploads", "assets");
+  // APP_ROOT is set by start.mjs — use it so uploads land in the same location
+  // that the download/view routes resolve files from.
+  const appRoot = process.env.APP_ROOT ?? process.cwd();
+  const uploadDir = path.join(appRoot, "public", "uploads", "assets");
   if (!existsSync(uploadDir)) {
     await mkdir(uploadDir, { recursive: true });
   }
