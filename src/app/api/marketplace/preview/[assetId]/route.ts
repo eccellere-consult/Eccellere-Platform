@@ -19,7 +19,7 @@ export async function GET(
   let asset;
   try {
     asset = await prisma.asset.findFirst({
-      where: { id: assetId, status: "PUBLISHED" },
+      where: { id: assetId, status: { in: ["PUBLISHED", "APPROVED", "SUBMITTED"] } },
       select: { fileUrls: true, title: true },
     });
   } catch {
@@ -44,7 +44,8 @@ export async function GET(
 
   // Resolve absolute path — fileUrl is like "/uploads/assets/filename.docx"
   const relative = fileUrl.startsWith("/") ? fileUrl.slice(1) : fileUrl;
-  const filePath = path.join(process.cwd(), "public", relative);
+  const appRoot = process.env.APP_ROOT ?? process.cwd();
+  const filePath = path.join(appRoot, "public", relative);
 
   if (!existsSync(filePath)) {
     return NextResponse.json({ pages: [], title: asset.title });

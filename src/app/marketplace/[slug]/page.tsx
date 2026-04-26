@@ -6,7 +6,6 @@ import { Footer } from "@/components/layout/Footer";
 import { assets as staticAssets, type Asset } from "@/lib/marketplace-data";
 import { prisma } from "@/lib/prisma";
 import { PurchaseCard } from "@/components/marketplace/PurchaseCard";
-import { DocumentPreview } from "@/components/marketplace/DocumentPreview";
 
 // Cache each slug page for 5 minutes; revalidate in background.
 // Avoids a live DB round-trip on every request which caused 503 hangs.
@@ -206,11 +205,20 @@ export default async function AssetDetailPage({ params }: { params: Promise<{ sl
                 </ul>
               </div>
 
-              {/* Preview */}
-              <div className="mt-8 border-t border-eccellere-ink/5 pt-8">
-                <h2 className="font-display text-xl font-light text-eccellere-ink">Contents preview</h2>
-                <DocumentPreview assetId={asset.id} assetTitle={asset.title} />
-              </div>
+              {/* Preview — bullet points entered by the specialist during submission */}
+              {asset.previewItems && asset.previewItems.length > 0 && (
+                <div className="mt-8 border-t border-eccellere-ink/5 pt-8">
+                  <h2 className="font-display text-xl font-light text-eccellere-ink">Contents preview</h2>
+                  <ul className="mt-4 space-y-3">
+                    {asset.previewItems.map((item, i) => (
+                      <li key={i} className="flex items-start gap-3 text-sm text-ink-mid">
+                        <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-eccellere-gold" />
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
               {/* Trust signals */}
               <div className="mt-8 grid grid-cols-2 gap-4 border-t border-eccellere-ink/5 pt-8">
