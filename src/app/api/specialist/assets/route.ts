@@ -8,6 +8,7 @@ import { pipeline } from "stream/promises";
 import { Readable } from "stream";
 import path from "path";
 import { getUploadsDir } from "@/lib/uploads";
+import { ensurePreviewDocx } from "@/lib/preview-docx";
 
 const CATEGORY_MAP: Record<string, string> = {
   "Strategy & Planning": "STRATEGY_FRAMEWORK",
@@ -57,6 +58,17 @@ async function saveUploadedFile(file: File): Promise<string> {
   );
   const writeStream = createWriteStream(destPath);
   await pipeline(nodeReadable, writeStream);
+
+  // For .docx uploads, pre-generate a sibling preview file truncated to the
+  // first 5 pages. Failure here must not block the upload — it's purely a
+  // marketing/preview optimisation.
+  if (path.extname(destPath).toLowerCase() === ".docx") {
+    try {
+      await ensurePreviewDocx(destPath, 5);
+    } catch (err) {
+      console.error("[saveUploadedFile] preview generation failed:", err);
+    }
+  }
 
   return `/uploads/assets/${uniqueName}`;
 }

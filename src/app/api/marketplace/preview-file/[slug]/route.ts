@@ -3,13 +3,15 @@ import { prisma } from "@/lib/prisma";
 import fs from "fs";
 import path from "path";
 import { resolveUploadPath } from "@/lib/uploads";
+import { ensurePreviewDocx } from "@/lib/preview-docx";
 
 export const dynamic = "force-dynamic";
 
-// Public preview endpoint used by the marketplace slug page to stream the
-// first file attached to a PUBLISHED asset, so the browser can render the
-// first ~5 pages with docx-preview. No auth — only PUBLISHED assets are
-// served, and the client-side renderer hides anything beyond page 5.
+// Public preview endpoint — streams a 5-page-truncated copy of the asset's
+// .docx file. The truncated `*.preview.docx` is generated at upload time;
+// for legacy assets uploaded before that hook existed, it is generated on
+// the first request and cached on disk. The full document is never exposed
+// to unauthenticated callers.
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ slug: string }> }
@@ -36,23 +38,41 @@ export async function GET(
     return NextResponse.json({ error: "No previewable file" }, { status: 404 });
   }
 
-  let absPath: string;
+  let absOriginal: string;
   try {
-    absPath = resolveUploadPath(fileUrl);
+    absOriginal = resolveUploadPath(fileUrl);
   } catch {
     return NextResponse.json({ error: "Invalid file path" }, { status: 400 });
   }
-  if (!fs.existsSync(absPath)) {
+  if (!fs.existsSync(absOriginal)) {
     return NextResponse.json({ error: "File missing" }, { status: 404 });
   }
 
-  const ext = path.extname(absPath).toLowerCase();
+  const ext = path.extname(absOriginal).toLowerCase();
   if (ext !== ".docx") {
     return NextResponse.json({ error: "Preview only available for .docx files" }, { status: 415 });
   }
 
-  const stat = fs.statSync(absPath);
-  const stream = fs.createReadStream(absPath);
+  // Sibling preview path: foo.docx → foo.preview.docx
+  const dir = path.dirname(absOriginal);
+  const base = path.basename(absOriginal, ext);
+  let previewPath = path.join(dir, `${base}.preview.docx`);
+
+  if (!fs.existsSync(previewPath)) {
+    try {
+      const generated = await ensurePreviewDocx(absOriginal, 5);
+      if (!generated) {
+        return NextResponse.json({ error: "Preview not available" }, { status: 415 });
+      }
+      previewPath = generated;
+    } catch (err) {
+      console.error("[preview-file] generation failed:", err);
+      return NextResponse.json({ error: "Preview generation failed" }, { status: 500 });
+    }
+  }
+
+  const stat = fs.statSync(previewPath);
+  const stream = fs.createReadStream(previewPath);
   const webStream = new ReadableStream({
     start(controller) {
       stream.on("data", (chunk) => controller.enqueue(chunk));
@@ -67,7 +87,8 @@ export async function GET(
   return new Response(webStream, {
     status: 200,
     headers: {
-      "Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "Content-Type":
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       "Content-Length": String(stat.size),
       "Cache-Control": "public, max-age=300",
     },
