@@ -6,6 +6,7 @@ import { Footer } from "@/components/layout/Footer";
 import { assets as staticAssets, type Asset } from "@/lib/marketplace-data";
 import { prisma } from "@/lib/prisma";
 import { PurchaseCard } from "@/components/marketplace/PurchaseCard";
+import { AssetDocPreview } from "@/components/marketplace/AssetDocPreview";
 
 // Cache each slug page for 5 minutes; revalidate in background.
 // Avoids a live DB round-trip on every request which caused 503 hangs.
@@ -219,6 +220,17 @@ export default async function AssetDetailPage({ params }: { params: Promise<{ sl
                   </ul>
                 </div>
               )}
+
+              {/* Sample preview — first 5 pages of the actual document */}
+              <div className="mt-8 border-t border-eccellere-ink/5 pt-8">
+                <h2 className="font-display text-xl font-light text-eccellere-ink">Sample preview</h2>
+                <p className="mt-2 text-sm text-ink-light">
+                  First 5 pages from the actual document.
+                </p>
+                <div className="mt-4">
+                  <AssetDocPreview slug={asset.slug} maxPages={5} />
+                </div>
+              </div>
 
               {/* Trust signals */}
               <div className="mt-8 grid grid-cols-2 gap-4 border-t border-eccellere-ink/5 pt-8">
