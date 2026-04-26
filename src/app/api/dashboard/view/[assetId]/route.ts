@@ -114,7 +114,7 @@ export async function GET(
 
       const publicFileUrl = `${origin}/api/files/asset/${token}`;
       const viewerUrl =
-        `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(publicFileUrl)}`;
+        `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(publicFileUrl)}`;
 
       const safeTitle = asset.title.replace(/</g, "&lt;").replace(/>/g, "&gt;");
       const html = `<!DOCTYPE html>
@@ -147,13 +147,13 @@ export async function GET(
         headers: {
           "Content-Type": "text/html; charset=utf-8",
           "Cache-Control": "private, no-store",
-          // Override the global strict CSP so the Office Online iframe loads.
+          // Override the global strict CSP so the Google Docs viewer iframe loads.
           "Content-Security-Policy":
             "default-src 'self'; " +
             "script-src 'self' 'unsafe-inline'; " +
             "style-src 'self' 'unsafe-inline'; " +
             "img-src 'self' data: blob: https:; " +
-            "frame-src https://view.officeapps.live.com https://*.officeapps.live.com; " +
+            "frame-src https://docs.google.com https://*.google.com https://view.officeapps.live.com https://*.officeapps.live.com; " +
             "connect-src 'self' https:; " +
             "frame-ancestors 'self';",
         },
