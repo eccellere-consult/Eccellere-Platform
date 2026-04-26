@@ -5,7 +5,7 @@
   "main": ".next/standalone/server.js",
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "prisma generate && node scripts/maybe-migrate.mjs && next build && node scripts/post-build.mjs",
+    "build": "prisma generate && next build && node scripts/post-build.mjs",
     "deploy:migrate": "prisma db push --accept-data-loss",
     "start": "node scripts/start.mjs",
     "lint": "eslint",

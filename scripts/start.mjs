@@ -30,6 +30,13 @@ process.env.HOSTNAME = process.env.HOSTNAME || "0.0.0.0";
 // real project root, regardless of what process.cwd() returns at runtime.
 process.env.APP_ROOT = root;
 
+// Sync schema to DB before starting (no-op if DATABASE_URL not set or DB unreachable)
+try {
+  await import(join(__dirname, "maybe-migrate.mjs").replace(/\\/g, "/"));
+} catch (e) {
+  console.warn("[start] maybe-migrate error (non-fatal):", e.message);
+}
+
 console.log(`[start] Starting Next.js on ${process.env.HOSTNAME}:${process.env.PORT}`);
 
 // Load the standalone server
