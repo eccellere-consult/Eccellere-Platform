@@ -48,6 +48,9 @@ export function AssetSamplePreviewModal({
   );
   const [errorMsg, setErrorMsg] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
+  // Start fetching the file as soon as the modal opens — in parallel with the
+  // CDN scripts loading. The blob is held here until both scripts are ready.
+  const blobPromiseRef = useRef<Promise<Blob | null> | null>(null);
 
   // Lock body scroll while the modal is open
   useEffect(() => {
@@ -69,26 +72,40 @@ export function AssetSamplePreviewModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
+  // Kick off file fetch the instant the modal opens, before scripts finish.
+  useEffect(() => {
+    if (!open) return;
+    blobPromiseRef.current = (async () => {
+      try {
+        const resp = await fetch(`/api/marketplace/preview-file/${slug}`, {
+          cache: "force-cache",
+        });
+        if (resp.status === 404 || resp.status === 415) return null;
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        return await resp.blob();
+      } catch (err) {
+        throw err;
+      }
+    })();
+  }, [open, slug]);
+
   // Render once the modal opens AND both scripts are loaded
   useEffect(() => {
     if (!open) return;
     if (!scriptsReady.jszip || !scriptsReady.docx) return;
     if (!containerRef.current) return;
+    if (!blobPromiseRef.current) return;
 
     let cancelled = false;
     setStatus("loading");
     (async () => {
       try {
-        const resp = await fetch(`/api/marketplace/preview-file/${slug}`, {
-          cache: "force-cache",
-        });
-        if (resp.status === 404 || resp.status === 415) {
-          if (!cancelled) setStatus("unavailable");
+        const blob = await blobPromiseRef.current;
+        if (cancelled || !containerRef.current) return;
+        if (blob === null) {
+          setStatus("unavailable");
           return;
         }
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const blob = await resp.blob();
-        if (cancelled || !containerRef.current) return;
         if (!window.docx?.renderAsync) {
           throw new Error("Viewer library not loaded");
         }
@@ -98,7 +115,13 @@ export function AssetSamplePreviewModal({
           className: "docx",
           inWrapper: true,
           breakPages: true,
-          ignoreLastRenderedPageBreak: true,
+          // Respect Word's own page break markers so the visible page count
+          // matches what the server truncated to. Setting this to true makes
+          // docx-preview re-paginate from page size in JS — producing a
+          // different page count than the server intended (often fewer).
+          ignoreLastRenderedPageBreak: false,
+          // Required for docx-preview to honour <w:lastRenderedPageBreak/>
+          // when breaking pages.
           experimental: true,
           trimXmlDeclaration: true,
           useBase64URL: true,

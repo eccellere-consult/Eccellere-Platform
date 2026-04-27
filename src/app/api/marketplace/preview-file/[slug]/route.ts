@@ -58,7 +58,22 @@ export async function GET(
   const base = path.basename(absOriginal, ext);
   let previewPath = path.join(dir, `${base}.preview.docx`);
 
-  if (!fs.existsSync(previewPath)) {
+  // Regenerate if missing OR if the source file is newer than the cached
+  // preview (e.g. the truncation algorithm itself was updated and we want
+  // existing assets to pick up the change on next access).
+  let needsGenerate = !fs.existsSync(previewPath);
+  if (!needsGenerate) {
+    try {
+      const srcMtime = fs.statSync(absOriginal).mtimeMs;
+      const prevMtime = fs.statSync(previewPath).mtimeMs;
+      // Treat preview as stale if it predates the source file at all.
+      if (prevMtime < srcMtime) needsGenerate = true;
+    } catch {
+      needsGenerate = true;
+    }
+  }
+
+  if (needsGenerate) {
     try {
       const generated = await ensurePreviewDocx(absOriginal, 5);
       if (!generated) {

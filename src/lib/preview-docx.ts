@@ -84,9 +84,12 @@ export async function truncateDocxPages(
     kept.push(b.text);
   }
 
-  // Fallback: no page break markers anywhere. Take the first ~40 blocks.
+  // Fallback: no page break markers anywhere (skill-generated DOCX never
+  // opened in Word). Approx. ~14 paragraph/table blocks per visible page,
+  // so 14 * maxPages keeps the right ballpark.
   if (!foundAnyBreak) {
-    kept = blocks.slice(0, Math.min(40, blocks.length)).map((b) => b.text);
+    const target = Math.max(40, maxPages * 14);
+    kept = blocks.slice(0, Math.min(target, blocks.length)).map((b) => b.text);
   }
 
   if (kept.length === blocks.length && finalSectPr) {
