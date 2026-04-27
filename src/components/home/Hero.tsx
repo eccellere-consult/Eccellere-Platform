@@ -50,9 +50,8 @@ export function Hero() {
           transition={{ duration: 0.6, delay: 0.3 }}
           className="mx-auto mt-6 max-w-2xl text-lg font-light leading-relaxed text-white/60"
         >
-          200+ ready-to-use toolkits and playbooks, Agentic AI solutions, and
-          expert consulting advisory — designed for the scale and budgets of
-          India&apos;s MSMEs and startups.
+          Start with proven diagnostic kits and playbooks. Power up with Agentic AI.
+          Then bring in expert consulting when you need to push harder — all on one platform.
         </motion.p>
 
         <motion.div
@@ -65,7 +64,7 @@ export function Hero() {
             <Link href="/marketplace">Browse Growth Assets</Link>
           </Button>
           <Button asChild variant="ghostLight" size="lg">
-            <Link href="/agentic-ai">Explore Agentic AI</Link>
+            <Link href="/msme-hub">The MSME Growth Path</Link>
           </Button>
         </motion.div>
 
