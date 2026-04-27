@@ -154,15 +154,17 @@ export default function MSMEHubPage() {
                 For MSMEs & Startups
               </p>
               <h1 className="mt-4 font-display text-[clamp(32px,6vw,72px)] font-light leading-[1.1] text-eccellere-cream">
-                Consulting built for the{" "}
+                Enabling Indian MSMEs with{" "}
                 <span className="italic text-eccellere-gold">
-                  Indian growth business
+                  world-class best practices
                 </span>
               </h1>
               <p className="mt-6 text-lg font-light text-white/50">
-                You don&apos;t need a 200-slide deck. You need actionable
-                frameworks, AI-powered tools, and specialists who understand
-                your scale and your constraints.
+                We take the best business practices from around the world,
+                contextualise them to Indian realities, and put them in the hands
+                of India&apos;s growth businesses — preparing them for the imminent
+                India Wave. Indian companies should disproportionately influence
+                world business. We&apos;re here to make that happen.
               </p>
               <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
                 <Button asChild size="lg">
@@ -281,18 +283,18 @@ export default function MSMEHubPage() {
               {[
                 {
                   step: "01",
-                  title: "Diagnose",
-                  desc: "Take our free AI Readiness Assessment or talk to the AI Advisor. We'll identify your top challenges and opportunities.",
+                  title: "Start with Growth Assets",
+                  desc: "Pick up diagnostic kits, best-practice playbooks, and ready-to-use frameworks from the marketplace. Cost-effective, immediate impact — no consultant required.",
                 },
                 {
                   step: "02",
-                  title: "Equip",
-                  desc: "Browse 200+ frameworks in the Marketplace, or get a custom recommendation. Buy what you need — no bloated engagements.",
+                  title: "Power Up with Agentic AI",
+                  desc: "Layer in AI to automate, optimise, and accelerate. From AI assessments to autonomous agents, build the skills and tools that multiply your team's output.",
                 },
                 {
                   step: "03",
-                  title: "Transform",
-                  desc: "Implement with our templates, or bring in a specialist for hands-on delivery. We stay through results.",
+                  title: "Accelerate with 1-on-1 Consulting",
+                  desc: "When you need a focused push on a specific growth challenge, bring in our experts. Deep-dive engagements and hands-on implementation to move the trajectory.",
                 },
               ].map((item, i) => (
                 <motion.div
