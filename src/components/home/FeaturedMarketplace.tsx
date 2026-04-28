@@ -1,26 +1,82 @@
-"use client";
-
 import Link from "next/link";
-import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
-import { Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { prisma } from "@/lib/prisma";
+import { withDbTimeout } from "@/lib/db-timeout";
 import { type Asset } from "@/lib/marketplace-data";
+import { FeaturedMarketplaceCard } from "./FeaturedMarketplaceCard";
 
-export function FeaturedMarketplace() {
-  const [assets, setAssets] = useState<Asset[]>([]);
-  const [loading, setLoading] = useState(true);
+// Re-render at most once per minute. Avoids hitting the DB on every visitor.
+export const revalidate = 60;
 
-  useEffect(() => {
-    fetch("/api/marketplace/assets")
-      .then((r) => r.json())
-      .then((data) => {
-        // API already orders by createdAt desc — take the first 4 newest
-        setAssets((data.assets ?? []).slice(0, 4));
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
+const CATEGORY_DISPLAY: Record<string, { label: string; color: string }> = {
+  AI_TOOLKIT:            { label: "Agentic AI",              color: "bg-eccellere-teal/20 text-eccellere-teal" },
+  STRATEGY_FRAMEWORK:    { label: "Strategy",                color: "bg-eccellere-gold/20 text-eccellere-gold" },
+  OPERATIONS_TEMPLATE:   { label: "Process Transformation",  color: "bg-blue-100 text-blue-700" },
+  MSME_GROWTH_KIT:       { label: "Strategy",                color: "bg-eccellere-gold/20 text-eccellere-gold" },
+  FINANCIAL_MODEL:       { label: "Digital",                 color: "bg-purple-100 text-purple-700" },
+  HR_PEOPLE:             { label: "Organisation",            color: "bg-green-100 text-green-700" },
+  CONSULTING_ENGAGEMENT: { label: "Strategy",                color: "bg-eccellere-gold/20 text-eccellere-gold" },
+  WEBINAR:               { label: "Digital",                 color: "bg-blue-100 text-blue-700" },
+  PLAYBOOK:              { label: "Strategy",                color: "bg-eccellere-gold/20 text-eccellere-gold" },
+  DIAGNOSTIC:            { label: "Strategy",                color: "bg-eccellere-gold/20 text-eccellere-gold" },
+  CALCULATOR:            { label: "Digital",                 color: "bg-purple-100 text-purple-700" },
+  CASE_STUDY:            { label: "Strategy",                color: "bg-eccellere-gold/20 text-eccellere-gold" },
+};
+
+async function getFeaturedAssets(): Promise<Asset[]> {
+  try {
+    const rows = await withDbTimeout(
+      prisma.asset.findMany({
+        where: { status: { in: ["PUBLISHED", "APPROVED"] as never[] } },
+        orderBy: [
+          { createdAt: "desc" },
+          { isFeatured: "desc" },
+          { totalPurchases: "desc" },
+        ],
+        take: 4,
+        select: {
+          id: true,
+          slug: true,
+          title: true,
+          category: true,
+          serviceDomain: true,
+          components: true,
+          price: true,
+          averageRating: true,
+        },
+      }),
+      4000,
+      "home.featured"
+    );
+
+    return rows.map((a) => {
+      const catInfo =
+        CATEGORY_DISPLAY[a.category as string] ?? {
+          label: a.serviceDomain,
+          color: "bg-eccellere-gold/20 text-eccellere-gold",
+        };
+      const format =
+        Array.isArray(a.components) && (a.components as unknown[]).length > 0
+          ? (a.components as string[])[0]
+          : "PDF";
+      return {
+        id: a.id,
+        slug: a.slug,
+        title: a.title,
+        category: catInfo.label,
+        categoryColor: catInfo.color,
+        format,
+        price: a.price,
+        rating: a.averageRating ?? 0,
+      } as unknown as Asset;
+    });
+  } catch {
+    return [];
+  }
+}
+
+export async function FeaturedMarketplace() {
+  const assets = await getFeaturedAssets();
 
   return (
     <section className="bg-eccellere-cream py-20 lg:py-[120px]">
@@ -33,51 +89,15 @@ export function FeaturedMarketplace() {
           <span className="italic">newest first</span>
         </h2>
 
-        {loading ? (
-          <div className="mt-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-52 animate-pulse rounded bg-white/60 shadow-sm" />
-            ))}
-          </div>
-        ) : (
-          <div className="mt-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {assets.map((asset, i) => (
-              <motion.div
-                key={asset.id ?? asset.slug}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.1, duration: 0.5 }}
-              >
-                <Link
-                  href={`/marketplace/${asset.slug}`}
-                  className="group block rounded bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md"
-                >
-                  <span
-                    className={`inline-block rounded-sm px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider ${
-                      asset.categoryColor ?? "bg-eccellere-gold/20 text-eccellere-gold"
-                    }`}
-                  >
-                    {asset.category}
-                  </span>
-                  <h3 className="mt-4 text-base font-medium leading-snug text-eccellere-ink">
-                    {asset.title}
-                  </h3>
-                  <p className="mt-2 text-xs text-ink-light">{asset.format}</p>
-                  <div className="mt-4 flex items-center justify-between">
-                    <span className="font-mono text-lg font-medium text-eccellere-ink">
-                      ₹{(asset.price ?? 0).toLocaleString("en-IN")}
-                    </span>
-                    <span className="flex items-center gap-1 text-xs text-eccellere-gold">
-                      <Star className="h-3 w-3 fill-current" />
-                      {(asset.rating ?? 0).toFixed(1)}
-                    </span>
-                  </div>
-                </Link>
-              </motion.div>
-            ))}
-          </div>
-        )}
+        <div className="mt-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          {assets.map((asset, i) => (
+            <FeaturedMarketplaceCard
+              key={asset.id ?? asset.slug}
+              asset={asset}
+              index={i}
+            />
+          ))}
+        </div>
 
         <div className="mt-12 text-center">
           <Button asChild variant="ghost">

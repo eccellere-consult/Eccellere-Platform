@@ -121,13 +121,14 @@ export async function GET(req: NextRequest) {
     { assets },
     {
       headers: {
-        // CDN/proxy cache: serve fresh for 60s, then serve stale for up to 5min
-        // while we revalidate in the background. Big TTFB win for repeat hits
-        // since `revalidate = 60` on the route export is ignored once the
-        // handler reads NextRequest (forces dynamic).
+        // Browsers must NOT cache this response — they should always ask the
+        // server (or the upstream CDN). The CDN/proxy then serves a fresh
+        // copy for 60s and stale for 5min while revalidating in the
+        // background. This prevents the "old screens visible" symptom while
+        // keeping origin DB pressure low.
         "Cache-Control": search
           ? "private, no-store"
-          : "public, s-maxage=60, stale-while-revalidate=300",
+          : "private, max-age=0, must-revalidate, s-maxage=60, stale-while-revalidate=300",
       },
     }
   );
