@@ -4,6 +4,7 @@ import path from "path";
 import { prisma } from "@/lib/prisma";
 import { resolveUploadPath } from "@/lib/uploads";
 import { verifyAssetToken } from "@/lib/asset-token";
+import { withDbTimeout } from "@/lib/db-timeout";
 
 export const dynamic = "force-dynamic";
 
@@ -26,23 +27,31 @@ export async function GET(
     return NextResponse.json({ error: "Invalid or expired token" }, { status: 403 });
   }
 
-  // Re-validate purchase ownership at fetch time (defence-in-depth)
-  const order = await prisma.order.findFirst({
-    where: {
-      userId: verified.userId,
-      status: "PAID",
-      items: { some: { assetId: verified.assetId } },
-    },
-    select: { id: true },
-  });
+  // Re-validate purchase ownership and fetch asset metadata in parallel
+  // (defence-in-depth). Both queries are bounded by a single 5 s timeout
+  // so a stalled DB cannot leave the request hanging.
+  const [order, asset] = await withDbTimeout(
+    Promise.all([
+      prisma.order.findFirst({
+        where: {
+          userId: verified.userId,
+          status: "PAID",
+          items: { some: { assetId: verified.assetId } },
+        },
+        select: { id: true },
+      }),
+      prisma.asset.findUnique({
+        where: { id: verified.assetId },
+        select: { title: true, fileUrls: true },
+      }),
+    ]),
+    5000,
+    "files.asset"
+  );
+
   if (!order) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
-
-  const asset = await prisma.asset.findUnique({
-    where: { id: verified.assetId },
-    select: { title: true, fileUrls: true },
-  });
   if (!asset) {
     return NextResponse.json({ error: "Asset not found" }, { status: 404 });
   }

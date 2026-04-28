@@ -19,18 +19,24 @@ function getPrismaClient(): PrismaClient {
   // Add connection_limit and socket_timeout to the URL to prevent idle
   // connection drops from causing request hangs on Hostinger's MariaDB.
   const url = new URL(process.env.DATABASE_URL);
-  // Tighten limits for Hostinger shared hosting:
-  // connection_limit=2  → keep pool small; fail fast before queueing piles up
-  // socket_timeout=5    → drop hung connections after 5 s to free the pool quickly
-  // connect_timeout=3   → fail fast if DB is unreachable instead of hanging
+  // Tuned for Hostinger Cloud Startup (shared MariaDB):
+  // connection_limit=3  → small pool; allow modest concurrency without
+  //                       overwhelming the shared DB
+  // pool_timeout=3      → fail fast if all 3 connections are busy instead
+  //                       of letting requests queue indefinitely
+  // socket_timeout=10   → drop hung connections after 10 s
+  // connect_timeout=5   → fail fast if DB is unreachable
   if (!url.searchParams.has("connection_limit")) {
-    url.searchParams.set("connection_limit", "2");
+    url.searchParams.set("connection_limit", "3");
+  }
+  if (!url.searchParams.has("pool_timeout")) {
+    url.searchParams.set("pool_timeout", "3");
   }
   if (!url.searchParams.has("socket_timeout")) {
-    url.searchParams.set("socket_timeout", "5");
+    url.searchParams.set("socket_timeout", "10");
   }
   if (!url.searchParams.has("connect_timeout")) {
-    url.searchParams.set("connect_timeout", "3");
+    url.searchParams.set("connect_timeout", "5");
   }
 
   const adapter = new PrismaMariaDb(url.toString());

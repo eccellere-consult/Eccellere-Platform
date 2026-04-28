@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { withDbTimeout } from "@/lib/db-timeout";
 
 // GET /api/dashboard/library — returns assets the logged-in user has purchased
 export async function GET() {
@@ -11,39 +12,43 @@ export async function GET() {
   }
 
   try {
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      select: {
-        id: true,
-        clientProfile: { select: { id: true } },
-        orders: {
-          where: { status: "PAID" },
-          select: {
-            orderNumber: true,
-            createdAt: true,
-            items: {
-              select: {
-                asset: {
-                  select: {
-                    id: true,
-                    slug: true,
-                    title: true,
-                    description: true,
-                    category: true,
-                    serviceDomain: true,
-                    components: true,
-                    fileUrls: true,
-                    downloadEnabled: true,
-                    averageRating: true,
-                    updatedAt: true,
+    const user = await withDbTimeout(
+      prisma.user.findUnique({
+        where: { email: session.user.email },
+        select: {
+          id: true,
+          clientProfile: { select: { id: true } },
+          orders: {
+            where: { status: "PAID" },
+            select: {
+              orderNumber: true,
+              createdAt: true,
+              items: {
+                select: {
+                  asset: {
+                    select: {
+                      id: true,
+                      slug: true,
+                      title: true,
+                      description: true,
+                      category: true,
+                      serviceDomain: true,
+                      components: true,
+                      fileUrls: true,
+                      downloadEnabled: true,
+                      averageRating: true,
+                      updatedAt: true,
+                    },
                   },
                 },
               },
             },
           },
         },
-      },
-    });
+      }),
+      6000,
+      "library"
+    );
 
     if (!user) {
       return NextResponse.json({ assets: [] });

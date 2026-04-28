@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { withDbTimeout } from "@/lib/db-timeout";
 
 // GET /api/dashboard/orders — returns the logged-in user's order history from DB
 export async function GET() {
@@ -11,42 +12,50 @@ export async function GET() {
   }
 
   try {
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      select: { id: true },
-    });
+    const user = await withDbTimeout(
+      prisma.user.findUnique({
+        where: { email: session.user.email },
+        select: { id: true },
+      }),
+      4000,
+      "orders.user"
+    );
 
     if (!user) {
       return NextResponse.json({ orders: [] });
     }
 
-    const dbOrders = await prisma.order.findMany({
-      where: { userId: user.id },
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        orderNumber: true,
-        status: true,
-        totalAmount: true,
-        currency: true,
-        paymentGateway: true,
-        createdAt: true,
-        invoiceUrl: true,
-        items: {
-          select: {
-            asset: {
-              select: {
-                id: true,
-                title: true,
-                slug: true,
-                serviceDomain: true,
-                category: true,
+    const dbOrders = await withDbTimeout(
+      prisma.order.findMany({
+        where: { userId: user.id },
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          orderNumber: true,
+          status: true,
+          totalAmount: true,
+          currency: true,
+          paymentGateway: true,
+          createdAt: true,
+          invoiceUrl: true,
+          items: {
+            select: {
+              asset: {
+                select: {
+                  id: true,
+                  title: true,
+                  slug: true,
+                  serviceDomain: true,
+                  category: true,
+                },
               },
             },
           },
         },
-      },
-    });
+      }),
+      6000,
+      "orders.list"
+    );
 
     const orders = dbOrders.map((o) => {
       const firstItem = o.items[0];
