@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Upload, PlusCircle, FileCheck, Loader2, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { MARKETPLACE_SECTORS } from "@/lib/sectors";
 
 const CATEGORIES = [
   "Strategy & Planning",
@@ -37,6 +38,7 @@ export default function SubmitNewAssetPage() {
     tags: "",
     termsAccepted: false,
   });
+  const [targetSectors, setTargetSectors] = useState<string[]>([]);
 
   const [submitted, setSubmitted] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -112,9 +114,19 @@ export default function SubmitNewAssetPage() {
     if (file) analyzeFile(file);
   }
 
+  function toggleSector(sector: string) {
+    setTargetSectors((prev) =>
+      prev.includes(sector) ? prev.filter((s) => s !== sector) : [...prev, sector]
+    );
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitError("");
+    if (targetSectors.length === 0) {
+      setSubmitError("Select at least one sector this asset is applicable to.");
+      return;
+    }
     setIsSubmitting(true);
     try {
       const whatIncludedArr = form.whatIncluded
@@ -144,6 +156,7 @@ export default function SubmitNewAssetPage() {
       data.set("contentsPreview", JSON.stringify(contentsPreviewArr));
       data.set("targetAudience", form.targetAudience);
       data.set("tags", JSON.stringify(tagsArr));
+      data.set("targetSectors", JSON.stringify(targetSectors));
       if (documentExcerpt) data.set("documentExcerpt", documentExcerpt);
       if (selectedFile) data.set("file", selectedFile);
 
@@ -433,6 +446,38 @@ export default function SubmitNewAssetPage() {
                       className="w-full rounded border border-eccellere-ink/15 bg-eccellere-cream py-2.5 pl-7 pr-3 text-sm text-eccellere-ink placeholder:text-ink-light/60 focus:border-eccellere-gold focus:outline-none focus:ring-1 focus:ring-eccellere-gold"
                     />
                   </div>
+                </div>
+
+                {/* Applicable Sectors */}
+                <div>
+                  <span className="block text-xs font-medium uppercase tracking-wider text-ink-light">
+                    Applicable Sectors <span className="text-eccellere-error">*</span>
+                  </span>
+                  <p className="mt-0.5 text-[11px] text-ink-light/70">
+                    Tick every sector this asset is relevant to. Buyers will filter the
+                    marketplace by these tags.
+                  </p>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    {MARKETPLACE_SECTORS.map((sector) => (
+                      <label
+                        key={sector}
+                        className="flex cursor-pointer items-center gap-2.5 rounded border border-eccellere-ink/15 bg-eccellere-cream px-3 py-2.5 text-sm text-eccellere-ink hover:border-eccellere-gold/50"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={targetSectors.includes(sector)}
+                          onChange={() => toggleSector(sector)}
+                          className="h-4 w-4 accent-eccellere-gold"
+                        />
+                        <span>{sector}</span>
+                      </label>
+                    ))}
+                  </div>
+                  {targetSectors.length === 0 && (
+                    <p className="mt-1.5 text-[11px] text-ink-light/70">
+                      Select at least one sector.
+                    </p>
+                  )}
                 </div>
               </div>
             </section>

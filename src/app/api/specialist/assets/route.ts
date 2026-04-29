@@ -9,6 +9,7 @@ import { Readable } from "stream";
 import path from "path";
 import { getUploadsDir } from "@/lib/uploads";
 import { ensurePreviewDocx } from "@/lib/preview-docx";
+import { MARKETPLACE_SECTORS } from "@/lib/sectors";
 
 const CATEGORY_MAP: Record<string, string> = {
   "Strategy & Planning": "STRATEGY_FRAMEWORK",
@@ -106,6 +107,7 @@ export async function GET() {
       createdAt: true,
       serviceDomain: true,
       targetAudience: true,
+      targetSectors: true,
       tags: true,
       aboutResource: true,
       whatIncluded: true,
@@ -193,6 +195,7 @@ export async function POST(req: NextRequest) {
   const contentsPreviewRaw = (formData.get("contentsPreview") as string | null) || "[]";
   const targetAudience = (formData.get("targetAudience") as string | null)?.trim() || null;
   const tagsRaw = (formData.get("tags") as string | null) || "[]";
+  const targetSectorsRaw = (formData.get("targetSectors") as string | null) || "[]";
   const documentExcerpt = (formData.get("documentExcerpt") as string | null)?.trim() || null;
   const file = formData.get("file") as File | null;
 
@@ -212,6 +215,28 @@ export async function POST(req: NextRequest) {
     if (!Array.isArray(tags)) tags = [];
   } catch {
     tags = [];
+  }
+
+  // Parse and validate targetSectors against the canonical list. Any value
+  // not in MARKETPLACE_SECTORS is silently dropped to prevent free-text drift
+  // breaking the marketplace filter.
+  let targetSectors: string[] = [];
+  try {
+    const parsed = JSON.parse(targetSectorsRaw);
+    if (Array.isArray(parsed)) {
+      const allowed = new Set<string>(MARKETPLACE_SECTORS);
+      targetSectors = parsed.filter(
+        (s): s is string => typeof s === "string" && allowed.has(s)
+      );
+    }
+  } catch {
+    targetSectors = [];
+  }
+  if (targetSectors.length === 0) {
+    return NextResponse.json(
+      { error: "Select at least one applicable sector." },
+      { status: 400 }
+    );
   }
 
   let whatIncluded: string[] = [];
@@ -267,7 +292,7 @@ export async function POST(req: NextRequest) {
       contentsPreview,
       category: (CATEGORY_MAP[category] ?? "PLAYBOOK") as never,
       serviceDomain: category,
-      targetSectors: [],
+      targetSectors,
       complexityLevel: "Intermediate",
       tags,
       targetAudience,
@@ -379,6 +404,18 @@ export async function PUT(req: NextRequest) {
     updateData.tags = (body.tags as unknown[])
       .filter((s): s is string => typeof s === "string")
       .slice(0, 8);
+  }
+  if (Array.isArray(body.targetSectors)) {
+    const allowed = new Set<string>(MARKETPLACE_SECTORS);
+    const filtered = (body.targetSectors as unknown[])
+      .filter((s): s is string => typeof s === "string" && allowed.has(s));
+    if (filtered.length === 0) {
+      return NextResponse.json(
+        { error: "Select at least one applicable sector." },
+        { status: 400 }
+      );
+    }
+    updateData.targetSectors = filtered;
   }
 
   if (Object.keys(updateData).length === 0) {

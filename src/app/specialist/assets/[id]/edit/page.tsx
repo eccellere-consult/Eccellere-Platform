@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Save, Loader2, CheckCircle2, X, AlertTriangle, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { MARKETPLACE_SECTORS } from "@/lib/sectors";
 
 const CATEGORIES = [
   "Strategy & Planning",
@@ -34,6 +35,7 @@ interface FormState {
   tagInput: string;
   category: string;
   format: string;
+  targetSectors: string[];
 }
 
 export default function EditAssetPage() {
@@ -62,6 +64,7 @@ export default function EditAssetPage() {
     tagInput: "",
     category: "",
     format: "",
+    targetSectors: [],
   });
 
   const loadAsset = useCallback(async () => {
@@ -87,6 +90,7 @@ export default function EditAssetPage() {
         tagInput: "",
         category: asset.serviceDomain ?? "",
         format: Array.isArray(asset.components) && asset.components.length > 0 ? asset.components[0] : "",
+        targetSectors: Array.isArray(asset.targetSectors) ? asset.targetSectors : [],
       });
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : "Failed to load asset");
@@ -124,6 +128,15 @@ export default function EditAssetPage() {
     setForm((prev) => ({ ...prev, tags: prev.tags.filter((t) => t !== tag) }));
   }
 
+  function toggleSector(sector: string) {
+    setForm((prev) => ({
+      ...prev,
+      targetSectors: prev.targetSectors.includes(sector)
+        ? prev.targetSectors.filter((s) => s !== sector)
+        : [...prev.targetSectors, sector],
+    }));
+  }
+
   async function handleResubmit() {
     setSaveError("");
     setResubmitting(true);
@@ -153,6 +166,9 @@ export default function EditAssetPage() {
     try {
       const priceNum = parseFloat(form.price);
       if (isNaN(priceNum) || priceNum < 0) throw new Error("Please enter a valid price.");
+      if (form.targetSectors.length === 0) {
+        throw new Error("Select at least one applicable sector.");
+      }
 
       const res = await fetch("/api/specialist/assets", {
         method: "PUT",
@@ -166,6 +182,7 @@ export default function EditAssetPage() {
           contentsPreview: form.contentsPreview,
           targetAudience: form.targetAudience,
           tags: form.tags,
+          targetSectors: form.targetSectors,
         }),
       });
       const json = await res.json();
@@ -448,6 +465,40 @@ export default function EditAssetPage() {
                   placeholder="e.g. MSME founders, CFOs, operations managers"
                   className="mt-1.5 w-full rounded border border-eccellere-ink/15 bg-eccellere-cream px-3 py-2.5 text-sm text-eccellere-ink placeholder:text-ink-light/60 focus:border-eccellere-gold focus:outline-none focus:ring-1 focus:ring-eccellere-gold disabled:opacity-50"
                 />
+              </div>
+
+              {/* Applicable Sectors */}
+              <div>
+                <label className="block text-xs font-medium uppercase tracking-wider text-ink-light">
+                  Applicable Sectors <span className="text-eccellere-error">*</span>
+                </label>
+                <p className="mt-1 text-xs text-ink-light/70">
+                  Tick every sector this asset is relevant to. Buyers in those sectors will see it in the marketplace.
+                </p>
+                <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {MARKETPLACE_SECTORS.map((sector) => {
+                    const checked = form.targetSectors.includes(sector);
+                    return (
+                      <label
+                        key={sector}
+                        className={`flex cursor-pointer items-center gap-2 rounded border px-3 py-2 text-sm transition ${
+                          checked
+                            ? "border-eccellere-gold bg-eccellere-gold/10 text-eccellere-ink"
+                            : "border-eccellere-ink/15 bg-eccellere-cream text-eccellere-ink hover:border-eccellere-gold/60"
+                        } ${!canEdit ? "pointer-events-none opacity-60" : ""}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          disabled={!canEdit}
+                          onChange={() => toggleSector(sector)}
+                          className="h-4 w-4 rounded border-eccellere-ink/30 text-eccellere-gold focus:ring-eccellere-gold"
+                        />
+                        <span>{sector}</span>
+                      </label>
+                    );
+                  })}
+                </div>
               </div>
 
               {/* Tags */}
