@@ -54,10 +54,26 @@ const nextConfig: NextConfig = {
         headers: securityHeaders,
       },
       {
-        // Cache static assets aggressively
-        source: "/(.*)\\.(js|css|woff2|woff|ttf|ico|png|jpg|jpeg|svg|webp|avif)",
+        // Cache static assets aggressively (filenames are content-hashed → safe forever)
+        source: "/_next/static/:path*",
         headers: [
           { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+        ],
+      },
+      {
+        // Same for top-level public files with hashed/versioned extensions
+        source: "/(.*)\\.(woff2|woff|ttf|ico|png|jpg|jpeg|svg|webp|avif)",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+        ],
+      },
+      {
+        // HTML pages: never let an upstream CDN serve a stale shell that
+        // references old JS chunk hashes after a deploy. Browsers may
+        // revalidate, but proxies must not store.
+        source: "/((?!_next/static|_next/image|api/).*)",
+        headers: [
+          { key: "Cache-Control", value: "private, no-store, max-age=0, must-revalidate" },
         ],
       },
     ];

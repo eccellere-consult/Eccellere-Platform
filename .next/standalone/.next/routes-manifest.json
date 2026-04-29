@@ -52,14 +52,34 @@
       "regex": "^(?:/(.*))(?:/)?$"
     },
     {
-      "source": "/(.*)\\.(js|css|woff2|woff|ttf|ico|png|jpg|jpeg|svg|webp|avif)",
+      "source": "/_next/static/:path*",
       "headers": [
         {
           "key": "Cache-Control",
           "value": "public, max-age=31536000, immutable"
         }
       ],
-      "regex": "^(?:/(.*))\\.(js|css|woff2|woff|ttf|ico|png|jpg|jpeg|svg|webp|avif)(?:/)?$"
+      "regex": "^/_next/static(?:/((?:[^/]+?)(?:/(?:[^/]+?))*))?(?:/)?$"
+    },
+    {
+      "source": "/(.*)\\.(woff2|woff|ttf|ico|png|jpg|jpeg|svg|webp|avif)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ],
+      "regex": "^(?:/(.*))\\.(woff2|woff|ttf|ico|png|jpg|jpeg|svg|webp|avif)(?:/)?$"
+    },
+    {
+      "source": "/((?!_next/static|_next/image|api/).*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "private, no-store, max-age=0, must-revalidate"
+        }
+      ],
+      "regex": "^(?:/((?!_next/static|_next/image|api/).*))(?:/)?$"
     }
   ],
   "rewrites": {
