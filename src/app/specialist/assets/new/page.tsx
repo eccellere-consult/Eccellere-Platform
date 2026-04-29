@@ -429,6 +429,9 @@ export default function SubmitNewAssetPage() {
                   >
                     Listing Price (₹) <span className="text-eccellere-error">*</span>
                   </label>
+                  <p className="mt-0.5 text-[11px] text-ink-light/70">
+                    AI suggests a price after analysis — you can change it to any amount.
+                  </p>
                   <div className="relative mt-1.5">
                     <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-ink-light">
                       ₹
@@ -439,7 +442,7 @@ export default function SubmitNewAssetPage() {
                       type="number"
                       required
                       min="0"
-                      step="100"
+                      step="any"
                       value={form.price}
                       onChange={handleChange}
                       placeholder="e.g. 4999"

@@ -327,7 +327,7 @@ export default function EditAssetPage() {
                     type="number"
                     required
                     min="0"
-                    step="100"
+                    step="any"
                     disabled={!canEdit}
                     value={form.price}
                     onChange={handleChange}
