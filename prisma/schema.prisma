@@ -171,19 +171,19 @@ model Asset {
   previewUrl      String?
   version         String        @default("1.0")
   status          AssetStatus   @default(DRAFT)
-  isFeatured        Boolean       @default(false)
-  downloadEnabled   Boolean       @default(true)
-  licenceType       String        @default("single-use")
-  exclusivity       String        @default("exclusive")
+  isFeatured      Boolean       @default(false)
+  downloadEnabled Boolean       @default(true)
+  licenceType     String        @default("single-use")
+  exclusivity     String        @default("exclusive")
 
   authorId String
   author   SpecialistProfile @relation(fields: [authorId], references: [id])
 
   // Structured marketplace listing sections (populated by AI or manually by specialist)
-  aboutResource    String?  @db.Text  // "About This Resource" narrative paragraph
-  whatIncluded     Json?              // string[] — bullet list of deliverables
-  contentsPreview  Json?              // string[] — bullet list of sections/chapters
-  documentExcerpt  String?  @db.Text  // Raw text excerpt from the uploaded document (first ~800 chars)
+  aboutResource   String? @db.Text // "About This Resource" narrative paragraph
+  whatIncluded    Json? // string[] — bullet list of deliverables
+  contentsPreview Json? // string[] — bullet list of sections/chapters
+  documentExcerpt String? @db.Text // Raw text excerpt from the uploaded document (first ~800 chars)
 
   reviewNotes    String?
   reviewedBy     String?
@@ -671,12 +671,34 @@ model NewsletterSubscriber {
 }
 
 model PasswordResetToken {
-  id        String   @id @default(cuid())
-  token     String   @unique
+  id        String    @id @default(cuid())
+  token     String    @unique
   email     String
   expiresAt DateTime
   usedAt    DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   @@index([email])
+}
+
+// ============================
+// WHATSAPP � WORKING CAPITAL DIAGNOSTIC
+// ============================
+
+model WcDiagnosticSession {
+  id           String    @id @default(cuid())
+  phoneNumber  String
+  status       String    @default("active") // active | completed | abandoned
+  phase        String    @default("screening") // screening | drill | complete
+  /// Ordered list of question IDs still to ask. JSON array of strings.
+  queue        Json      @default("[]")
+  /// Map of questionId -> number | "yes" | "no". JSON object.
+  answers      Json      @default("{}")
+  totalPlanned Int       @default(5)
+  reportSent   Boolean   @default(false)
+  startedAt    DateTime  @default(now())
+  completedAt  DateTime?
+  updatedAt    DateTime  @updatedAt
+
+  @@index([phoneNumber, status])
 }
