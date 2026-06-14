@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Download, FileText, CheckCircle, AlertCircle, Tag, X, Loader2 } from "lucide-react";
+import { Download, FileText, CheckCircle, AlertCircle, Tag, X, Loader2, ChevronDown, ChevronUp } from "lucide-react";
 import Link from "next/link";
 import { CheckoutButton } from "@/components/marketplace/CheckoutButton";
 import { AssetSamplePreviewModal } from "@/components/marketplace/AssetSamplePreviewModal";
@@ -22,6 +22,25 @@ export function PurchaseCard({ asset, discount }: PurchaseCardProps) {
   const [purchased, setPurchased] = useState<string | null>(null);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
+  // Available coupons fetched from API
+  type AvailableCoupon = {
+    code: string;
+    description: string | null;
+    discountType: string;
+    discountValue: number;
+    minOrderAmount: number | null;
+    validUntil: string;
+  };
+  const [availableCoupons, setAvailableCoupons] = useState<AvailableCoupon[]>([]);
+  const [offersOpen, setOffersOpen] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/coupons")
+      .then((r) => r.json())
+      .then((d) => setAvailableCoupons(d.coupons ?? []))
+      .catch(() => {/* silent — coupon list is optional */});
+  }, []);
+
   // Coupon state
   const [couponInput, setCouponInput] = useState("");
   const [couponValidating, setCouponValidating] = useState(false);
@@ -35,26 +54,20 @@ export function PurchaseCard({ asset, discount }: PurchaseCardProps) {
 
   const effectivePrice = appliedCoupon ? appliedCoupon.finalAmount : asset.price;
 
-  const validateCoupon = async () => {
-    const code = couponInput.trim().toUpperCase();
-    if (!code) return;
+  const applyCode = async (code: string) => {
     setCouponValidating(true);
     setCouponError(null);
     try {
       const res = await fetch("/api/coupons/validate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code, orderAmount: asset.price }),
+        body: JSON.stringify({ code: code.trim().toUpperCase(), orderAmount: asset.price }),
       });
       const data = await res.json();
       if (data.valid) {
-        setAppliedCoupon({
-          code,
-          couponId: data.couponId,
-          discountAmount: data.discountAmount,
-          finalAmount: data.finalAmount,
-        });
+        setAppliedCoupon({ code: code.trim().toUpperCase(), couponId: data.couponId, discountAmount: data.discountAmount, finalAmount: data.finalAmount });
         setCouponInput("");
+        setOffersOpen(false);
       } else {
         setCouponError(data.reason ?? "Invalid coupon");
       }
@@ -127,9 +140,10 @@ export function PurchaseCard({ asset, discount }: PurchaseCardProps) {
 
         <div className="mt-1 text-xs text-ink-light">Inclusive of GST</div>
 
-        {/* Coupon input */}
+        {/* Coupon section */}
         <div className="mt-4">
           {appliedCoupon ? (
+            /* Applied state */
             <div className="flex items-center justify-between rounded-md border border-eccellere-teal/30 bg-eccellere-teal/5 px-3 py-2">
               <div className="flex items-center gap-2">
                 <Tag className="h-3.5 w-3.5 text-eccellere-teal" />
@@ -141,22 +155,85 @@ export function PurchaseCard({ asset, discount }: PurchaseCardProps) {
               </button>
             </div>
           ) : (
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={couponInput}
-                onChange={(e) => { setCouponInput(e.target.value.toUpperCase()); setCouponError(null); }}
-                onKeyDown={(e) => e.key === "Enter" && validateCoupon()}
-                placeholder="Coupon code"
-                className="flex-1 rounded-md border border-eccellere-ink/10 bg-eccellere-cream/50 px-3 py-2 text-sm uppercase placeholder:normal-case placeholder:text-ink-light focus:border-eccellere-gold focus:outline-none focus:ring-1 focus:ring-eccellere-gold"
-              />
-              <button
-                onClick={validateCoupon}
-                disabled={!couponInput.trim() || couponValidating}
-                className="rounded-md bg-eccellere-ink/5 px-3 py-2 text-xs font-medium text-eccellere-ink hover:bg-eccellere-ink/10 disabled:opacity-50"
-              >
-                {couponValidating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Apply"}
-              </button>
+            <div>
+              {/* Available offers toggle */}
+              {availableCoupons.length > 0 && (
+                <button
+                  onClick={() => setOffersOpen((o) => !o)}
+                  className="flex w-full items-center justify-between rounded-md border border-eccellere-gold/30 bg-eccellere-gold/5 px-3 py-2 text-left"
+                >
+                  <div className="flex items-center gap-2">
+                    <Tag className="h-3.5 w-3.5 text-eccellere-gold" />
+                    <span className="text-xs font-medium text-eccellere-gold">
+                      {availableCoupons.length} offer{availableCoupons.length > 1 ? "s" : ""} available
+                    </span>
+                  </div>
+                  {offersOpen
+                    ? <ChevronUp className="h-3.5 w-3.5 text-eccellere-gold" />
+                    : <ChevronDown className="h-3.5 w-3.5 text-eccellere-gold" />}
+                </button>
+              )}
+
+              {/* Offers list */}
+              {offersOpen && (
+                <div className="mt-1 overflow-hidden rounded-md border border-eccellere-ink/10 bg-white shadow-sm">
+                  {availableCoupons.map((c) => {
+                    const saving = c.discountType === "percentage"
+                      ? `${c.discountValue}% off`
+                      : `₹${c.discountValue} off`;
+                    const eligible = c.minOrderAmount === null || asset.price >= c.minOrderAmount;
+                    return (
+                      <div
+                        key={c.code}
+                        className="flex items-center justify-between border-b border-eccellere-ink/5 px-3 py-2.5 last:border-0"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <code className="rounded bg-eccellere-ink/5 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-eccellere-ink">
+                              {c.code}
+                            </code>
+                            <span className="text-[11px] font-medium text-eccellere-gold">{saving}</span>
+                          </div>
+                          {c.description && (
+                            <p className="mt-0.5 truncate text-[10px] text-ink-light">{c.description}</p>
+                          )}
+                          {!eligible && c.minOrderAmount && (
+                            <p className="mt-0.5 text-[10px] text-amber-500">
+                              Min. order {formatPrice(c.minOrderAmount)} required
+                            </p>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => applyCode(c.code)}
+                          disabled={!eligible || couponValidating}
+                          className="ml-3 shrink-0 rounded-md bg-eccellere-gold px-2.5 py-1 text-[11px] font-medium text-white hover:bg-eccellere-gold/90 disabled:opacity-40"
+                        >
+                          {couponValidating ? <Loader2 className="h-3 w-3 animate-spin" /> : "Apply"}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Manual entry */}
+              <div className="mt-2 flex gap-2">
+                <input
+                  type="text"
+                  value={couponInput}
+                  onChange={(e) => { setCouponInput(e.target.value.toUpperCase()); setCouponError(null); }}
+                  onKeyDown={(e) => e.key === "Enter" && applyCode(couponInput)}
+                  placeholder={availableCoupons.length > 0 ? "Or enter code manually" : "Coupon code"}
+                  className="flex-1 rounded-md border border-eccellere-ink/10 bg-eccellere-cream/50 px-3 py-2 text-sm uppercase placeholder:normal-case placeholder:text-ink-light focus:border-eccellere-gold focus:outline-none focus:ring-1 focus:ring-eccellere-gold"
+                />
+                <button
+                  onClick={() => applyCode(couponInput)}
+                  disabled={!couponInput.trim() || couponValidating}
+                  className="rounded-md bg-eccellere-ink/5 px-3 py-2 text-xs font-medium text-eccellere-ink hover:bg-eccellere-ink/10 disabled:opacity-50"
+                >
+                  {couponValidating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Apply"}
+                </button>
+              </div>
             </div>
           )}
           {couponError && (
