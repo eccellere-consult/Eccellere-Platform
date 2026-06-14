@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Download, FileText, CheckCircle, AlertCircle } from "lucide-react";
+import { Download, FileText, CheckCircle, AlertCircle, Tag, X, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { CheckoutButton } from "@/components/marketplace/CheckoutButton";
 import { AssetSamplePreviewModal } from "@/components/marketplace/AssetSamplePreviewModal";
@@ -19,8 +19,57 @@ function formatPrice(p: number) {
 
 export function PurchaseCard({ asset, discount }: PurchaseCardProps) {
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [purchased, setPurchased] = useState<string | null>(null); // order id after success
+  const [purchased, setPurchased] = useState<string | null>(null);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
+
+  // Coupon state
+  const [couponInput, setCouponInput] = useState("");
+  const [couponValidating, setCouponValidating] = useState(false);
+  const [couponError, setCouponError] = useState<string | null>(null);
+  const [appliedCoupon, setAppliedCoupon] = useState<{
+    code: string;
+    couponId: string;
+    discountAmount: number;
+    finalAmount: number;
+  } | null>(null);
+
+  const effectivePrice = appliedCoupon ? appliedCoupon.finalAmount : asset.price;
+
+  const validateCoupon = async () => {
+    const code = couponInput.trim().toUpperCase();
+    if (!code) return;
+    setCouponValidating(true);
+    setCouponError(null);
+    try {
+      const res = await fetch("/api/coupons/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, orderAmount: asset.price }),
+      });
+      const data = await res.json();
+      if (data.valid) {
+        setAppliedCoupon({
+          code,
+          couponId: data.couponId,
+          discountAmount: data.discountAmount,
+          finalAmount: data.finalAmount,
+        });
+        setCouponInput("");
+      } else {
+        setCouponError(data.reason ?? "Invalid coupon");
+      }
+    } catch {
+      setCouponError("Could not validate coupon. Try again.");
+    } finally {
+      setCouponValidating(false);
+    }
+  };
+
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponError(null);
+    setCouponInput("");
+  };
 
   if (purchased) {
     return (
@@ -57,21 +106,65 @@ export function PurchaseCard({ asset, discount }: PurchaseCardProps) {
         {/* Price */}
         <div className="flex items-end gap-3">
           <span className="font-mono text-3xl font-light text-eccellere-ink">
-            {formatPrice(asset.price)}
+            {formatPrice(effectivePrice)}
           </span>
-          {asset.originalPrice && discount && (
+          {appliedCoupon ? (
             <div className="flex items-center gap-2">
-              <span className="text-sm text-ink-light line-through">
-                {formatPrice(asset.originalPrice)}
+              <span className="text-sm text-ink-light line-through">{formatPrice(asset.price)}</span>
+              <span className="rounded bg-eccellere-teal/10 px-1.5 py-0.5 text-xs font-medium text-eccellere-teal">
+                −{formatPrice(appliedCoupon.discountAmount)}
               </span>
+            </div>
+          ) : asset.originalPrice && discount ? (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-ink-light line-through">{formatPrice(asset.originalPrice)}</span>
               <span className="rounded bg-eccellere-teal/10 px-1.5 py-0.5 text-xs font-medium text-eccellere-teal">
                 {discount}% off
               </span>
             </div>
-          )}
+          ) : null}
         </div>
 
         <div className="mt-1 text-xs text-ink-light">Inclusive of GST</div>
+
+        {/* Coupon input */}
+        <div className="mt-4">
+          {appliedCoupon ? (
+            <div className="flex items-center justify-between rounded-md border border-eccellere-teal/30 bg-eccellere-teal/5 px-3 py-2">
+              <div className="flex items-center gap-2">
+                <Tag className="h-3.5 w-3.5 text-eccellere-teal" />
+                <span className="font-mono text-xs font-semibold text-eccellere-teal">{appliedCoupon.code}</span>
+                <span className="text-xs text-ink-mid">applied — saving {formatPrice(appliedCoupon.discountAmount)}</span>
+              </div>
+              <button onClick={removeCoupon} className="rounded p-1 text-ink-light hover:text-eccellere-ink">
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={couponInput}
+                onChange={(e) => { setCouponInput(e.target.value.toUpperCase()); setCouponError(null); }}
+                onKeyDown={(e) => e.key === "Enter" && validateCoupon()}
+                placeholder="Coupon code"
+                className="flex-1 rounded-md border border-eccellere-ink/10 bg-eccellere-cream/50 px-3 py-2 text-sm uppercase placeholder:normal-case placeholder:text-ink-light focus:border-eccellere-gold focus:outline-none focus:ring-1 focus:ring-eccellere-gold"
+              />
+              <button
+                onClick={validateCoupon}
+                disabled={!couponInput.trim() || couponValidating}
+                className="rounded-md bg-eccellere-ink/5 px-3 py-2 text-xs font-medium text-eccellere-ink hover:bg-eccellere-ink/10 disabled:opacity-50"
+              >
+                {couponValidating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Apply"}
+              </button>
+            </div>
+          )}
+          {couponError && (
+            <p className="mt-1.5 flex items-center gap-1 text-xs text-red-600">
+              <AlertCircle className="h-3 w-3" /> {couponError}
+            </p>
+          )}
+        </div>
 
         {checkoutError && (
           <div className="mt-3 flex items-start gap-2 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
@@ -84,7 +177,10 @@ export function PurchaseCard({ asset, discount }: PurchaseCardProps) {
           assetSlug={asset.slug}
           assetTitle={asset.title}
           assetFormat={asset.format}
-          price={asset.price}
+          price={effectivePrice}
+          couponCode={appliedCoupon?.code}
+          couponId={appliedCoupon?.couponId}
+          discountAmount={appliedCoupon?.discountAmount ?? 0}
           className="mt-5 w-full"
           onSuccess={(orderId) => {
             setCheckoutError(null);
@@ -94,7 +190,7 @@ export function PurchaseCard({ asset, discount }: PurchaseCardProps) {
             setCheckoutError(msg);
           }}
         >
-          Buy Now — {formatPrice(asset.price)}
+          Buy Now — {formatPrice(effectivePrice)}
         </CheckoutButton>
 
         <Button

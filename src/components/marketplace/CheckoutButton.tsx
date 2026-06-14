@@ -8,7 +8,10 @@ interface CheckoutButtonProps {
   assetSlug: string;
   assetTitle: string;
   assetFormat: string;
-  price: number; // in rupees
+  price: number; // effective price after coupon, in rupees
+  couponCode?: string;
+  couponId?: string;
+  discountAmount?: number;
   className?: string;
   children?: React.ReactNode;
   onSuccess?: (orderId: string) => void;
@@ -67,6 +70,9 @@ export function CheckoutButton({
   assetTitle,
   assetFormat,
   price,
+  couponCode,
+  couponId,
+  discountAmount = 0,
   className,
   children,
   onSuccess,
@@ -85,6 +91,9 @@ export function CheckoutButton({
           amount: price * 100, // convert to paise
           assetSlug,
           assetTitle,
+          couponCode,
+          couponId,
+          discountAmount,
         }),
       });
 
