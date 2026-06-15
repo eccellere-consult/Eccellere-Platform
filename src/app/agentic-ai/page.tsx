@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
@@ -21,6 +21,7 @@ import {
   Layers,
   ArrowRight,
   Star,
+  ChevronLeft,
 } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
@@ -374,6 +375,12 @@ const roadmap = [
 
 export default function AgenticAIPage() {
   const [agenticAssets, setAgenticAssets] = useState<Asset[]>([]);
+  const carouselRef = useRef<HTMLDivElement>(null);
+
+  const scrollCarousel = (dir: "left" | "right") => {
+    if (!carouselRef.current) return;
+    carouselRef.current.scrollBy({ left: dir === "right" ? 280 : -280, behavior: "smooth" });
+  };
 
   useEffect(() => {
     fetch("/api/marketplace/assets")
@@ -531,7 +538,27 @@ export default function AgenticAIPage() {
                   Browse all <ArrowRight className="h-3 w-3" />
                 </Link>
               </div>
-              <div className="flex gap-4 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <div className="relative">
+                {/* Prev button */}
+                <button
+                  onClick={() => scrollCarousel("left")}
+                  aria-label="Scroll left"
+                  className="absolute -left-4 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white p-2 shadow-md transition hover:bg-eccellere-gold hover:text-white"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                {/* Next button */}
+                <button
+                  onClick={() => scrollCarousel("right")}
+                  aria-label="Scroll right"
+                  className="absolute -right-4 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white p-2 shadow-md transition hover:bg-eccellere-gold hover:text-white"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+                <div
+                  ref={carouselRef}
+                  className="flex gap-4 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                >
                 {agenticAssets.map((asset) => (
                   <Link
                     key={asset.id}
@@ -565,6 +592,7 @@ export default function AgenticAIPage() {
                     </div>
                   </Link>
                 ))}
+                </div>
               </div>
             </div>
           </section>
