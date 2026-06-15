@@ -19,10 +19,12 @@ import {
   BarChart3,
   Layers,
   ArrowRight,
+  Star,
 } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
+import { assets as marketplaceAssets } from "@/lib/marketplace-data";
 
 /* ─── Data ─────────────────────────────────────────────────── */
 
@@ -495,6 +497,70 @@ export default function AgenticAIPage() {
             </div>
           </div>
         </section>
+
+        {/* ── Marketplace Carousel ── */}
+        {(() => {
+          const agenticAssets = marketplaceAssets.filter(
+            (a) => a.category === "Agentic AI"
+          );
+          return (
+            <section className="border-y border-eccellere-ink/5 bg-eccellere-cream py-10">
+              <div className="mx-auto max-w-[1280px] px-6">
+                <div className="mb-6 flex items-center justify-between">
+                  <div>
+                    <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-eccellere-gold">
+                      From the Marketplace
+                    </p>
+                    <p className="mt-1 text-sm text-ink-mid">
+                      Tools &amp; playbooks to accelerate your AI journey
+                    </p>
+                  </div>
+                  <Link
+                    href="/marketplace?category=Agentic+AI"
+                    className="flex items-center gap-1 text-xs font-medium text-eccellere-gold hover:underline"
+                  >
+                    Browse all <ArrowRight className="h-3 w-3" />
+                  </Link>
+                </div>
+                <div className="flex gap-4 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  {agenticAssets.map((asset) => (
+                    <Link
+                      key={asset.id}
+                      href={`/marketplace/${asset.slug}`}
+                      className="group flex w-64 shrink-0 flex-col rounded bg-white p-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="inline-block rounded-sm bg-eccellere-purple/20 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-eccellere-purple">
+                          {asset.category}
+                        </span>
+                        {asset.bestseller && (
+                          <span className="rounded-sm bg-eccellere-gold px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-white">
+                            Bestseller
+                          </span>
+                        )}
+                      </div>
+                      <h3 className="mt-3 text-sm font-medium leading-snug text-eccellere-ink">
+                        {asset.title}
+                      </h3>
+                      <p className="mt-1.5 line-clamp-2 text-xs text-ink-mid">
+                        {asset.description}
+                      </p>
+                      <div className="mt-auto flex items-center justify-between border-t border-eccellere-ink/5 pt-3">
+                        <span className="font-mono text-base font-medium text-eccellere-ink">
+                          ₹{asset.price.toLocaleString("en-IN")}
+                        </span>
+                        <span className="flex items-center gap-1 text-xs text-eccellere-gold">
+                          <Star className="h-3 w-3 fill-current" />
+                          {asset.rating}
+                        </span>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            </section>
+          );
+        })()}
 
         {/* ── 5 MSME Offerings ── */}
         <section className="bg-gold-pale py-20 lg:py-[120px]">
