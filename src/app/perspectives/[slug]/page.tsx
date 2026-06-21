@@ -87,25 +87,23 @@ function parseDbContent(content: string): Array<{ type: "paragraph" | "heading" 
 export default async function ArticleDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const article = articles.find((a) => a.slug === slug);
-  const dbPost = !article
-    ? await prisma.blogPost.findFirst({
-        where: { slug, status: { in: ["published", "scheduled"] } },
-        select: {
-          slug: true,
-          title: true,
-          excerpt: true,
-          content: true,
-          category: true,
-          tags: true,
-          authorName: true,
-          authorBio: true,
-          heroImage: true,
-          readingTime: true,
-          publishedAt: true,
-          createdAt: true,
-        },
-      })
-    : null;
+  const dbPost = await prisma.blogPost.findFirst({
+    where: { slug, status: { in: ["published", "scheduled"] } },
+    select: {
+      slug: true,
+      title: true,
+      excerpt: true,
+      content: true,
+      category: true,
+      tags: true,
+      authorName: true,
+      authorBio: true,
+      heroImage: true,
+      readingTime: true,
+      publishedAt: true,
+      createdAt: true,
+    },
+  });
 
   if (!article && !dbPost) notFound();
 
@@ -116,17 +114,20 @@ export default async function ArticleDetailPage({ params }: { params: Promise<{ 
         .slice(0, 3) as typeof articles
     : [];
 
-  const catColor = categoryColors[(article ?? dbPost)!.category] ?? "bg-eccellere-ink/10 text-eccellere-ink";
+  const source = dbPost ?? article;
+  const catColor = categoryColors[source!.category] ?? "bg-eccellere-ink/10 text-eccellere-ink";
   const heroImage = dbPost?.heroImage ?? article?.heroImage ?? null;
-  const heroTitle = article?.title ?? dbPost!.title;
-  const heroTeaser = article?.teaser ?? dbPost!.excerpt ?? dbPost!.content.slice(0, 180);
-  const displayAuthor = article?.author ?? dbPost!.authorName;
-  const displayAuthorRole = article?.authorRole ?? dbPost?.authorBio ?? "";
-  const articleContent = article ? article.content : parseDbContent(dbPost!.content);
-  const tags = article ? article.tags : (Array.isArray(dbPost?.tags) ? dbPost!.tags : []);
-  const dateLabel = article ? article.date : new Date(dbPost!.publishedAt ?? dbPost!.createdAt).toLocaleDateString("en-IN", { month: "short", year: "numeric" });
-  const readTime = article ? article.readTime : `${dbPost?.readingTime ?? 0} min read`;
-  const currentCategory = article?.category ?? dbPost!.category;
+  const heroTitle = dbPost?.title ?? article!.title;
+  const heroTeaser = dbPost?.excerpt ?? (dbPost ? dbPost.content.slice(0, 180) : article!.teaser);
+  const displayAuthor = dbPost?.authorName ?? article!.author;
+  const displayAuthorRole = dbPost?.authorBio ?? article?.authorRole ?? "";
+  const articleContent = dbPost ? parseDbContent(dbPost.content) : article!.content;
+  const tags = dbPost ? (Array.isArray(dbPost.tags) ? dbPost.tags : []) : article!.tags;
+  const dateLabel = dbPost
+    ? new Date(dbPost.publishedAt ?? dbPost.createdAt).toLocaleDateString("en-IN", { month: "short", year: "numeric" })
+    : article!.date;
+  const readTime = dbPost ? `${dbPost.readingTime ?? 0} min read` : article!.readTime;
+  const currentCategory = source!.category;
 
   return (
     <>
