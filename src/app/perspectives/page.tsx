@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { motion } from "framer-motion";
 import { Search, Clock, User } from "lucide-react";
 import { Header } from "@/components/layout/Header";
