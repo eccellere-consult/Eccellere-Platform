@@ -11,6 +11,7 @@ import {
   Upload,
   X,
   Loader2,
+  Sparkles,
   Image as ImageIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -78,6 +79,13 @@ export default function AdminContent() {
   const [heroPreview, setHeroPreview] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [composerTab, setComposerTab] = useState<"manual" | "ai">("manual");
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiSourceText, setAiSourceText] = useState("");
+  const [aiCategoryHint, setAiCategoryHint] = useState("MSME Strategy");
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [sourceFileName, setSourceFileName] = useState<string | null>(null);
 
   const fetchContent = useCallback(async () => {
     setLoading(true);
@@ -162,6 +170,49 @@ export default function AdminContent() {
       setSaveError(err instanceof Error ? err.message : "Failed to create post");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleSourceTextFile(file: File | null) {
+    if (!file) return;
+    try {
+      const text = await file.text();
+      setAiSourceText((prev) => (prev ? `${prev}\n\n${text}` : text));
+      setSourceFileName(file.name);
+    } catch {
+      setAiError("Could not read the uploaded file. Please use .txt or .md.");
+    }
+  }
+
+  async function handleGenerateDraft() {
+    setAiError(null);
+    setAiGenerating(true);
+    try {
+      const res = await fetch("/api/admin/content/ai-draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: aiPrompt,
+          sourceText: aiSourceText,
+          categoryHint: aiCategoryHint,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to generate draft");
+
+      setForm((prev) => ({
+        ...prev,
+        title: data.title || prev.title,
+        excerpt: data.excerpt || prev.excerpt,
+        category: data.category || prev.category,
+        content: data.content || prev.content,
+        tags: Array.isArray(data.tags) ? data.tags.join(", ") : prev.tags,
+      }));
+      setComposerTab("manual");
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : "Failed to generate draft");
+    } finally {
+      setAiGenerating(false);
     }
   }
 
@@ -309,6 +360,12 @@ export default function AdminContent() {
                   setHeroFile(null);
                   setHeroPreview(null);
                   setSaveError(null);
+                  setAiError(null);
+                  setAiPrompt("");
+                  setAiSourceText("");
+                  setAiCategoryHint("MSME Strategy");
+                  setSourceFileName(null);
+                  setComposerTab("manual");
                 }}
                 className="rounded p-1 text-ink-light hover:bg-eccellere-ink/5 hover:text-eccellere-ink"
               >
@@ -316,6 +373,111 @@ export default function AdminContent() {
               </button>
             </div>
 
+            <div className="mb-5 inline-flex rounded-md border border-eccellere-ink/10 bg-eccellere-cream p-1">
+              <button
+                onClick={() => setComposerTab("manual")}
+                className={cn(
+                  "rounded px-3 py-1.5 text-xs font-medium",
+                  composerTab === "manual"
+                    ? "bg-white text-eccellere-ink shadow-sm"
+                    : "text-ink-mid"
+                )}
+              >
+                Create Manually
+              </button>
+              <button
+                onClick={() => setComposerTab("ai")}
+                className={cn(
+                  "inline-flex items-center gap-1 rounded px-3 py-1.5 text-xs font-medium",
+                  composerTab === "ai"
+                    ? "bg-white text-eccellere-ink shadow-sm"
+                    : "text-ink-mid"
+                )}
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                Create with AI
+              </button>
+            </div>
+
+            {composerTab === "ai" ? (
+              <div className="space-y-5">
+                <div>
+                  <label className="mb-1.5 block text-xs uppercase tracking-wider text-ink-light">
+                    Topic / Prompt
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={aiPrompt}
+                    onChange={(e) => setAiPrompt(e.target.value)}
+                    className="w-full rounded border border-eccellere-ink/10 px-3 py-2.5 text-sm focus:border-eccellere-gold focus:outline-none"
+                    placeholder="Example: Write an MSME-focused article on reducing receivables cycle using AI and process controls."
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-xs uppercase tracking-wider text-ink-light">
+                    Category Hint
+                  </label>
+                  <input
+                    value={aiCategoryHint}
+                    onChange={(e) => setAiCategoryHint(e.target.value)}
+                    className="w-full rounded border border-eccellere-ink/10 px-3 py-2.5 text-sm focus:border-eccellere-gold focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-xs uppercase tracking-wider text-ink-light">
+                    Source Draft / Notes
+                  </label>
+                  <textarea
+                    rows={8}
+                    value={aiSourceText}
+                    onChange={(e) => setAiSourceText(e.target.value)}
+                    className="w-full rounded border border-eccellere-ink/10 px-3 py-2.5 text-sm focus:border-eccellere-gold focus:outline-none"
+                    placeholder="Paste any old article, bullet points, or raw draft here..."
+                  />
+                  <div className="mt-2 flex items-center gap-3">
+                    <label className="inline-flex cursor-pointer items-center gap-2 rounded border border-eccellere-ink/10 px-3 py-1.5 text-xs text-eccellere-ink hover:bg-eccellere-cream">
+                      <Upload className="h-3.5 w-3.5" />
+                      Upload Article Text File
+                      <input
+                        type="file"
+                        accept=".txt,.md,text/plain,text/markdown"
+                        className="hidden"
+                        onChange={(e) => handleSourceTextFile(e.target.files?.[0] || null)}
+                      />
+                    </label>
+                    {sourceFileName && <span className="text-xs text-ink-light">Loaded: {sourceFileName}</span>}
+                  </div>
+                </div>
+
+                <p className="text-xs text-ink-light">
+                  You can also upload a hero image in the manual tab after draft generation.
+                </p>
+
+                {aiError && <p className="text-sm text-eccellere-error">{aiError}</p>}
+
+                <div className="flex justify-end">
+                  <Button
+                    onClick={handleGenerateDraft}
+                    disabled={aiGenerating || (!aiPrompt.trim() && !aiSourceText.trim())}
+                    className="gap-2"
+                  >
+                    {aiGenerating ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Generating Draft...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4" />
+                        Generate & Fill Draft
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            ) : (
             <div className="grid gap-5 sm:grid-cols-2">
               <div className="sm:col-span-2">
                 <label className="mb-1.5 block text-xs uppercase tracking-wider text-ink-light">Title *</label>
@@ -429,6 +591,7 @@ export default function AdminContent() {
                 )}
               </div>
             </div>
+            )}
 
             {saveError && <p className="mt-4 text-sm text-eccellere-error">{saveError}</p>}
 
@@ -440,11 +603,18 @@ export default function AdminContent() {
                   setForm(EMPTY_COMPOSER);
                   setHeroFile(null);
                   setHeroPreview(null);
+                  setAiError(null);
+                  setAiPrompt("");
+                  setAiSourceText("");
+                  setAiCategoryHint("MSME Strategy");
+                  setSourceFileName(null);
+                  setComposerTab("manual");
                 }}
               >
                 Cancel
               </Button>
               <Button
+                className={composerTab === "ai" ? "hidden" : ""}
                 disabled={saving || !form.title.trim() || !form.content.trim() || !form.category.trim()}
                 onClick={handleCreatePost}
               >
