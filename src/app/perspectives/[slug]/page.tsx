@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import Image from "next/image";
 import { Clock, User, Tag, ArrowLeft, ChevronRight, Image as ImageIcon } from "lucide-react";
 import { Header } from "@/components/layout/Header";
@@ -104,21 +104,6 @@ export default async function ArticleDetailPage({ params }: { params: Promise<{ 
       createdAt: true,
     },
   });
-
-  if (!dbPost) {
-    const slugPrefixMatch = await prisma.blogPost.findFirst({
-      where: {
-        status: { in: ["published", "scheduled"] },
-        slug: { startsWith: `${slug}-` },
-      },
-      orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
-      select: { slug: true },
-    });
-
-    if (slugPrefixMatch?.slug) {
-      redirect(`/perspectives/${slugPrefixMatch.slug}`);
-    }
-  }
 
   if (!article && !dbPost) notFound();
 
