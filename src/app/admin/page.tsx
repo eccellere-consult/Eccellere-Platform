@@ -10,6 +10,7 @@ import {
   IndianRupee,
   FileText,
   MessageCircle,
+  Mail,
   Shield,
   Tag,
   ClipboardList,
@@ -128,6 +129,14 @@ const adminModules = [
     description: "Create and manage discount coupons",
     icon: Tag,
     stat: "15",
+    badge: null,
+  },
+  {
+    label: "Enquiries",
+    href: "/admin/contact-enquiries",
+    description: "View and manage website contact submissions",
+    icon: Mail,
+    stat: "new",
     badge: null,
   },
   {
