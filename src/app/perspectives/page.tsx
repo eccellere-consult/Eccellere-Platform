@@ -210,17 +210,6 @@ export default function PerspectivesPage() {
                   href={`/perspectives/${featured.slug}`}
                   className="group block rounded bg-white p-8 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md lg:p-10"
                 >
-                  {featured.heroImage && (
-                    <div className="mb-6 aspect-[3/2] overflow-hidden rounded-md bg-eccellere-cream">
-                      <Image
-                        src={featured.heroImage}
-                        alt={featured.title}
-                        width={1536}
-                        height={1024}
-                        className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-[1.02]"
-                      />
-                    </div>
-                  )}
                   <span className="inline-block rounded-sm bg-eccellere-gold/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-eccellere-gold">
                     Featured · {featured.category}
                   </span>
@@ -256,17 +245,6 @@ export default function PerspectivesPage() {
                     href={`/perspectives/${article.slug}`}
                     className="group block h-full rounded bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md"
                   >
-                    {article.heroImage && (
-                      <div className="mb-4 aspect-[3/2] overflow-hidden rounded bg-eccellere-cream">
-                        <Image
-                          src={article.heroImage}
-                          alt={article.title}
-                          width={1536}
-                          height={1024}
-                          className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-[1.03]"
-                        />
-                      </div>
-                    )}
                     <span className="text-[10px] font-medium uppercase tracking-wider text-eccellere-gold">
                       {article.category}
                     </span>
