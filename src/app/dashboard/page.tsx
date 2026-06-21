@@ -290,7 +290,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Quick actions */}
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Link
           href="/dashboard/advisor"
           className="flex items-center gap-4 rounded-lg bg-eccellere-ink p-5 transition-colors hover:bg-eccellere-ink/90"
@@ -327,6 +327,20 @@ export default function DashboardPage() {
           <div>
             <p className="text-sm font-medium text-eccellere-ink">View Assessments</p>
             <p className="mt-0.5 text-xs text-ink-light">Your AI readiness history</p>
+          </div>
+        </Link>
+        <Link
+          href="https://eccellere.in/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-4 rounded-lg bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
+        >
+          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded bg-eccellere-purple/10">
+            <ArrowUpRight className="h-5 w-5 text-eccellere-purple" />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-eccellere-ink">Upcoming Features</p>
+            <p className="mt-0.5 text-xs text-ink-light">Explore what is launching next</p>
           </div>
         </Link>
       </div>
