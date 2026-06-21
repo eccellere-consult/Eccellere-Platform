@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import Image from "next/image";
-import { Clock, User, Tag, ArrowLeft, ChevronRight } from "lucide-react";
+import { Clock, User, Tag, ArrowLeft, ChevronRight, Image as ImageIcon } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
@@ -117,7 +117,7 @@ export default async function ArticleDetailPage({ params }: { params: Promise<{ 
     : [];
 
   const catColor = categoryColors[(article ?? dbPost)!.category] ?? "bg-eccellere-ink/10 text-eccellere-ink";
-  const heroImage = dbPost?.heroImage ?? null;
+  const heroImage = dbPost?.heroImage ?? article?.heroImage ?? null;
   const heroTitle = article?.title ?? dbPost!.title;
   const heroTeaser = article?.teaser ?? dbPost!.excerpt ?? dbPost!.content.slice(0, 180);
   const displayAuthor = article?.author ?? dbPost!.authorName;
@@ -145,16 +145,34 @@ export default async function ArticleDetailPage({ params }: { params: Promise<{ 
         </div>
 
         {/* Article hero */}
-        <section className="bg-eccellere-ink py-16 lg:py-24">
-          <div className="mx-auto max-w-3xl px-6 text-center">
+        <section className="bg-eccellere-ink py-14 lg:py-20">
+          <div className="mx-auto max-w-[1280px] px-6">
+            <div className="mb-8 aspect-[3/2] overflow-hidden rounded-lg border border-white/10 bg-white/5">
+              {heroImage ? (
+                <Image
+                  src={heroImage}
+                  alt={heroTitle}
+                  width={1536}
+                  height={1024}
+                  className="h-full w-full object-contain"
+                  priority
+                />
+              ) : (
+                <div className="flex h-full items-center justify-center gap-2 text-sm text-white/40">
+                  <ImageIcon className="h-5 w-5" />
+                  No hero image uploaded yet
+                </div>
+              )}
+            </div>
+
             <span className={`inline-block rounded px-3 py-1 text-xs font-medium ${catColor} ring-1 ring-white/10`}>
               {(article ?? dbPost)!.category}
             </span>
-            <h1 className="mt-6 font-display text-[clamp(24px,4vw,48px)] font-light leading-tight text-eccellere-cream">
+            <h1 className="mt-5 max-w-4xl text-left font-display text-[clamp(22px,3.2vw,38px)] font-light leading-tight text-eccellere-cream">
               {heroTitle}
             </h1>
-            <p className="mx-auto mt-5 max-w-2xl text-base text-white/50">{heroTeaser}</p>
-            <div className="mt-8 flex flex-wrap items-center justify-center gap-6 text-sm text-white/40">
+            <p className="mt-4 max-w-3xl text-left text-sm text-white/55">{heroTeaser}</p>
+            <div className="mt-6 flex flex-wrap items-center justify-start gap-5 text-xs text-white/40 sm:text-sm">
               <span className="flex items-center gap-2">
                 <User className="h-4 w-4" />
                 {displayAuthor}
@@ -174,24 +192,6 @@ export default async function ArticleDetailPage({ params }: { params: Promise<{ 
             {/* Main content */}
             <article className="prose-sm max-w-none">
               <div className="rounded-lg bg-white p-8 shadow-sm lg:p-12">
-                {heroImage && (
-                  <section aria-label="Featured image" className="mb-10">
-                    <p className="mb-3 text-[11px] font-medium uppercase tracking-[0.2em] text-ink-light">
-                      Featured image
-                    </p>
-                    <div className="overflow-hidden rounded-lg border border-eccellere-ink/5 bg-eccellere-cream">
-                      <Image
-                        src={heroImage}
-                        alt={heroTitle}
-                        width={1200}
-                        height={675}
-                        className="h-auto w-full object-cover"
-                        priority
-                      />
-                    </div>
-                  </section>
-                )}
-
                 {article
                   ? article.content.map((block, i) => <ContentBlock key={i} block={block} />)
                   : articleContent.map((block, i) => <ContentBlock key={i} block={block} />)}

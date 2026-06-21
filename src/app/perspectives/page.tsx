@@ -56,7 +56,7 @@ function mapStaticArticle(article: (typeof articles)[number]): PerspectiveItem {
     author: article.author,
     date: article.date,
     readTime: article.readTime,
-    heroImage: null,
+    heroImage: article.heroImage || null,
     featured: article.featured,
   };
 }
@@ -206,13 +206,13 @@ export default function PerspectivesPage() {
                   className="group block rounded bg-white p-8 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md lg:p-10"
                 >
                   {featured.heroImage && (
-                    <div className="mb-6 overflow-hidden rounded-md bg-eccellere-cream">
+                    <div className="mb-6 aspect-[3/2] overflow-hidden rounded-md bg-eccellere-cream">
                       <Image
                         src={featured.heroImage}
                         alt={featured.title}
-                        width={1200}
-                        height={675}
-                        className="h-64 w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                        width={1536}
+                        height={1024}
+                        className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-[1.02]"
                       />
                     </div>
                   )}
@@ -252,13 +252,13 @@ export default function PerspectivesPage() {
                     className="group block h-full rounded bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md"
                   >
                     {article.heroImage && (
-                      <div className="mb-4 overflow-hidden rounded bg-eccellere-cream">
+                      <div className="mb-4 aspect-[3/2] overflow-hidden rounded bg-eccellere-cream">
                         <Image
                           src={article.heroImage}
                           alt={article.title}
-                          width={900}
-                          height={520}
-                          className="h-40 w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                          width={1536}
+                          height={1024}
+                          className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-[1.03]"
                         />
                       </div>
                     )}

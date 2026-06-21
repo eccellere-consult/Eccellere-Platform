@@ -9,6 +9,7 @@ export type Article = {
   category: string;
   title: string;
   teaser: string;
+  heroImage?: string | null;
   author: string;
   authorRole: string;
   date: string;
@@ -27,6 +28,7 @@ export const articles: Article[] = [
     title: "Why Indian MSMEs Should Adopt Agentic AI Before Their Competitors Do",
     teaser:
       "The window of advantage is narrow. Here's how early movers are gaining 30% efficiency improvements across manufacturing and logistics.",
+    heroImage: "/api/files/perspectives/1782026614310-617e02a713f32089.png",
     author: "Eccellere Research",
     authorRole: "Research & Insights Team",
     date: "Mar 2026",

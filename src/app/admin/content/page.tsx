@@ -8,6 +8,8 @@ import {
   Filter,
   Plus,
   Globe,
+  Pencil,
+  Send,
   Upload,
   X,
   Loader2,
@@ -71,13 +73,17 @@ export default function AdminContent() {
   const [items, setItems] = useState<ContentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [showComposer, setShowComposer] = useState(false);
   const [form, setForm] = useState<ComposerState>(EMPTY_COMPOSER);
+  const [editingPostId, setEditingPostId] = useState<string | null>(null);
+  const [existingHeroImage, setExistingHeroImage] = useState<string | null>(null);
   const [heroFile, setHeroFile] = useState<File | null>(null);
   const [heroPreview, setHeroPreview] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [linkedinPostingId, setLinkedinPostingId] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [composerTab, setComposerTab] = useState<"manual" | "ai">("manual");
   const [aiPrompt, setAiPrompt] = useState("");
@@ -90,6 +96,7 @@ export default function AdminContent() {
   const fetchContent = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setNotice(null);
     try {
       const res = await fetch("/api/admin/content", { cache: "no-store" });
       const data = await res.json();
@@ -127,11 +134,84 @@ export default function AdminContent() {
     };
   }, [items]);
 
+  function resetComposer() {
+    setShowComposer(false);
+    setForm(EMPTY_COMPOSER);
+    setEditingPostId(null);
+    setExistingHeroImage(null);
+    setHeroFile(null);
+    setHeroPreview(null);
+    setSaveError(null);
+    setAiError(null);
+    setAiPrompt("");
+    setAiSourceText("");
+    setAiCategoryHint("MSME Strategy");
+    setSourceFileName(null);
+    setComposerTab("manual");
+  }
+
+  async function handleEditPost(id: string) {
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/admin/content/${id}`, { cache: "no-store" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to load post details");
+
+      const post = data.post;
+      const tags = Array.isArray(post.tags)
+        ? post.tags.filter((tag: unknown): tag is string => typeof tag === "string").join(", ")
+        : "";
+      const scheduledAt = post.scheduledAt
+        ? new Date(post.scheduledAt).toISOString().slice(0, 16)
+        : "";
+
+      setForm({
+        title: post.title || "",
+        category: post.category || "Strategy",
+        authorName: post.authorName || "Eccellere Team",
+        excerpt: post.excerpt || "",
+        content: post.content || "",
+        tags,
+        status: post.status || "draft",
+        scheduledAt,
+      });
+
+      setEditingPostId(post.id);
+      setExistingHeroImage(post.heroImage || null);
+      setHeroFile(null);
+      setHeroPreview(post.heroImage || null);
+      setSaveError(null);
+      setComposerTab("manual");
+      setShowComposer(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load post details");
+    }
+  }
+
+  async function handlePostToLinkedIn(id: string) {
+    setError(null);
+    setNotice(null);
+    setLinkedinPostingId(id);
+    try {
+      const res = await fetch(`/api/admin/content/${id}/linkedin`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to post on LinkedIn");
+      setNotice("Post sent to LinkedIn successfully.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to post on LinkedIn");
+    } finally {
+      setLinkedinPostingId(null);
+    }
+  }
+
   async function handleCreatePost() {
     setSaveError(null);
     setSaving(true);
     try {
-      let heroImage: string | null = null;
+      let heroImage: string | null = existingHeroImage;
 
       if (heroFile) {
         const fd = new FormData();
@@ -148,8 +228,9 @@ export default function AdminContent() {
         heroImage = uploadData.file?.url || null;
       }
 
-      const res = await fetch("/api/admin/content", {
-        method: "POST",
+      const isEditing = Boolean(editingPostId);
+      const res = await fetch(isEditing ? `/api/admin/content/${editingPostId}` : "/api/admin/content", {
+        method: isEditing ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
@@ -159,15 +240,13 @@ export default function AdminContent() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to create post");
+      if (!res.ok) throw new Error(data.error || `Failed to ${isEditing ? "update" : "create"} post`);
 
-      setShowComposer(false);
-      setForm(EMPTY_COMPOSER);
-      setHeroFile(null);
-      setHeroPreview(null);
+      setNotice(isEditing ? "Post updated successfully." : "Post created successfully.");
+      resetComposer();
       await fetchContent();
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : "Failed to create post");
+      setSaveError(err instanceof Error ? err.message : "Failed to save post");
     } finally {
       setSaving(false);
     }
@@ -291,6 +370,11 @@ export default function AdminContent() {
               {error}
             </div>
           )}
+          {notice && !loading && (
+            <div className="border-b border-eccellere-ink/5 bg-eccellere-teal/5 px-6 py-5 text-sm text-eccellere-teal">
+              {notice}
+            </div>
+          )}
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
@@ -300,6 +384,7 @@ export default function AdminContent() {
                   <th className="px-6 py-3.5 text-left text-[10px] font-medium uppercase tracking-wider text-ink-light">Status</th>
                   <th className="px-6 py-3.5 text-left text-[10px] font-medium uppercase tracking-wider text-ink-light">Date</th>
                   <th className="px-6 py-3.5 text-left text-[10px] font-medium uppercase tracking-wider text-ink-light">Slug</th>
+                  <th className="px-6 py-3.5 text-left text-[10px] font-medium uppercase tracking-wider text-ink-light">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-eccellere-ink/5">
@@ -336,6 +421,32 @@ export default function AdminContent() {
                       <td className="px-6 py-4">
                         <span className="font-mono text-xs text-ink-light">/{item.slug}</span>
                       </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 gap-1 px-2 text-xs"
+                            onClick={() => handleEditPost(item.id)}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                            Edit Post
+                          </Button>
+                          <Button
+                            size="sm"
+                            className="h-8 gap-1 px-2 text-xs"
+                            onClick={() => handlePostToLinkedIn(item.id)}
+                            disabled={linkedinPostingId === item.id}
+                          >
+                            {linkedinPostingId === item.id ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Send className="h-3.5 w-3.5" />
+                            )}
+                            Post on LinkedIn
+                          </Button>
+                        </div>
+                      </td>
                     </tr>
                   );
                 })}
@@ -352,21 +463,9 @@ export default function AdminContent() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-lg bg-white p-6 shadow-2xl">
             <div className="mb-5 flex items-center justify-between">
-              <h2 className="text-lg font-medium text-eccellere-ink">Create New Post</h2>
+              <h2 className="text-lg font-medium text-eccellere-ink">{editingPostId ? "Edit Post" : "Create New Post"}</h2>
               <button
-                onClick={() => {
-                  setShowComposer(false);
-                  setForm(EMPTY_COMPOSER);
-                  setHeroFile(null);
-                  setHeroPreview(null);
-                  setSaveError(null);
-                  setAiError(null);
-                  setAiPrompt("");
-                  setAiSourceText("");
-                  setAiCategoryHint("MSME Strategy");
-                  setSourceFileName(null);
-                  setComposerTab("manual");
-                }}
+                onClick={resetComposer}
                 className="rounded p-1 text-ink-light hover:bg-eccellere-ink/5 hover:text-eccellere-ink"
               >
                 <X className="h-4 w-4" />
@@ -601,35 +700,24 @@ export default function AdminContent() {
             <div className="mt-6 flex items-center justify-end gap-2">
               <Button
                 variant="ghost"
-                onClick={() => {
-                  setShowComposer(false);
-                  setForm(EMPTY_COMPOSER);
-                  setHeroFile(null);
-                  setHeroPreview(null);
-                  setAiError(null);
-                  setAiPrompt("");
-                  setAiSourceText("");
-                  setAiCategoryHint("MSME Strategy");
-                  setSourceFileName(null);
-                  setComposerTab("manual");
-                }}
+                onClick={resetComposer}
               >
                 Cancel
               </Button>
               <Button
                 className={composerTab === "ai" ? "hidden" : ""}
-                disabled={saving || !form.title.trim() || !form.content.trim() || !form.category.trim() || (form.status === "published" && !heroFile)}
+                disabled={saving || !form.title.trim() || !form.content.trim() || !form.category.trim() || (form.status === "published" && !heroFile && !existingHeroImage)}
                 onClick={handleCreatePost}
               >
                 {saving ? (
                   <span className="inline-flex items-center gap-2">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Posting...
+                    Saving...
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-2">
                     <Globe className="h-4 w-4" />
-                    Save Post
+                    {editingPostId ? "Update Post" : "Save Post"}
                   </span>
                 )}
               </Button>
