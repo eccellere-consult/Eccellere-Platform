@@ -568,7 +568,7 @@ export default function AdminContent() {
                     Upload Image
                     <input
                       type="file"
-                      accept="image/*"
+                      accept="image/png,image/jpeg,image/tiff,.png,.jpg,.jpeg,.tif,.tiff"
                       className="hidden"
                       onChange={(e) => {
                         const file = e.target.files?.[0] || null;
@@ -583,6 +583,9 @@ export default function AdminContent() {
                   </label>
                   {heroFile && <span className="text-xs text-ink-light">{heroFile.name}</span>}
                 </div>
+                <p className="mt-2 text-xs text-ink-light">
+                  PNG, JPG, or TIFF up to 3 MB. TIFF files are converted to JPEG on upload so they display in the browser.
+                </p>
                 {heroPreview && (
                   <div className="mt-3 h-40 w-full overflow-hidden rounded border border-eccellere-ink/10 bg-eccellere-cream">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -615,7 +618,7 @@ export default function AdminContent() {
               </Button>
               <Button
                 className={composerTab === "ai" ? "hidden" : ""}
-                disabled={saving || !form.title.trim() || !form.content.trim() || !form.category.trim()}
+                disabled={saving || !form.title.trim() || !form.content.trim() || !form.category.trim() || (form.status === "published" && !heroFile)}
                 onClick={handleCreatePost}
               >
                 {saving ? (

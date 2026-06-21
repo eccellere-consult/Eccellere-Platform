@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { shareBlogPostToLinkedIn } from "@/lib/linkedin";
 
 export const dynamic = "force-dynamic";
 
@@ -83,6 +84,16 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  if (status === "published" && !heroImage) {
+    return NextResponse.json(
+      {
+        error:
+          "Published posts require a hero image so they display at the top of the article and can be shared to LinkedIn.",
+      },
+      { status: 400 }
+    );
+  }
+
   const tags = (body.tags || "")
     .split(",")
     .map((t) => t.trim())
@@ -135,5 +146,17 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  return NextResponse.json({ post }, { status: 201 });
+  const linkedin =
+    status === "published"
+      ? await shareBlogPostToLinkedIn({
+          title: post.title,
+          excerpt: excerpt || null,
+          slug,
+          category,
+          heroImage,
+          tags,
+        })
+      : { status: "skipped", reason: "Only published posts are shared to LinkedIn." };
+
+  return NextResponse.json({ post, linkedin }, { status: 201 });
 }

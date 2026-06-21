@@ -1,13 +1,65 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { motion } from "framer-motion";
 import { Search, Clock, User } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { cn } from "@/lib/utils";
 import { articles } from "@/lib/perspectives-data";
+
+type PerspectiveItem = {
+  id: string;
+  slug: string;
+  title: string;
+  teaser: string;
+  category: string;
+  author: string;
+  date: string;
+  readTime: string;
+  heroImage: string | null;
+  featured?: boolean;
+};
+
+type LivePerspectivePost = {
+  id: string;
+  slug: string;
+  title: string;
+  excerpt: string | null;
+  category: string;
+  authorName: string;
+  publishedAt: string | Date | null;
+  createdAt: string | Date;
+  readingTime: number | null;
+  heroImage: string | null;
+};
+
+type LivePerspectiveResponse = {
+  posts?: LivePerspectivePost[];
+};
+
+function formatDate(value: string | Date | null | undefined) {
+  if (!value) return "";
+  const date = value instanceof Date ? value : new Date(value);
+  return date.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+}
+
+function mapStaticArticle(article: (typeof articles)[number]): PerspectiveItem {
+  return {
+    id: article.id,
+    slug: article.slug,
+    title: article.title,
+    teaser: article.teaser,
+    category: article.category,
+    author: article.author,
+    date: article.date,
+    readTime: article.readTime,
+    heroImage: null,
+    featured: article.featured,
+  };
+}
 
 const categories = [
   "All",
@@ -22,8 +74,59 @@ const categories = [
 export default function PerspectivesPage() {
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
+  const [livePosts, setLivePosts] = useState<PerspectiveItem[]>([]);
 
-  const filtered = articles.filter((a) => {
+  useEffect(() => {
+    let active = true;
+
+    async function loadPosts() {
+      try {
+        const res = await fetch("/api/perspectives", { cache: "no-store" });
+        const data = (await res.json()) as LivePerspectiveResponse;
+        if (!res.ok) return;
+        if (!active) return;
+
+        const mapped = Array.isArray(data.posts)
+          ? data.posts.map((post) => ({
+              id: post.id,
+              slug: post.slug,
+              title: post.title,
+              teaser: post.excerpt || "",
+              category: post.category,
+              author: post.authorName || "Eccellere Team",
+              date: formatDate(post.publishedAt || post.createdAt),
+              readTime: post.readingTime ? `${post.readingTime} min read` : "",
+              heroImage: post.heroImage || null,
+            }))
+          : [];
+
+        setLivePosts(mapped);
+      } catch {
+        // Keep static seed content if live fetch fails.
+      }
+    }
+
+    loadPosts();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const allArticles = useMemo(() => {
+    const merged = new Map<string, PerspectiveItem>();
+
+    articles.map(mapStaticArticle).forEach((item) => {
+      merged.set(item.slug, item);
+    });
+
+    livePosts.forEach((item) => {
+      merged.set(item.slug, item);
+    });
+
+    return Array.from(merged.values());
+  }, [livePosts]);
+
+  const filtered = allArticles.filter((a) => {
     const matchCategory =
       selectedCategory === "All" || a.category === selectedCategory;
     const matchSearch =
@@ -102,6 +205,17 @@ export default function PerspectivesPage() {
                   href={`/perspectives/${featured.slug}`}
                   className="group block rounded bg-white p-8 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md lg:p-10"
                 >
+                  {featured.heroImage && (
+                    <div className="mb-6 overflow-hidden rounded-md bg-eccellere-cream">
+                      <Image
+                        src={featured.heroImage}
+                        alt={featured.title}
+                        width={1200}
+                        height={675}
+                        className="h-64 w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                      />
+                    </div>
+                  )}
                   <span className="inline-block rounded-sm bg-eccellere-gold/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-eccellere-gold">
                     Featured · {featured.category}
                   </span>
@@ -137,6 +251,17 @@ export default function PerspectivesPage() {
                     href={`/perspectives/${article.slug}`}
                     className="group block h-full rounded bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md"
                   >
+                    {article.heroImage && (
+                      <div className="mb-4 overflow-hidden rounded bg-eccellere-cream">
+                        <Image
+                          src={article.heroImage}
+                          alt={article.title}
+                          width={900}
+                          height={520}
+                          className="h-40 w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                        />
+                      </div>
+                    )}
                     <span className="text-[10px] font-medium uppercase tracking-wider text-eccellere-gold">
                       {article.category}
                     </span>

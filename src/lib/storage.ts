@@ -175,7 +175,7 @@ export function getStorage(): StorageProvider {
 // ─── Validation ───────────────────────────────────────────────────────────────
 
 const ALLOWED_TYPES: Record<string, string[]> = {
-  image: ["image/jpeg", "image/png", "image/webp", "image/avif", "image/gif"],
+  image: ["image/jpeg", "image/png", "image/tiff", "image/x-tiff", "image/webp", "image/avif", "image/gif"],
   document: [
     "application/pdf",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -186,7 +186,7 @@ const ALLOWED_TYPES: Record<string, string[]> = {
 };
 
 const MAX_FILE_SIZES: Record<string, number> = {
-  image: 5 * 1024 * 1024,      // 5 MB
+  image: 3 * 1024 * 1024,      // 3 MB
   document: 25 * 1024 * 1024,   // 25 MB
   video: 100 * 1024 * 1024,     // 100 MB
 };

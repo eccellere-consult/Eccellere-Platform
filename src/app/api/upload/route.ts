@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
+import sharp from "sharp";
 import { getStorage, validateFile } from "@/lib/storage";
 import { uploadLimiter, getClientIp } from "@/lib/rate-limit";
+
+const TIFF_TYPES = new Set(["image/tiff", "image/x-tiff"]);
 
 export async function POST(request: Request) {
   // Rate limit
@@ -51,12 +54,27 @@ export async function POST(request: Request) {
     }
 
     // Sanitise filename — strip path traversal attempts
-    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
     const safeFolder = folder.replace(/[^a-zA-Z0-9_-]/g, "_");
 
-    const buffer = Buffer.from(await file.arrayBuffer());
+    const inputBuffer = Buffer.from(await file.arrayBuffer());
+    let safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+    let contentType = file.type;
+    let uploadBuffer = inputBuffer;
+
+    if (TIFF_TYPES.has(file.type)) {
+      uploadBuffer = Buffer.from(
+        await sharp(inputBuffer)
+          .rotate()
+          .flatten({ background: "#ffffff" })
+          .jpeg({ quality: 88, mozjpeg: true })
+          .toBuffer()
+      );
+      safeName = safeName.replace(/\.(tif|tiff)$/i, "").replace(/\.[^.]+$/, "") + ".jpg";
+      contentType = "image/jpeg";
+    }
+
     const storage = getStorage();
-    const result = await storage.upload(buffer, safeName, file.type, safeFolder);
+    const result = await storage.upload(uploadBuffer, safeName, contentType, safeFolder);
 
     return NextResponse.json(
       {

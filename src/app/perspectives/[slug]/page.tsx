@@ -1,10 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import Image from "next/image";
 import { Clock, User, Tag, ArrowLeft, ChevronRight } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
 import { articles, type ContentBlock } from "@/lib/perspectives-data";
+import { prisma } from "@/lib/prisma";
+
+export const dynamic = "force-dynamic";
 
 export function generateStaticParams() {
   return articles.map((a) => ({ slug: a.slug }));
@@ -13,10 +17,22 @@ export function generateStaticParams() {
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const article = articles.find((a) => a.slug === slug);
-  if (!article) return {};
+  if (article) {
+    return {
+      title: article.title,
+      description: article.teaser,
+    };
+  }
+
+  const post = await prisma.blogPost.findFirst({
+    where: { slug, status: { in: ["published", "scheduled"] } },
+    select: { title: true, excerpt: true, content: true, heroImage: true },
+  });
+
+  if (!post) return {};
   return {
-    title: article.title,
-    description: article.teaser,
+    title: post.title,
+    description: post.excerpt || post.content.slice(0, 160),
   };
 }
 
@@ -51,17 +67,66 @@ function ContentBlock({ block }: { block: ContentBlock }) {
   );
 }
 
+function parseDbContent(content: string): Array<{ type: "paragraph" | "heading" | "callout"; text: string }> {
+  const blocks = content
+    .split(/\n{2,}/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  return blocks.map((part) => {
+    if (/^#{1,3}\s+/.test(part)) {
+      return { type: "heading" as const, text: part.replace(/^#{1,3}\s+/, "") };
+    }
+    if (/^>\s+/.test(part)) {
+      return { type: "callout" as const, text: part.replace(/^>\s+/, "") };
+    }
+    return { type: "paragraph" as const, text: part };
+  });
+}
+
 export default async function ArticleDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const article = articles.find((a) => a.slug === slug);
-  if (!article) notFound();
+  const dbPost = !article
+    ? await prisma.blogPost.findFirst({
+        where: { slug, status: { in: ["published", "scheduled"] } },
+        select: {
+          slug: true,
+          title: true,
+          excerpt: true,
+          content: true,
+          category: true,
+          tags: true,
+          authorName: true,
+          authorBio: true,
+          heroImage: true,
+          readingTime: true,
+          publishedAt: true,
+          createdAt: true,
+        },
+      })
+    : null;
 
-  const related = article.relatedSlugs
-    .map((slug) => articles.find((a) => a.slug === slug))
-    .filter(Boolean)
-    .slice(0, 3) as typeof articles;
+  if (!article && !dbPost) notFound();
 
-  const catColor = categoryColors[article.category] ?? "bg-eccellere-ink/10 text-eccellere-ink";
+  const related = article
+    ? article.relatedSlugs
+        .map((slug) => articles.find((a) => a.slug === slug))
+        .filter(Boolean)
+        .slice(0, 3) as typeof articles
+    : [];
+
+  const catColor = categoryColors[(article ?? dbPost)!.category] ?? "bg-eccellere-ink/10 text-eccellere-ink";
+  const heroImage = dbPost?.heroImage ?? null;
+  const heroTitle = article?.title ?? dbPost!.title;
+  const heroTeaser = article?.teaser ?? dbPost!.excerpt ?? dbPost!.content.slice(0, 180);
+  const displayAuthor = article?.author ?? dbPost!.authorName;
+  const displayAuthorRole = article?.authorRole ?? dbPost?.authorBio ?? "";
+  const articleContent = article ? article.content : parseDbContent(dbPost!.content);
+  const tags = article ? article.tags : (Array.isArray(dbPost?.tags) ? dbPost!.tags : []);
+  const dateLabel = article ? article.date : new Date(dbPost!.publishedAt ?? dbPost!.createdAt).toLocaleDateString("en-IN", { month: "short", year: "numeric" });
+  const readTime = article ? article.readTime : `${dbPost?.readingTime ?? 0} min read`;
+  const currentCategory = article?.category ?? dbPost!.category;
 
   return (
     <>
@@ -75,7 +140,7 @@ export default async function ArticleDetailPage({ params }: { params: Promise<{ 
               Perspectives
             </Link>
             <ChevronRight className="h-3.5 w-3.5" />
-            <span className={`rounded px-2 py-0.5 text-xs font-medium ${catColor}`}>{article.category}</span>
+            <span className={`rounded px-2 py-0.5 text-xs font-medium ${catColor}`}>{currentCategory}</span>
           </div>
         </div>
 
@@ -83,22 +148,22 @@ export default async function ArticleDetailPage({ params }: { params: Promise<{ 
         <section className="bg-eccellere-ink py-16 lg:py-24">
           <div className="mx-auto max-w-3xl px-6 text-center">
             <span className={`inline-block rounded px-3 py-1 text-xs font-medium ${catColor} ring-1 ring-white/10`}>
-              {article.category}
+              {(article ?? dbPost)!.category}
             </span>
             <h1 className="mt-6 font-display text-[clamp(24px,4vw,48px)] font-light leading-tight text-eccellere-cream">
-              {article.title}
+              {heroTitle}
             </h1>
-            <p className="mx-auto mt-5 max-w-2xl text-base text-white/50">{article.teaser}</p>
+            <p className="mx-auto mt-5 max-w-2xl text-base text-white/50">{heroTeaser}</p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-6 text-sm text-white/40">
               <span className="flex items-center gap-2">
                 <User className="h-4 w-4" />
-                {article.author}
+                {displayAuthor}
               </span>
               <span className="flex items-center gap-2">
                 <Clock className="h-4 w-4" />
-                {article.readTime}
+                {readTime}
               </span>
-              <span>{article.date}</span>
+              <span>{dateLabel}</span>
             </div>
           </div>
         </section>
@@ -109,20 +174,38 @@ export default async function ArticleDetailPage({ params }: { params: Promise<{ 
             {/* Main content */}
             <article className="prose-sm max-w-none">
               <div className="rounded-lg bg-white p-8 shadow-sm lg:p-12">
-                {article.content.map((block, i) => (
-                  <ContentBlock key={i} block={block} />
-                ))}
+                {heroImage && (
+                  <section aria-label="Featured image" className="mb-10">
+                    <p className="mb-3 text-[11px] font-medium uppercase tracking-[0.2em] text-ink-light">
+                      Featured image
+                    </p>
+                    <div className="overflow-hidden rounded-lg border border-eccellere-ink/5 bg-eccellere-cream">
+                      <Image
+                        src={heroImage}
+                        alt={heroTitle}
+                        width={1200}
+                        height={675}
+                        className="h-auto w-full object-cover"
+                        priority
+                      />
+                    </div>
+                  </section>
+                )}
+
+                {article
+                  ? article.content.map((block, i) => <ContentBlock key={i} block={block} />)
+                  : articleContent.map((block, i) => <ContentBlock key={i} block={block} />)}
 
                 {/* Article footer */}
                 <div className="mt-12 border-t border-eccellere-ink/5 pt-8">
                   <div className="flex flex-wrap items-center gap-2">
                     <Tag className="h-4 w-4 text-ink-light" />
-                    {article.tags.map((tag) => (
+                    {tags.map((tag) => (
                       <span
-                        key={tag}
+                        key={String(tag)}
                         className="rounded-sm bg-eccellere-ink/5 px-2.5 py-1 text-xs text-ink-mid"
                       >
-                        {tag}
+                        {String(tag)}
                       </span>
                     ))}
                   </div>
@@ -158,11 +241,11 @@ export default async function ArticleDetailPage({ params }: { params: Promise<{ 
                 <p className="text-xs font-medium uppercase tracking-wider text-ink-light">Written by</p>
                 <div className="mt-3 flex items-center gap-3">
                   <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-eccellere-gold/10 text-sm font-medium text-eccellere-gold">
-                    {article.author.charAt(0)}
+                    {displayAuthor.charAt(0)}
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-eccellere-ink">{article.author}</p>
-                    <p className="text-xs text-ink-light">{article.authorRole}</p>
+                    <p className="text-sm font-medium text-eccellere-ink">{displayAuthor}</p>
+                    <p className="text-xs text-ink-light">{displayAuthorRole}</p>
                   </div>
                 </div>
               </div>

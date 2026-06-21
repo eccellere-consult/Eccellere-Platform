@@ -22,6 +22,7 @@ const schema: EnvSchema = {
     "NEXT_PUBLIC_SENTRY_DSN",
     "SENTRY_DSN",
     "SENTRY_AUTH_TOKEN",
+    "NEXT_PUBLIC_SITE_URL",
     "AWS_S3_BUCKET",
     "AWS_REGION",
     "AWS_ACCESS_KEY_ID",
@@ -33,6 +34,8 @@ const schema: EnvSchema = {
     "SMTP_USER",
     "SMTP_PASS",
     "SMTP_FROM",
+    "LINKEDIN_ACCESS_TOKEN",
+    "LINKEDIN_AUTHOR_URN",
     "RAZORPAY_KEY_ID",
     "RAZORPAY_KEY_SECRET",
   ],
@@ -72,9 +75,14 @@ export const env = {
   s3Bucket: process.env.AWS_S3_BUCKET ?? "",
   awsRegion: process.env.AWS_REGION ?? "ap-south-1",
   cdnDomain: process.env.CDN_DOMAIN ?? "",
+  siteUrl: process.env.NEXT_PUBLIC_SITE_URL ?? process.env.NEXTAUTH_URL ?? "http://localhost:3000",
 
   // Email (optional — defaults to console in dev)
   emailProvider: process.env.EMAIL_PROVIDER ?? "console",
+
+  // LinkedIn (optional)
+  linkedinAccessToken: process.env.LINKEDIN_ACCESS_TOKEN ?? "",
+  linkedinAuthorUrn: process.env.LINKEDIN_AUTHOR_URN ?? "",
 
   // Razorpay (optional)
   razorpayKeyId: process.env.RAZORPAY_KEY_ID ?? "",
