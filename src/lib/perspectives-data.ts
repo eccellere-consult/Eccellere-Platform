@@ -28,7 +28,7 @@ export const articles: Article[] = [
     title: "Why Indian MSMEs Should Adopt Agentic AI Before Their Competitors Do",
     teaser:
       "The window of advantage is narrow. Here's how early movers are gaining 30% efficiency improvements across manufacturing and logistics.",
-    heroImage: "/api/files/perspectives/1782026614310-617e02a713f32089.png",
+    heroImage: "/perspectives/why-indian-msmes-hero.png",
     author: "Eccellere Research",
     authorRole: "Research & Insights Team",
     date: "Mar 2026",

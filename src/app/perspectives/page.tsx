@@ -120,7 +120,12 @@ export default function PerspectivesPage() {
     });
 
     livePosts.forEach((item) => {
-      merged.set(item.slug, item);
+      const existing = merged.get(item.slug);
+      merged.set(item.slug, {
+        ...item,
+        heroImage: item.heroImage || existing?.heroImage || null,
+        featured: existing?.featured ?? item.featured,
+      });
     });
 
     return Array.from(merged.values());
