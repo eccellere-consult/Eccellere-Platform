@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { env } from "@/lib/env";
 
 const CATEGORIES = [
   "Strategy & Planning",
@@ -54,7 +55,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const groqApiKey = process.env.GROQ_API_KEY;
+  const groqApiKey = env.groqApiKey;
   if (!groqApiKey) {
     return NextResponse.json(
       { error: "AI service not configured. Please add GROQ_API_KEY to your environment." },

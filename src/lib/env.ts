@@ -38,6 +38,8 @@ const schema: EnvSchema = {
     "LINKEDIN_AUTHOR_URN",
     "RAZORPAY_KEY_ID",
     "RAZORPAY_KEY_SECRET",
+    "GROQ_API_KEY",
+    "RAZORPAY_WEBHOOK_SECRET",
   ],
 };
 
@@ -87,6 +89,10 @@ export const env = {
   // Razorpay (optional)
   razorpayKeyId: process.env.RAZORPAY_KEY_ID ?? "",
   razorpayKeySecret: process.env.RAZORPAY_KEY_SECRET ?? "",
+  razorpayWebhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET ?? "",
+
+  // Groq AI (optional — specialist asset analysis/generation)
+  groqApiKey: process.env.GROQ_API_KEY ?? "",
 
   // Runtime
   isProduction: process.env.NODE_ENV === "production",
