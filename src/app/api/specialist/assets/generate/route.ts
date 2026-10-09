@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { env } from "@/lib/env";
 
 const CATEGORIES = [
   "Strategy & Planning",
@@ -65,7 +66,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const groqApiKey = process.env.GROQ_API_KEY;
+  const groqApiKey = env.groqApiKey;
   if (!groqApiKey) {
     return NextResponse.json(
       { error: "AI service not configured. Please add GROQ_API_KEY to your environment." },
