@@ -176,3 +176,28 @@ export const METHOD_CARDS: MethodCard[] = [
     worksheet: { headers: ["Element", "Your pilot"], rows: [["Hypothesis", ""], ["Scale", ""], ["Duration", ""], ["Success measure and target", ""], ["Stop rule", ""], ["Comparison", ""], ["Decision after the pilot", ""]] },
   },
 ];
+
+/**
+ * Blank templates for the Playbook annexure (skill s9, section 20).
+ * Generic worksheets: not client data.
+ */
+export interface PlaybookTemplate {
+  id: string;
+  name: string;
+  use: string;
+  headers: string[];
+  rows: string[][];
+}
+
+const blank = (n: number, cols: number) => Array.from({ length: n }, () => Array.from({ length: cols }, () => ""));
+
+export const PLAYBOOK_TEMPLATES: PlaybookTemplate[] = [
+  { id: "T1", name: "Workstream charter", use: "One per workstream before work starts.", headers: ["Item", "Entry"], rows: [["Workstream and number", ""], ["Objective and scope", ""], ["Owner", ""], ["Depends on", ""], ["Stage gate and evidence", ""], ["Key risks", ""]] },
+  { id: "T2", name: "Step detail sheet", use: "For each implementation step.", headers: ["Action", "Method", "Output", "Validation", "Owner", "Workstream"], rows: blank(4, 6) },
+  { id: "T3", name: "RACI matrix", use: "Exactly one Accountable per activity.", headers: ["Activity", "Responsible", "Accountable", "Consulted", "Informed"], rows: blank(5, 5) },
+  { id: "T4", name: "KPI and benefits tracker", use: "Track forecast, approved, validated, realised and sustained benefit separately.", headers: ["KPI", "Baseline", "Target", "Formula", "Owner", "Cadence", "Benefit status"], rows: blank(4, 7) },
+  { id: "T5", name: "Risk and issue log", use: "Review at every weekly stand-up.", headers: ["Risk", "Likelihood", "Impact", "Counter-action", "Owner", "Status"], rows: blank(5, 6) },
+  { id: "T6", name: "30 / 60 / 90 day plan", use: "For focused interventions.", headers: ["Horizon", "Activity", "Owner", "Milestone", "Decision gate"], rows: [["Days 0-30", "", "", "", ""], ["Days 31-60", "", "", "", ""], ["Days 61-90", "", "", "", ""]] },
+  { id: "T7", name: "Stage-gate checklist", use: "Yes or no, with evidence.", headers: ["Gate", "Evidence required", "Owner", "Met or Open"], rows: blank(5, 4) },
+  { id: "T8", name: "Post-implementation review", use: "Held after completion to capture results and lessons.", headers: ["Question", "Finding", "Action"], rows: [["Were outcomes achieved against the baseline?", "", ""], ["What worked and should be kept?", "", ""], ["What did not work?", "", ""], ["What must be sustained, and by whom?", "", ""]] },
+];

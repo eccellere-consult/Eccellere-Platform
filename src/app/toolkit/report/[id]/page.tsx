@@ -11,7 +11,10 @@ import {
 } from "@/lib/toolkit/engine";
 import { analyseDiagnostic, type DiagnosticAnalysis } from "@/lib/toolkit/analysis";
 import { analyseProblemSolving, answerFor, type PSAnalysis } from "@/lib/toolkit/analysis-ps";
-import { diagnosticBody, problemSolvingBody } from "@/components/toolkit/ReportBodies";
+import { analysePlaybook, type PBAnalysis } from "@/lib/toolkit/analysis-pb";
+import { analyseGuide, type GuideAnalysis } from "@/lib/toolkit/analysis-gd";
+import { analyseLearning, type LearningAnalysis } from "@/lib/toolkit/analysis-lk";
+import { diagnosticBody, problemSolvingBody, playbookBody, guideBody, learningBody } from "@/components/toolkit/ReportBodies";
 
 type Val = string | number | null;
 interface RRow { fieldId: string; value: Val; provenance: string; confidence?: string | null }
@@ -81,6 +84,9 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
   data.responses.forEach((r) => (storedA[r.fieldId] = { fieldId: r.fieldId, value: r.value, provenance: r.provenance, confidence: r.confidence }));
   const an: DiagnosticAnalysis | null = bp.type === "DIAGNOSTIC" && scores ? analyseDiagnostic(bp, storedA, scores) : null;
   const ps: PSAnalysis | null = bp.type === "PROBLEM_SOLVING" ? analyseProblemSolving(bp, storedA) : null;
+  const pb: PBAnalysis | null = bp.type === "PLAYBOOK" ? analysePlaybook(bp, storedA) : null;
+  const gd: GuideAnalysis | null = bp.type === "GUIDE" ? analyseGuide(bp, storedA) : null;
+  const lk: LearningAnalysis | null = bp.type === "LEARNING" ? analyseLearning(bp, storedA) : null;
 
   const aiUnconfirmed = data.responses.filter((r) => r.provenance === "AI-suggested").length;
   const notKnown = data.responses.filter((r) => r.provenance === "Not-known").length;
@@ -112,9 +118,16 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
   const sectionBody = (s: KitSection) => {
     const extra = s.fields.length ? fieldBlocks(s) : null;
     const dx = an ? diagnosticBody(s.seq, an, bp, extra) : null;
-    if (dx) return dx;
+    // Sections 13-19 combine the computed analysis with the client's own notes; never drop the latter.
+    if (dx) return s.seq >= 13 && s.seq <= 19 && extra ? <>{dx}{extra}</> : dx;
     const px = ps ? problemSolvingBody(s.seq, ps, extra, (q, re) => answerFor(bp, storedA, q, re)) : null;
     if (px) return px;
+    const bx = pb ? playbookBody(s.seq, pb, extra) : null;
+    if (bx) return bx;
+    const gx = gd ? guideBody(s.seq, gd, extra) : null;
+    if (gx) return gx;
+    const lx = lk ? learningBody(s.seq, lk, extra) : null;
+    if (lx) return lx;
     if (bp.type === "DIAGNOSTIC" && s.seq === 7) {
       return (
         <table><thead><tr><th>ID</th><th>Dimension</th><th>Purpose</th><th>Weight</th></tr></thead>

@@ -295,6 +295,23 @@ const BRIEF: F[] = [
   ["Brief (answer first)", "longtext", "Lead with the conclusion, then the 3 supporting points and the decision needed. Draft with AI, then edit.", { required: true, ai: true }],
 ];
 
+/** Learning Kit module block (skill s11): one block per module, every required element. */
+const LK_MODULES = 5;
+const lkModuleFields = (n: number): F[] => [
+  [`Module ${n} · Title`, "text", n === 1 ? "A short, specific title. Leave unused modules (all fields) blank." : "Leave blank if this module is not used.", { required: n === 1, ai: true }],
+  [`Module ${n} · Learning outcome`, "text", "One observable outcome, starting with a verb such as apply, calculate, build, explain, compare or design.", { required: n === 1, ai: true }],
+  [`Module ${n} · Business need`, "longtext", "Why this matters in the learner's work.", { ai: true }],
+  [`Module ${n} · Concept explained simply`, "longtext", "Explain it in plain words, as if to someone new (the Feynman technique).", { ai: true }],
+  [`Module ${n} · Analogy and technical explanation`, "longtext", "An analogy first, then the precise explanation.", { ai: true }],
+  [`Module ${n} · Named framework and supporting tools`, "text", "The framework, plus 2 to 4 supporting tools where useful.", { ai: true }],
+  [`Module ${n} · Worked example`, "longtext", "A realistic example with the numbers or steps shown. Label it Real or Illustrative.", { ai: true }],
+  [`Module ${n} · Guided exercise (with hints)`, "longtext", "A task the learner performs, with hints.", { ai: true }],
+  [`Module ${n} · Teach-back prompt`, "text", "What the learner explains to someone else.", { ai: true }],
+  [`Module ${n} · Knowledge check`, "longtext", "One per line: question | answer guidance.", { ai: true }],
+  [`Module ${n} · Action items`, "longtext", "Five to seven verifiable actions, one per line.", { ai: true }],
+  [`Module ${n} · Learner output`, "text", "The named artefact the learner produces.", { ai: true }],
+];
+
 const FIELD_SETS: Record<KitType, Record<number, F[]>> = {
   DIAGNOSTIC: {
     2: DOC_CONTROL,
@@ -394,16 +411,17 @@ const FIELD_SETS: Record<KitType, Record<number, F[]>> = {
       ["Design principles", "longtext", "Rules the implementation must follow.", { ai: true }],
     ],
     7: [["Target operating state", "longtext", "How work will be done after implementation, and the success measures.", { ai: true }]],
-    8: [["Readiness and prerequisites", "longtext", "People, data, systems and approvals needed before start.", { required: true, ai: true }]],
-    9: [["Workstreams and phases", "longtext", "Each workstream with scope, dependencies and gates.", { required: true, ai: true }]],
-    10: [["Implementation steps", "longtext", "Ordered steps; each with action, method, output and validation.", { required: true, ai: true }]],
-    11: [["RACI and decision rights", "longtext", "Who is Responsible, Accountable, Consulted, Informed, and escalation path.", { required: true, ai: true }]],
+    8: [["Readiness and prerequisites", "longtext", "One per line: prerequisite | Ready or Not ready | owner. Cover people, data, systems and approvals needed before start.", { required: true, ai: true }]],
+    9: [["Workstreams and phases", "longtext", "One per line: workstream name | scope | owner | depends on (W1, W2...) | stage gate. Workstreams are numbered W1, W2 in the order you list them.", { required: true, ai: true }]],
+    10: [["Implementation steps", "longtext", "One per line: action | method | output | validation | owner | workstream (W1, W2...). Every step needs an action, a method, an output and a way to validate it.", { required: true, ai: true }]],
+    11: [["RACI and decision rights", "longtext", "One per line: activity | Responsible | Accountable | Consulted | Informed. Use role names; separate several roles with commas. Exactly one Accountable per activity.", { required: true, ai: true }]],
     12: [["Resources, technology, data, budget", "longtext", "State the budget as approved or Not known; never assume.", { ai: true }]],
     13: [["Change, communications, training, adoption", "longtext", "Who is affected and how they will be supported.", { ai: true }]],
-    14: [["Risks, dependencies, controls", "longtext", "At least five risks with counter-actions.", { ai: true }]],
-    15: [["KPIs: baseline, target, formula, owner, cadence", "longtext", "One per line. Track forecast, validated and realised benefits separately.", { required: true, ai: true }]],
-    17: [["Governance calendar", "longtext", "Weekly, monthly and quarterly forums.", { ai: true }]],
-    18: [["Completion gates", "longtext", "Binary, evidence-based gates.", { ai: true }]],
+    14: [["Risks, dependencies, controls", "longtext", "One per line: risk | likelihood (High, Medium, Low) | impact | counter-action | owner. At least five risks.", { ai: true }]],
+    15: [["KPIs: baseline, target, formula, owner, cadence", "longtext", "One per line: KPI | baseline | target | formula | owner | cadence | benefit status (forecast, approved, validated, realised or sustained). Write Not known for a baseline you cannot state.", { required: true, ai: true }]],
+    16: [["Roadmap and milestones", "longtext", "One per line: phase | activity | owner | start | end | milestone | depends on | decision gate. Use dates (2026-02-15) or relative days (Day 30, Week 6).", { required: true, ai: true }]],
+    17: [["Governance calendar", "longtext", "One per line: forum | cadence (weekly, monthly or quarterly) | attendees | purpose.", { ai: true }]],
+    18: [["Completion gates", "longtext", "One per line: gate | evidence required | owner | Met or Open. Gates must be yes or no, and backed by evidence.", { ai: true }]],
     19: [["Post-implementation review plan", "longtext", "When and how results will be reviewed.", { ai: true }]],
   },
   GUIDE: {
@@ -412,8 +430,17 @@ const FIELD_SETS: Record<KitType, Record<number, F[]>> = {
       ["Intended audience", "longtext", "Roles and their level of prior knowledge.", { required: true, ai: true }],
       ["Purpose and scope", "longtext", "What the Guide covers and does not.", { required: true, ai: true }],
     ],
+    6: [["Why this topic matters", "longtext", "Two or three short paragraphs for a busy reader: what is at stake and what the Guide will help them do.", { ai: true }]],
+    7: [["Concepts and definitions", "longtext", "One per line: term | plain-language definition | why it matters | example | limitation | source. Write Not known in any part you cannot support.", { required: true, ai: true }]],
     8: [["Your context and use cases", "longtext", "Where you will apply this topic.", { required: true, ai: true }]],
+    9: [["Frameworks, models, methods or standards", "longtext", "One per line: name | what it is | when to use it | key steps | limitation | source.", { required: true, ai: true }]],
+    10: [["Step-by-step application", "longtext", "One per line: step title | action | output | common error.", { ai: true }]],
+    11: [["Worked examples and case studies", "longtext", "One per line: title | Real or Illustrative | situation | approach | result | lesson. Label every example as Real or Illustrative.", { ai: true }]],
+    12: [["Decision criteria and when to use or not use", "longtext", "One per line: approach or choice | use when | do not use when | trade-off.", { ai: true }]],
+    13: [["Common mistakes and troubleshooting", "longtext", "One per line: mistake | symptom | fix.", { ai: true }]],
+    14: [["Checklists and quick references", "longtext", "One checklist item per line: item | when to check it. Group items under a heading line that ends with a colon.", { ai: true }]],
     15: [["Next steps", "longtext", "What you will do after reading.", { ai: true }]],
+    17: [["References and source notes", "longtext", "One per line: source | citation or URL | publication date | what it supports. Only list sources you have actually used.", { ai: false }]],
   },
   LEARNING: {
     2: DOC_CONTROL,
@@ -430,6 +457,12 @@ const FIELD_SETS: Record<KitType, Record<number, F[]>> = {
     11: [["Assessment rubric", "longtext", "Criteria and what good looks like.", { ai: true }]],
     12: [["Teach-back task and reflection prompts", "longtext", "Each learner explains the idea simply to someone else.", { ai: true }]],
     13: [["Transfer-to-work actions", "longtext", "5-7 verifiable actions with owner and date.", { required: true, ai: true }]],
+    8: Array.from({ length: LK_MODULES }, (_, i) => lkModuleFields(i + 1)).flat(),
+    14: [["Facilitator or self-study notes and completion criteria", "longtext", "How to run or self-study the kit, the time each module needs, and what a learner must complete to finish.", { ai: true }]],
+    15: [
+      ["Glossary", "longtext", "One per line: term | definition.", { ai: true }],
+      ["References and sources", "longtext", "One per line: source | citation or URL | what it supports. Only list sources you have actually used.", { ai: false }],
+    ],
   },
 };
 
