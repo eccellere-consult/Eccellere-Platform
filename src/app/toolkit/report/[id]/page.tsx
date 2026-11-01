@@ -2,7 +2,7 @@
 
 import { readJson } from "@/lib/toolkit/http";
 
-import { use, useEffect, useMemo, useState } from "react";
+import { use, useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { Printer, ArrowLeft } from "lucide-react";
 import {
@@ -10,6 +10,8 @@ import {
   type Blueprint, type KitField, type KitSection, type KitType, type StoredResponse,
 } from "@/lib/toolkit/engine";
 import { analyseDiagnostic, GOVERNANCE_CALENDAR, type DiagnosticAnalysis } from "@/lib/toolkit/analysis";
+import { analyseProblemSolving, answerFor, type PSAnalysis } from "@/lib/toolkit/analysis-ps";
+import { METHOD_CARDS } from "@/lib/toolkit/methods";
 
 type Val = string | number | null;
 interface RRow { fieldId: string; value: Val; provenance: string; confidence?: string | null }
@@ -78,6 +80,7 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
   const storedA: Record<string, StoredResponse & { confidence?: string | null }> = {};
   data.responses.forEach((r) => (storedA[r.fieldId] = { fieldId: r.fieldId, value: r.value, provenance: r.provenance, confidence: r.confidence }));
   const an: DiagnosticAnalysis | null = bp.type === "DIAGNOSTIC" && scores ? analyseDiagnostic(bp, storedA, scores) : null;
+  const ps: PSAnalysis | null = bp.type === "PROBLEM_SOLVING" ? analyseProblemSolving(bp, storedA) : null;
 
   const aiUnconfirmed = data.responses.filter((r) => r.provenance === "AI-suggested").length;
   const notKnown = data.responses.filter((r) => r.provenance === "Not-known").length;
@@ -98,9 +101,20 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
     return <span className={`tag ${r.provenance === "AI-suggested" ? "ai" : ""}`}>{r.provenance.replace("-", " ")}{r.provenance === "AI-suggested" && r.confidence ? ` · ${r.confidence}` : ""}</span>;
   };
 
+  const fieldBlocks = (s: KitSection) => (
+    <>{s.fields.map((f) => (
+      <div key={f.id} className="field avoid">
+        <div className="label">{f.label} <span className="fid">[{f.id}]</span> {tag(f)}</div>
+        <div className="answer">{answer(f)}</div>
+      </div>))}</>
+  );
+
   const sectionBody = (s: KitSection) => {
-    const dx = an ? diagnosticBody(s.seq, an, bp) : null;
+    const extra = s.fields.length ? fieldBlocks(s) : null;
+    const dx = an ? diagnosticBody(s.seq, an, bp, extra) : null;
     if (dx) return dx;
+    const px = ps ? problemSolvingBody(s.seq, ps, extra, (q, re) => answerFor(bp, storedA, q, re)) : null;
+    if (px) return px;
     if (bp.type === "DIAGNOSTIC" && s.seq === 7) {
       return (
         <table><thead><tr><th>ID</th><th>Dimension</th><th>Purpose</th><th>Weight</th></tr></thead>
@@ -129,13 +143,7 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
       );
     }
     if (s.seq === 1) return null;
-    if (s.fields.length) {
-      return <>{s.fields.map((f) => (
-        <div key={f.id} className="field avoid">
-          <div className="label">{f.label} <span className="fid">[{f.id}]</span> {tag(f)}</div>
-          <div className="answer">{answer(f)}</div>
-        </div>))}</>;
-    }
+    if (s.fields.length) return fieldBlocks(s);
     if (s.title.startsWith("How to Use")) return <p>{HOW_TO[bp.type]}</p>;
     if (s.kind === "auto" && /Annexure/i.test(s.title)) return null; // rendered below with disclosure
     return <p className="muted">This section is assembled from the answers in the other sections of this report. Where a conclusion is not supported by evidence, it is shown as an open question rather than stated as fact.</p>;
@@ -215,7 +223,7 @@ const TEMPLATE_NOTE =
 const heatCls = (level: number | null, kind: string) =>
   kind === "unknown" ? "h-unk" : level === null ? "h-blank" : `h-${level}`;
 
-function diagnosticBody(seq: number, an: DiagnosticAnalysis, bp: Blueprint) {
+function diagnosticBody(seq: number, an: DiagnosticAnalysis, bp: Blueprint, extra: ReactNode) {
   if (seq === 3) {
     return (
       <>
@@ -233,6 +241,7 @@ function diagnosticBody(seq: number, an: DiagnosticAnalysis, bp: Blueprint) {
             <ol>{an.topGaps.map((g) => <li key={g.moduleId}><b>{g.name}</b>: score {g.score} against a target of {g.target} (priority index {g.priorityIndex}).</li>)}</ol>
           </>
         ) : <p className="muted">No dimension is below the target level, or there are not yet enough scored answers to rank gaps.</p>}
+        {extra}
       </>
     );
   }
@@ -359,6 +368,209 @@ function diagnosticBody(seq: number, an: DiagnosticAnalysis, bp: Blueprint) {
   return null;
 }
 
+function problemSolvingBody(
+  seq: number,
+  ps: PSAnalysis,
+  extra: ReactNode,
+  getA: (seq: number, re: RegExp) => string,
+) {
+  const none = (msg: string) => <p className="muted">{msg}</p>;
+  const yn = (b: boolean) => (b ? <span className="ok">Yes</span> : <span className="flag">No</span>);
+
+  if (seq === 3) {
+    const top = ps.topOption;
+    return (
+      <>
+        <table><tbody>
+          <tr><td>Hypotheses recorded</td><td>{ps.counts.total} ({ps.counts.validated} validated, {ps.counts.rejected} rejected, {ps.counts.inconclusive} inconclusive, {ps.counts.untested} untested)</td></tr>
+          <tr><td>Options on the longlist</td><td>{ps.options.rows.length} ({ps.options.distinct} distinct)</td></tr>
+          <tr><td>Highest weighted option</td><td>{top ? `${top.name} (${top.weighted} out of 5)${ps.closeCall ? ", a close call" : ""}` : "None scored yet"}</td></tr>
+          <tr><td>Decision recorded</td><td>{ps.decision.decision || "Not yet"}{ps.decision.owner ? ` by ${ps.decision.owner}` : ""}</td></tr>
+          <tr><td>Decision gate</td><td><b>{ps.readiness}</b>{ps.openGates ? ` (${ps.openGates} gate${ps.openGates > 1 ? "s" : ""} open)` : ""}</td></tr>
+        </tbody></table>
+        {extra}
+      </>
+    );
+  }
+  if (seq === 6) {
+    return (
+      <>
+        {extra}
+        <h3>Problem-definition check</h3>
+        <table><thead><tr><th>Check</th><th style={{ width: 70 }}>Met</th><th>Note</th></tr></thead>
+          <tbody>{ps.problemChecks.map((c) => <tr key={c.label}><td>{c.label}</td><td>{yn(c.ok)}</td><td>{c.note}</td></tr>)}</tbody></table>
+        <p className="muted">These checks test whether the statement is specific and measurable. They do not judge whether the problem is the right one.</p>
+      </>
+    );
+  }
+  if (seq === 8) {
+    return (
+      <>
+        {ps.tree.nodes.length === 0 ? none("No issue tree was provided.") : (
+          <ul className="tree">{ps.tree.nodes.map((n, i) => <li key={i} style={{ marginLeft: n.depth * 18, borderLeftWidth: n.depth === 0 ? 3 : 0 }}>{n.depth === 0 ? <b>{n.text}</b> : n.text}</li>)}</ul>
+        )}
+        {ps.tree.notes.map((n, i) => <p key={i} className="flag">{n}</p>)}
+        <p className="muted">MECE self-test: (1) Could any item belong in two branches? (2) Is anything important missing? (3) Does each branch use the same kind of split? (4) Can each leaf be tested with data?</p>
+      </>
+    );
+  }
+  if (seq === 9) {
+    return (
+      <>
+        {extra}
+        <h3>Methods available for this kit</h3>
+        <table><thead><tr><th style={{ width: 50 }}>Ref</th><th>Method</th><th>Use it when</th></tr></thead>
+          <tbody>{METHOD_CARDS.map((m) => <tr key={m.id}><td>{m.id}</td><td>{m.name}</td><td>{m.whenToUse}</td></tr>)}</tbody></table>
+        <p className="muted">Each method is described step by step, with a blank worksheet, in section 19.</p>
+      </>
+    );
+  }
+  if (seq === 10) {
+    return ps.hypotheses.length === 0 ? none("No hypotheses were recorded.") : (
+      <>
+        <table><thead><tr><th style={{ width: 36 }}>ID</th><th>Hypothesis</th><th>Evidence for</th><th>Evidence against</th><th>Test</th><th style={{ width: 70 }}>Confidence</th></tr></thead>
+          <tbody>{ps.hypotheses.map((h) => (
+            <tr key={h.id}><td>{h.id}</td><td>{h.statement}</td><td>{h.evidenceFor || <span className="muted">Not recorded</span>}</td><td>{h.evidenceAgainst || <span className="flag">Not recorded</span>}</td><td>{h.test || <span className="flag">Not defined</span>}</td><td>{h.confidence}</td></tr>))}</tbody></table>
+        <p className="muted">{ps.counts.noCounterEvidence} of {ps.counts.total} hypotheses have no counter-evidence recorded. A hypothesis is a candidate cause to test, not a finding.</p>
+      </>
+    );
+  }
+  if (seq === 11) {
+    return (
+      <>
+        {ps.hypotheses.length === 0 ? none("No hypotheses were recorded, so no causes can be validated.") : (
+          <table><thead><tr><th style={{ width: 36 }}>ID</th><th>Hypothesis</th><th style={{ width: 90 }}>Status</th><th>Evidence that decided it</th></tr></thead>
+            <tbody>{ps.hypotheses.map((h) => (
+              <tr key={h.id}><td>{h.id}</td><td>{h.statement}</td><td className={h.status === "Validated" ? "ok" : h.status === "Untested" ? "flag" : ""}>{h.status}</td><td>{h.validationEvidence || <span className="muted">None recorded</span>}{h.flags.filter((f) => /no evidence/.test(f)).map((f) => <div key={f} className="flag">{f}</div>)}</td></tr>))}</tbody></table>
+        )}
+        <p>{ps.counts.validated} validated, {ps.counts.rejected} rejected, {ps.counts.inconclusive} inconclusive and {ps.counts.untested} untested. Only validated causes should drive the choice of solution.</p>
+        {extra}
+      </>
+    );
+  }
+  if (seq === 13) {
+    return (
+      <>
+        {ps.options.rows.length === 0 ? none("No options were listed.") : (
+          <table><thead><tr><th style={{ width: 40 }}>ID</th><th>Option</th></tr></thead>
+            <tbody>{ps.options.rows.map((o) => <tr key={o.id}><td>{o.id}</td><td>{o.name}</td></tr>)}</tbody></table>
+        )}
+        {ps.options.notes.map((n, i) => <p key={i} className="flag">{n}</p>)}
+        <p className="muted">Generate widely first, then narrow. Include a &quot;do nothing&quot; and a &quot;do the minimum&quot; option so the case for change is visible.</p>
+      </>
+    );
+  }
+  if (seq === 14) {
+    return (
+      <>
+        <h3>Criteria and weights</h3>
+        <table><thead><tr><th>Criterion</th><th style={{ width: 90 }}>Weight %</th><th style={{ width: 90 }}>Basis</th></tr></thead>
+          <tbody>{ps.criteria.map((c) => <tr key={c.name}><td>{c.name}</td><td>{c.weight}</td><td>{c.proposed ? "Proposed" : "Entered"}</td></tr>)}</tbody></table>
+        {ps.criteriaNotes.map((n, i) => <p key={i} className="muted">{n}</p>)}
+        <h3>Scores (1 = poor, 5 = excellent) and ranking</h3>
+        {ps.options.rows.length === 0 ? none("No options to appraise.") : (
+          <table><thead><tr><th style={{ width: 36 }}>ID</th><th>Option</th>{ps.criteria.map((c, i) => <th key={i} title={c.name}>C{i + 1}</th>)}<th>Weighted</th><th>Rank</th></tr></thead>
+            <tbody>{ps.options.rows.map((o) => (
+              <tr key={o.id}><td>{o.id}</td><td>{o.name}{o.flags.length > 0 && <div className="flag">{o.flags.join("; ")}</div>}</td>
+                {o.scores.map((s, i) => <td key={i}>{s === null ? <span className="muted">?</span> : s}</td>)}
+                <td>{o.weighted === null ? <span className="muted">Not scored</span> : o.weighted}</td><td>{o.rank ?? "-"}</td></tr>))}</tbody></table>
+        )}
+        <p className="muted">Criteria C1 to C{ps.criteria.length} follow the order in the table above. An unknown score (?) is left out and the remaining weights are rescaled; it is never treated as zero.</p>
+        {ps.topOption && (
+          <p>
+            Highest weighted option: <b>{ps.topOption.name}</b> ({ps.topOption.weighted}).{" "}
+            {ps.topStable === false ? <span className="flag">The top option changes if all criteria are weighted equally, so the ranking depends on the weights. Discuss them before deciding. </span> : ps.topStable === true ? "It is also first with equal weights. " : ""}
+            {ps.closeCall ? <span className="flag">The top two options are within a quarter of a point: treat this as a close call. </span> : ""}
+          </p>
+        )}
+        <p className="muted">A weighted score informs the decision. It does not replace judgement about risk, reversibility and fit.</p>
+      </>
+    );
+  }
+  if (seq === 15) {
+    return (
+      <>
+        {extra}
+        <h3>Pilot design check</h3>
+        <table><thead><tr><th>Element</th><th style={{ width: 70 }}>Found</th></tr></thead>
+          <tbody>{ps.pilotChecks.map((c) => <tr key={c.label}><td>{c.label}</td><td>{yn(c.found)}</td></tr>)}</tbody></table>
+        <p className="muted">This is a keyword check of what was written. It cannot tell whether the pilot design is sound.</p>
+      </>
+    );
+  }
+  if (seq === 16) {
+    return (
+      <>
+        <table><tbody>
+          <tr><td style={{ width: 170 }}>Recommended solution</td><td>{ps.decision.recommended || <span className="muted">Not recorded</span>}</td></tr>
+          <tr><td>Decision</td><td>{ps.decision.decision || <span className="flag">Not yet taken</span>}</td></tr>
+          <tr><td>Decision owner</td><td>{ps.decision.owner || <span className="muted">Not named</span>}</td></tr>
+          <tr><td>Rationale</td><td>{ps.decision.rationale || <span className="muted">Not recorded</span>}</td></tr>
+        </tbody></table>
+        <h3>Decision gate</h3>
+        <table><thead><tr><th style={{ width: 40 }}>Gate</th><th>Condition</th><th style={{ width: 80 }}>Status</th><th>Detail</th></tr></thead>
+          <tbody>{ps.gates.map((g) => <tr key={g.id}><td>{g.id}</td><td>{g.label}</td><td>{g.met === null ? <span className="muted">Not yet</span> : g.met ? <span className="ok">Met</span> : <span className="flag">Open</span>}</td><td>{g.detail}</td></tr>)}</tbody></table>
+        <p><b>{ps.readiness}.</b> This report records the decision; it never makes or approves it. Only the named decision owner can approve a solution.</p>
+      </>
+    );
+  }
+  if (seq === 17) {
+    const validated = ps.hypotheses.filter((h) => h.status === "Validated");
+    const risks = ps.risks.filter((r) => r.rating === "High").slice(0, 5);
+    const row = (k: string, v: ReactNode) => <tr key={k}><td style={{ width: 190 }}>{k}</td><td>{v || <span className="muted">Not recorded</span>}</td></tr>;
+    return (
+      <>
+        {ps.readiness === "Not ready" && <p className="flag">This brief is a working draft: {ps.openGates > 0 ? `${ps.openGates} decision gate${ps.openGates > 1 ? "s are" : " is"} open` : "no solution has been approved"} (section 16). Do not start implementation from it.</p>}
+        <table><tbody>
+          {row("Problem statement", <span style={{ whiteSpace: "pre-wrap" }}>{getA(6, /Problem statement/i)}</span>)}
+          {row("Success criteria", <span style={{ whiteSpace: "pre-wrap" }}>{getA(6, /Success criteria/i)}</span>)}
+          {row("Validated causes", validated.length ? <ul>{validated.map((h) => <li key={h.id}>{h.id}: {h.statement}</li>)}</ul> : null)}
+          {row("Solution to implement", ps.decision.recommended)}
+          {row("Design constraints", <span style={{ whiteSpace: "pre-wrap" }}>{getA(12, /Solution principles/i)}</span>)}
+          {row("Pilot", <span style={{ whiteSpace: "pre-wrap" }}>{getA(15, /Pilot design/i)}</span>)}
+          {row("Highest risks", risks.length ? <ul>{risks.map((r, i) => <li key={i}>{r.text}{r.counter ? ` (counter-action: ${r.counter})` : ""}</li>)}</ul> : null)}
+          {row("Decision owner and decision", ps.decision.decision ? `${ps.decision.decision}${ps.decision.owner ? `, ${ps.decision.owner}` : ""}` : "")}
+        </tbody></table>
+        <p className="muted">Re-route gate: if implementation evidence shows the problem or the solution premise was wrong, return to this kit instead of pushing on. The Playbook then adds workstreams, owners, controls and benefits tracking.</p>
+      </>
+    );
+  }
+  if (seq === 18) {
+    return (
+      <>
+        {ps.risks.length === 0 ? none("No risks, assumptions or open questions were recorded.") : (
+          <table><thead><tr><th>Item</th><th style={{ width: 80 }}>Likelihood</th><th style={{ width: 70 }}>Impact</th><th style={{ width: 80 }}>Rating</th><th>Counter-action</th></tr></thead>
+            <tbody>{ps.risks.map((r, i) => <tr key={i}><td>{r.text}</td><td>{r.likelihood || "-"}</td><td>{r.impact || "-"}</td><td className={r.rating === "High" ? "flag" : ""}>{r.rating}</td><td>{r.counter || "-"}</td></tr>)}</tbody></table>
+        )}
+        <p className="muted">Write each item as: risk | likelihood (High, Medium, Low) | impact | counter-action. Items without ratings are shown as Not rated, not guessed. Include what would change the recommendation.</p>
+      </>
+    );
+  }
+  if (seq === 19) {
+    return (
+      <>
+        <p>Reference methods, with when to use them, steps, common errors and a blank worksheet. Illustrations are generic and are not client data.</p>
+        {METHOD_CARDS.map((m) => (
+          <div key={m.id} className="method avoid">
+            <div className="ibanner">{m.id} · {m.name}</div>
+            <table><tbody>
+              <tr><td style={{ width: 130 }}>Purpose</td><td>{m.purpose}</td></tr>
+              <tr><td>Use when</td><td>{m.whenToUse}</td></tr>
+              <tr><td>Do not use when</td><td>{m.whenNotToUse}</td></tr>
+            </tbody></table>
+            <ol>{m.steps.map((s, i) => <li key={i}>{s}</li>)}</ol>
+            <p><b>Common errors:</b> {m.commonErrors.join(" ")}</p>
+            <p className="muted">{m.illustration}</p>
+            <table><thead><tr>{m.worksheet.headers.map((h) => <th key={h}>{h}</th>)}</tr></thead>
+              <tbody>{m.worksheet.rows.map((r, i) => <tr key={i}>{r.map((c, j) => <td key={j} style={{ height: 24 }}>{c}</td>)}</tr>)}</tbody></table>
+          </div>
+        ))}
+      </>
+    );
+  }
+  return null;
+}
+
 const css = (c: typeof brand) => `
 .report{font-family:Calibri,Carlito,'Segoe UI',Arial,sans-serif;color:${c.ink};background:#fff;max-width:900px;margin:0 auto;padding:0 28px 60px;font-size:11pt;line-height:1.5}
 .report h1,.report h2,.report h3{font-family:Cambria,Georgia,serif;color:${c.navy}}
@@ -397,6 +609,7 @@ tbody tr:nth-child(even) td{background:${c.grey}}
 tr.total td{font-weight:700;background:${c.lightBlue}!important}
 .rag{font-weight:700}.rag.Red{color:${c.red}}.rag.Amber{color:#b7791f}.rag.Green{color:${c.green}}
 .avoid{break-inside:avoid}
+.ok{color:#1d6a3a;font-weight:600}.method{margin:16px 0}
 .heat{margin:6px 0}.heatrow{display:flex;gap:10px;align-items:center;margin:3px 0}.heatname{width:240px;font-size:9.5pt}.heatcells{display:flex;gap:3px;flex-wrap:wrap}
 .heat i,.legend i{display:inline-block;width:14px;height:14px;border:1px solid #cfcfcf;vertical-align:middle}
 .h-1{background:#b03a2e}.h-2{background:#e6a23c}.h-3{background:#9bc98b}.h-4{background:#1d6a3a}.h-unk{background:#c7c7c7}.h-blank{background:#fff}
