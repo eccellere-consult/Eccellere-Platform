@@ -43,10 +43,16 @@ export function FeaturedMarketplaceCard({
           <span className="font-mono text-lg font-medium text-eccellere-ink">
             ₹{(asset.price ?? 0).toLocaleString("en-IN")}
           </span>
-          <span className="flex items-center gap-1 text-xs text-eccellere-gold">
-            <Star className="h-3 w-3 fill-current" />
-            {(asset.rating ?? 0).toFixed(1)}
-          </span>
+          {(asset.rating ?? 0) > 0 ? (
+            <span className="flex items-center gap-1 text-xs text-eccellere-gold">
+              <Star className="h-3 w-3 fill-current" />
+              {(asset.rating ?? 0).toFixed(1)}
+            </span>
+          ) : (
+            <span className="rounded-sm bg-eccellere-gold/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-eccellere-gold">
+              New
+            </span>
+          )}
         </div>
       </Link>
     </motion.div>
