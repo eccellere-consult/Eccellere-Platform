@@ -361,9 +361,23 @@ const FIELD_SETS: Record<KitType, Record<number, F[]>> = {
     10: [
       ["Hypotheses", "longtext", "One per line: statement, evidence for, evidence against, test, confidence.", { required: true, ai: true }],
     ],
+    11: [
+      ["Validation results", "longtext", "One per line: H1 | Validated, Rejected or Inconclusive | the evidence that decided it. Use the hypothesis numbers from section 10 (H1, H2 and so on). A hypothesis with no line stays Untested.", { ai: false }],
+      ["Causal logic (5 Whys or fishbone)", "longtext", "Show the chain from symptom to root cause, one 'Why?' per line. Only include causes you have tested.", { ai: true }],
+    ],
     12: [["Solution principles and constraints", "longtext", "Budget, time, compliance, capability and other limits.", { ai: true }]],
-    13: [["Option longlist", "longtext", "Generate widely first: at least 5 distinct options.", { required: true, ai: true }]],
+    13: [["Option longlist", "longtext", "Generate widely first: at least 5 distinct options, one per line.", { required: true, ai: true }]],
+    14: [
+      ["Appraisal criteria and weights", "longtext", "One per line: criterion | weight %. Leave blank to use the proposed defaults (impact, feasibility, cost, time to value, risk, readiness). Weights should total 100.", { ai: false }],
+      ["Option scores (1-5)", "longtext", "One per line: option name or number | one score per criterion in the same order, separated by commas (1 = poor, 5 = excellent). Use ? where you do not know. Example: O1 | 4,3,2,5,3,4", { ai: false }],
+    ],
     15: [["Pilot design", "longtext", "Scale, duration, success measure and stop rule.", { ai: true }]],
+    16: [
+      ["Recommended solution", "longtext", "The option you recommend and why it addresses the validated causes.", { ai: true }],
+      ["Decision", "select", "The decision owner's decision. AI never decides for you.", { options: ["Approve", "Reject", "Defer", "No-go (do not proceed)"], ai: false }],
+      ["Decision owner", "text", "Name and role of the person who made the decision.", { ai: false }],
+      ["Decision rationale", "longtext", "Why this decision was taken, including trade-offs accepted.", { ai: true }],
+    ],
     18: [["Risks, assumptions, open questions", "longtext", "Include what would change the recommendation.", { ai: true }]],
   },
   PLAYBOOK: {
