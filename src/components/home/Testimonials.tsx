@@ -3,34 +3,21 @@
 import { motion } from "framer-motion";
 import { Quote } from "lucide-react";
 
-const testimonials = [
-  {
-    quote:
-      "Eccellere's AI readiness assessment changed how we think about technology. Within 3 months, we automated 40% of our quality checks.",
-    name: "Rajesh Kumar",
-    title: "Managing Director",
-    company: "Precision Auto Components",
-    sector: "Manufacturing",
-  },
-  {
-    quote:
-      "The strategy frameworks are worth 10x what we paid. Clear, actionable, and designed for Indian businesses — not multinationals.",
-    name: "Priya Sharma",
-    title: "Founder & CEO",
-    company: "FreshBasket D2C",
-    sector: "Retail",
-  },
-  {
-    quote:
-      "We went from zero digital presence to a fully integrated omnichannel operation in 6 months. The process transformation toolkit was our blueprint.",
-    name: "Anand Mehta",
-    title: "COO",
-    company: "SwiftShip Logistics",
-    sector: "Logistics",
-  },
-];
+type Testimonial = {
+  quote: string;
+  name: string;
+  title: string;
+  company: string;
+  sector: string;
+};
+
+// Intentionally empty: publish only real, client-approved testimonials.
+// While empty, the whole section is hidden from the homepage.
+const testimonials: Testimonial[] = [];
 
 export function Testimonials() {
+  if (testimonials.length === 0) return null;
+
   return (
     <section className="border-y border-eccellere-ink/5 bg-white py-20 lg:py-[120px]">
       <div className="mx-auto max-w-[1280px] px-6">

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 
 const stats = [
   { value: "60%", label: "Revenue share" },
-  { value: "200+", label: "MSMEs waiting" },
+  { value: "5", label: "Service disciplines" },
   { value: "Flexible", label: "Engagement" },
 ];
 
