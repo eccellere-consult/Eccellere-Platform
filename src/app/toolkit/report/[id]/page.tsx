@@ -270,7 +270,7 @@ function diagnosticBody(seq: number, an: DiagnosticAnalysis, bp: Blueprint) {
           <ul className="tree">{an.tree.map((t) => (
             <li key={t.moduleId}><b>{t.name}</b> <span className={`rag ${t.rag}`}>{t.rag}</span>
               <ul>{t.causes.length
-                ? t.causes.map((c) => <li key={c.findingId}><span className="fid">{c.findingId}</span> Hypothesis: {c.text}</li>)
+                ? t.causes.map((c) => <li key={c.findingId}><span className="fid">{c.findingId}</span> Weak answer to test: {c.text}</li>)
                 : <li className="muted">No single answer scored 1 or 2; review the dimension as a whole.</li>}</ul></li>))}</ul>
         )}
       </>
