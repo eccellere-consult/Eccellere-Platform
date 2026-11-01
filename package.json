@@ -12,7 +12,8 @@
     "test": "playwright test",
     "test:ui": "playwright test --ui",
     "test:report": "playwright show-report test-results/report",
-    "agent:submit-asset": "playwright test --config=scripts/agent-playwright.config.ts"
+    "agent:submit-asset": "playwright test --config=scripts/agent-playwright.config.ts",
+    "test:unit": "node --test unit/toolkit-engine.test.mjs unit/toolkit-ai.test.mjs"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",

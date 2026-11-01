@@ -34,6 +34,7 @@ model User {
   notifications     Notification[]
   sessions          Session[]
   assessments       Assessment[]
+  customKits        CustomKit[]
   cartItems         CartItem[]
 }
 
@@ -701,4 +702,93 @@ model WcDiagnosticSession {
   updatedAt    DateTime  @updatedAt
 
   @@index([phoneNumber, status])
+}
+
+// ============================
+// CONFIGURE-YOUR-OWN TOOLKIT (additive; do not alter existing models above)
+// ============================
+
+model CustomKit {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title          String
+  industry       String
+  topic          String?
+  problemText    String?  @db.Text
+  contextText    String?  @db.Text
+  // Routing (Problem x Solution 2x2). Client choice is stored separately from AI recommendation.
+  problemClarity  String   @default("unsure") // clear | unclear | unsure
+  solutionClarity String   @default("unsure")
+  recommendedType String   // DIAGNOSTIC | PROBLEM_SOLVING | PLAYBOOK | GUIDE | LEARNING
+  kitType         String   // client-confirmed type
+  mode            String   @default("CLIENT_LED") // CLIENT_LED | AI_FIRST_CUT | AI_ANALYSIS
+  status          String   @default("DRAFT") // DRAFT | IN_PROGRESS | SUBMITTED
+  blueprint       Json     // generated form schema (canonical TOC + topic modules); stable field IDs
+  blueprintSource String   @default("template") // template | ai
+  version         Int      @default(1)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  responses   KitResponse[]
+  evidence    KitEvidence[]
+  submissions KitSubmission[]
+
+  @@index([userId, updatedAt])
+}
+
+model KitResponse {
+  id         String   @id @default(cuid())
+  kitId      String
+  kit        CustomKit @relation(fields: [kitId], references: [id], onDelete: Cascade)
+  fieldId    String
+  value      Json?
+  // Client-entered | AI-suggested | Source-extracted | Calculated | Client-confirmed | Not-known | Not-applicable
+  provenance String   @default("Client-entered")
+  confidence String?  // High | Medium | Low
+  sourceRef  String?
+  status     String   @default("DRAFT")
+  version    Int      @default(1)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([kitId, fieldId])
+}
+
+model KitEvidence {
+  id            String   @id @default(cuid())
+  kitId         String
+  kit           CustomKit @relation(fields: [kitId], references: [id], onDelete: Cascade)
+  fileName      String
+  fileKey       String
+  contentType   String
+  size          Int
+  extractedText String?  @db.LongText
+  status        String   @default("UPLOADED") // UPLOADED | EXTRACTED | UNREADABLE
+  createdAt     DateTime @default(now())
+
+  @@index([kitId])
+}
+
+model KitSubmission {
+  id          String   @id @default(cuid())
+  kitId       String
+  kit         CustomKit @relation(fields: [kitId], references: [id], onDelete: Cascade)
+  version     Int
+  snapshot    Json     // frozen blueprint + responses at submit time
+  approvedBy  String?
+  submittedAt DateTime @default(now())
+
+  @@index([kitId])
+}
+
+// ============================
+// ADMIN AI PROVIDER SETTINGS (additive). No secrets stored here: keys live in env vars only.
+// ============================
+
+model AiSetting {
+  key       String   @id
+  value     Json
+  updatedBy String?
+  updatedAt DateTime @updatedAt
 }

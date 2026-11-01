@@ -140,6 +140,14 @@ const adminModules = [
     badge: null,
   },
   {
+    label: "AI Providers",
+    href: "/admin/ai-settings",
+    description: "Switch AI providers on or off, choose the primary and fallback order",
+    icon: Shield,
+    stat: "4",
+    badge: null,
+  },
+  {
     label: "Audit Log",
     href: "/admin/audit-log",
     description: "Full platform audit trail",
