@@ -159,3 +159,13 @@ test("method cards are complete: steps, errors, illustration labelled as not cli
     assert.ok(m.whenToUse && m.whenNotToUse, m.name);
   }
 });
+
+test("option scores match by partial name, so 'Change supplier' finds 'Change resin supplier'", () => {
+  const a = run(fill([
+    [13, /Option longlist/, "Change resin supplier\nRetool"],
+    [14, /criteria and weights/, "X | 50\nY | 50"],
+    [14, /Option scores/, "Change supplier | 4,4\nRetool | 2,2"],
+  ]));
+  assert.equal(a.options.rows[0].weighted, 4);
+  assert.equal(a.options.rows[1].weighted, 2);
+});

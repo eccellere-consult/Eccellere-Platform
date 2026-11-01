@@ -227,11 +227,29 @@ export function analyseProblemSolving(bp: Blueprint, responses: Record<string, P
   const criteria: Criterion[] = rawCrit.map((c) => ({ name: c.name, weight: Math.round((c.weight / wsum) * 1000) / 10, proposed }));
 
   const scoreLines = parseLines(A(14, /Option scores/i)).map(cells);
+  // A score line finds its option by number (O2), by exact name, or by a name whose words all appear in
+  // exactly one option ("Change supplier" -> "Change resin supplier"). If a short name could fit several
+  // options we do not guess; the option is reported as having no scores.
+  const toks = (s: string) => norm(s).split(" ").filter(Boolean);
+  const subset = (a: string[], b: string[]) => a.length > 0 && a.every((t) => b.includes(t));
+  const looselyMatches = (key: string, opt: string) => {
+    const a = toks(key), b = toks(opt);
+    return subset(a, b) || subset(b, a);
+  };
+  const parseScores = (c: string[]) =>
+    (c[1] ?? "").split(/[,\s]+/).filter(Boolean).map((t) => (/^\d$/.test(t) && +t >= 1 && +t <= 5 ? +t : NaN));
   const scoresFor = (opt: string, idx: number): number[] | null => {
     for (const c of scoreLines) {
       const key = c[0] ?? "";
       const m = key.match(/^O?(\d+)$/i);
-      if ((m && parseInt(m[1], 10) - 1 === idx) || norm(key) === norm(opt)) return (c[1] ?? "").split(/[,\s]+/).filter(Boolean).map((t) => (/^\d$/.test(t) && +t >= 1 && +t <= 5 ? +t : NaN));
+      if (m && parseInt(m[1], 10) - 1 === idx) return parseScores(c);
+      if (!m && norm(key) === norm(opt)) return parseScores(c);
+    }
+    for (const c of scoreLines) {
+      const key = c[0] ?? "";
+      if (/^O?\d+$/i.test(key) || !looselyMatches(key, opt)) continue;
+      const candidates = optNames.filter((o) => looselyMatches(key, o)).length;
+      if (candidates === 1) return parseScores(c);
     }
     return null;
   };
