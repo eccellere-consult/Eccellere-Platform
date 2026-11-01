@@ -4,7 +4,8 @@ import type { ReactNode } from "react";
 import type { Blueprint } from "@/lib/toolkit/engine";
 import { GOVERNANCE_CALENDAR, type DiagnosticAnalysis } from "@/lib/toolkit/analysis";
 import type { PSAnalysis } from "@/lib/toolkit/analysis-ps";
-import { METHOD_CARDS } from "@/lib/toolkit/methods";
+import type { PBAnalysis } from "@/lib/toolkit/analysis-pb";
+import { METHOD_CARDS, PLAYBOOK_TEMPLATES } from "@/lib/toolkit/methods";
 
 /** Section bodies for the printable report. Pure rendering: no data fetching. */
 const TEMPLATE_NOTE =
@@ -352,6 +353,164 @@ export function problemSolvingBody(
             <p className="muted">{m.illustration}</p>
             <table><thead><tr>{m.worksheet.headers.map((h) => <th key={h}>{h}</th>)}</tr></thead>
               <tbody>{m.worksheet.rows.map((r, i) => <tr key={i}>{r.map((c, j) => <td key={j} style={{ height: 24 }}>{c}</td>)}</tr>)}</tbody></table>
+          </div>
+        ))}
+      </>
+    );
+  }
+  return null;
+}
+
+export function playbookBody(seq: number, pb: PBAnalysis, extra: ReactNode) {
+  const none = (msg: string) => <p className="muted">{msg}</p>;
+  const yn = (b: boolean) => (b ? <span className="ok">Yes</span> : <span className="flag">No</span>);
+  const flagList = (f: string[]) => (f.length ? <div className="flag">{f.join("; ")}</div> : null);
+  const cell = (v: string, missing = "Not recorded") => (v ? v : <span className="muted">{missing}</span>);
+
+  if (seq === 3) {
+    return (
+      <>
+        <table><tbody>
+          <tr><td>Workstreams / steps</td><td>{pb.workstreams.length} workstreams, {pb.steps.length} steps</td></tr>
+          <tr><td>RACI rows with a problem</td><td>{pb.raci.rows.filter((r) => r.flags.length).length} of {pb.raci.rows.length}</td></tr>
+          <tr><td>KPIs / benefit status</td><td>{pb.kpis.length} KPIs ({Object.entries(pb.benefitCounts).filter(([, n]) => n > 0).map(([k, n]) => `${n} ${k}`).join(", ") || "none"})</td></tr>
+          <tr><td>Roadmap items</td><td>{pb.roadmap.length}</td></tr>
+          <tr><td>Completion gates met</td><td>{pb.gatesMetPct === null ? "No gate status stated" : `${pb.gatesMetPct}%`}</td></tr>
+          <tr><td>Mobilisation checks</td><td><b>{pb.mobilisation}</b>{pb.openChecks ? ` (${pb.openChecks} of ${pb.checks.length} checks open)` : ""}</td></tr>
+        </tbody></table>
+        {extra}
+      </>
+    );
+  }
+  if (seq === 5) {
+    return (
+      <>
+        {extra}
+        <h3>Premise check</h3>
+        <table><thead><tr><th>Check</th><th style={{ width: 70 }}>Met</th><th>Note</th></tr></thead>
+          <tbody>{pb.premise.map((p) => <tr key={p.label}><td>{p.label}</td><td>{yn(p.ok)}</td><td>{p.note}</td></tr>)}</tbody></table>
+        <p className="muted">A Playbook implements a decision that has already been made. If implementation evidence shows the problem or solution premise was wrong, use the re-route gate and return to a Diagnostic or Problem-Solving Kit.</p>
+      </>
+    );
+  }
+  if (seq === 8) {
+    return (
+      <>
+        {pb.readiness.items.length === 0 ? none("No readiness items were recorded.") : (
+          <table><thead><tr><th>Prerequisite</th><th style={{ width: 90 }}>Status</th><th>Owner</th></tr></thead>
+            <tbody>{pb.readiness.items.map((r, i) => <tr key={i}><td>{r.item}</td><td className={r.status === "Not ready" ? "flag" : r.status === "Ready" ? "ok" : ""}>{r.status}</td><td>{cell(r.owner, "No owner")}</td></tr>)}</tbody></table>
+        )}
+        <p>{pb.readiness.readyPct === null ? "No readiness status was stated." : `${pb.readiness.readyPct}% of the items with a stated status are Ready.`}</p>
+      </>
+    );
+  }
+  if (seq === 9) {
+    return pb.workstreams.length === 0 ? none("No workstreams were recorded.") : (
+      <>
+        <table><thead><tr><th style={{ width: 40 }}>ID</th><th>Workstream</th><th>Scope</th><th>Owner</th><th>Depends on</th><th>Stage gate</th><th style={{ width: 50 }}>Steps</th></tr></thead>
+          <tbody>{pb.workstreams.map((w) => (
+            <tr key={w.id}><td>{w.id}</td><td>{w.name}{flagList(w.flags)}</td><td>{cell(w.scope)}</td><td>{cell(w.owner, "No owner")}</td><td>{w.dependsOn.join(", ") || "None"}</td><td>{cell(w.gate, "No gate")}</td><td>{w.stepCount}</td></tr>))}</tbody></table>
+        <p className="muted">Each workstream needs a named owner and a stage gate. Dependencies show what must finish first.</p>
+      </>
+    );
+  }
+  if (seq === 10) {
+    return pb.steps.length === 0 ? none("No implementation steps were recorded.") : (
+      <>
+        <table><thead><tr><th style={{ width: 36 }}>ID</th><th>Action</th><th>Method</th><th>Output</th><th>Validation</th><th>Owner</th><th style={{ width: 40 }}>WS</th></tr></thead>
+          <tbody>{pb.steps.map((s) => (
+            <tr key={s.id}><td>{s.id}</td><td>{s.action}{flagList(s.flags)}</td><td>{cell(s.method)}</td><td>{cell(s.output)}</td><td>{cell(s.validation)}</td><td>{cell(s.owner, "No owner")}</td><td>{s.workstream || "-"}</td></tr>))}</tbody></table>
+        <p className="muted">Every step states an action, a method, an output and how it will be validated.</p>
+      </>
+    );
+  }
+  if (seq === 11) {
+    return pb.raci.rows.length === 0 ? <>{none("No RACI rows were recorded.")}{extra}</> : (
+      <>
+        <table><thead><tr><th>Activity</th><th>Responsible</th><th>Accountable</th><th>Consulted</th><th>Informed</th></tr></thead>
+          <tbody>{pb.raci.rows.map((r, i) => (
+            <tr key={i}><td>{r.activity}{flagList(r.flags)}</td><td>{r.R.join(", ") || "-"}</td><td>{r.A.join(", ") || <span className="flag">None</span>}</td><td>{r.C.join(", ") || "-"}</td><td>{r.I.join(", ") || "-"}</td></tr>))}</tbody></table>
+        <p className="muted">Roles involved: {pb.raci.roles.join(", ") || "none"}. Rule: exactly one Accountable per activity, and at least one Responsible.</p>
+        {pb.raci.uncovered.length > 0 && <p className="muted">Name check: no RACI activity mentions {pb.raci.uncovered.join(", ")}. This is a text match only, so confirm by hand that each workstream has an accountable owner.</p>}
+      </>
+    );
+  }
+  if (seq === 12) {
+    return (
+      <>
+        {extra}
+        <p className={pb.budget.stated ? "muted" : "flag"}>{pb.budget.note}</p>
+      </>
+    );
+  }
+  if (seq === 14) {
+    return pb.risks.length === 0 ? none("No risks were recorded.") : (
+      <>
+        <table><thead><tr><th>Risk</th><th style={{ width: 80 }}>Likelihood</th><th style={{ width: 70 }}>Impact</th><th style={{ width: 80 }}>Rating</th><th>Counter-action</th><th>Owner</th></tr></thead>
+          <tbody>{pb.risks.map((r, i) => <tr key={i}><td>{r.text}</td><td>{r.likelihood || "-"}</td><td>{r.impact || "-"}</td><td className={r.rating === "High" ? "flag" : ""}>{r.rating}</td><td>{cell(r.counter, "None stated")}</td><td>{cell(r.owner, "No owner")}</td></tr>)}</tbody></table>
+        <p className="muted">{pb.risks.filter((r) => r.counter).length} of {pb.risks.length} risks have a counter-action. Aim for at least five. Ratings are likelihood times impact; unrated items are shown as Not rated, not guessed.</p>
+      </>
+    );
+  }
+  if (seq === 15) {
+    return pb.kpis.length === 0 ? none("No KPIs were recorded.") : (
+      <>
+        <table><thead><tr><th>KPI</th><th>Baseline</th><th>Target</th><th>Formula</th><th>Owner</th><th>Cadence</th><th>Benefit status</th></tr></thead>
+          <tbody>{pb.kpis.map((k, i) => (
+            <tr key={i}><td>{k.name}{flagList(k.flags)}</td><td>{cell(k.baseline, "None")}</td><td>{cell(k.target, "None")}</td><td>{cell(k.formula, "None")}</td><td>{cell(k.owner, "No owner")}</td><td>{cell(k.cadence, "None")}</td><td>{k.status}</td></tr>))}</tbody></table>
+        <p className="muted">Benefit status is shown as the client stated it and is counted separately: {Object.entries(pb.benefitCounts).map(([k, n]) => `${k} ${n}`).join(", ")}. Forecast benefit is not realised benefit.</p>
+      </>
+    );
+  }
+  if (seq === 16) {
+    return (
+      <>
+        {pb.roadmap.length === 0 ? none("No roadmap was recorded.") : (
+          <table><thead><tr><th style={{ width: 36 }}>ID</th><th>Phase</th><th>Activity</th><th>Owner</th><th>Start</th><th>End</th><th>Horizon</th><th>Milestone</th><th>Depends on</th><th>Gate</th></tr></thead>
+            <tbody>{(new Set(pb.roadmap.filter((r) => r.kind !== "none").map((r) => r.kind)).size > 1 ? pb.roadmap : pb.roadmap.slice().sort((a, b) => (a.startDay ?? 9e9) - (b.startDay ?? 9e9))).map((r) => (
+              <tr key={r.id}><td>{r.id}</td><td>{r.phase}</td><td>{r.activity}{flagList(r.flags)}</td><td>{cell(r.owner, "No owner")}</td><td>{cell(r.start, "-")}</td><td>{cell(r.end, "-")}</td><td>{r.horizon}</td><td>{cell(r.milestone, "None")}</td><td>{r.dependsOn || "-"}</td><td>{r.gate || "-"}</td></tr>))}</tbody></table>
+        )}
+        {pb.roadmapNotes.map((n, i) => <p key={i} className="flag">{n}</p>)}
+        <p className="muted">Use 30/60/90 days for focused work and a longer roadmap for programmes. Dates are shown exactly as entered; none are assumed.</p>
+      </>
+    );
+  }
+  if (seq === 17) {
+    return pb.forums.length === 0 ? none("No governance forums were recorded.") : (
+      <>
+        <table><thead><tr><th>Forum</th><th>Cadence</th><th>Attendees</th><th>Purpose</th></tr></thead>
+          <tbody>{pb.forums.map((f, i) => <tr key={i}><td>{f.forum}</td><td>{f.cadence || "-"}</td><td>{cell(f.attendees, "-")}</td><td>{cell(f.purpose, "-")}</td></tr>)}</tbody></table>
+        <p className={pb.governanceCovers.weekly && pb.governanceCovers.monthly && pb.governanceCovers.quarterly ? "muted" : "flag"}>
+          Coverage: weekly {pb.governanceCovers.weekly ? "yes" : "no"}, monthly {pb.governanceCovers.monthly ? "yes" : "no"}, quarterly {pb.governanceCovers.quarterly ? "yes" : "no"}.
+        </p>
+      </>
+    );
+  }
+  if (seq === 18) {
+    return (
+      <>
+        {pb.gates.length === 0 ? none("No completion gates were recorded.") : (
+          <table><thead><tr><th>Gate</th><th>Evidence required</th><th>Owner</th><th style={{ width: 80 }}>Status</th></tr></thead>
+            <tbody>{pb.gates.map((g, i) => <tr key={i}><td>{g.gate}{flagList(g.flags)}</td><td>{cell(g.evidence, "None defined")}</td><td>{cell(g.owner, "No owner")}</td><td className={g.status === "Met" ? "ok" : g.status === "Open" ? "flag" : ""}>{g.status}</td></tr>)}</tbody></table>
+        )}
+        <p>{pb.gatesMetPct === null ? "No gate status was stated." : `${pb.gatesMetPct}% of gates with a stated status are met.`}</p>
+        <h3>Mobilisation checks</h3>
+        <table><thead><tr><th style={{ width: 44 }}>Check</th><th>Condition</th><th style={{ width: 70 }}>Status</th><th>Detail</th></tr></thead>
+          <tbody>{pb.checks.map((c) => <tr key={c.id}><td>{c.id}</td><td>{c.label}</td><td>{c.met ? <span className="ok">Met</span> : <span className="flag">Open</span>}</td><td>{c.detail}</td></tr>)}</tbody></table>
+        <p><b>{pb.mobilisation}.</b> This report states which checks are met; it never approves mobilisation. That is the sponsor&apos;s decision.</p>
+      </>
+    );
+  }
+  if (seq === 20) {
+    return (
+      <>
+        <p>Blank templates to use during implementation. They are generic worksheets, not client data.</p>
+        {PLAYBOOK_TEMPLATES.map((t) => (
+          <div key={t.id} className="method avoid">
+            <div className="ibanner">{t.id} · {t.name}</div>
+            <p className="muted">{t.use}</p>
+            <table><thead><tr>{t.headers.map((h) => <th key={h}>{h}</th>)}</tr></thead>
+              <tbody>{t.rows.map((r, i) => <tr key={i}>{r.map((c, j) => <td key={j} style={{ height: 24 }}>{c}</td>)}</tr>)}</tbody></table>
           </div>
         ))}
       </>
