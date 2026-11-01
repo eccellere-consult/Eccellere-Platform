@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Cormorant_Garamond, DM_Sans, JetBrains_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { ChatbotWidget } from "@/components/chatbot/ChatbotWidget";
 import { ThemeProvider } from "@/components/ThemeProvider";
@@ -7,25 +7,25 @@ import { GoogleAnalytics } from "@/components/analytics/GoogleAnalytics";
 import { PostHogPageView } from "@/components/analytics/PostHogProvider";
 import { Suspense } from "react";
 
-const cormorant = Cormorant_Garamond({
+// Fonts are bundled in the repo (latin subset) so builds never depend on Google Fonts.
+const cormorant = localFont({
   variable: "--font-cormorant",
-  subsets: ["latin"],
-  weight: ["300", "400", "600"],
-  style: ["normal", "italic"],
+  src: [
+    { path: "./fonts/CormorantGaramond.woff2", weight: "300 600", style: "normal" },
+    { path: "./fonts/CormorantGaramond-Italic.woff2", weight: "300 600", style: "italic" },
+  ],
   display: "swap",
 });
 
-const dmSans = DM_Sans({
+const dmSans = localFont({
   variable: "--font-dm-sans",
-  subsets: ["latin"],
-  weight: ["300", "400", "500"],
+  src: [{ path: "./fonts/DMSans.woff2", weight: "300 500", style: "normal" }],
   display: "swap",
 });
 
-const jetbrainsMono = JetBrains_Mono({
+const jetbrainsMono = localFont({
   variable: "--font-jetbrains-mono",
-  subsets: ["latin"],
-  weight: ["400"],
+  src: [{ path: "./fonts/JetBrainsMono.woff2", weight: "400", style: "normal" }],
   display: "swap",
 });
 
