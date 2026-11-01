@@ -220,11 +220,12 @@ export default function NewToolkitPage() {
                 id="problem"
                 rows={5}
                 className={inputCls}
-                maxLength={4000}
+                maxLength={20000}
                 value={problemText}
                 onChange={(e) => setProblemText(e.target.value)}
                 placeholder="e.g. Scrap on our main line is 8% against a 3% target and customers are complaining about late deliveries."
               />
+              <p className="mt-1 text-xs text-ink-light">{problemText.length.toLocaleString()} / 20,000 characters. For longer material, upload a file in the next step.</p>
               {!step0Ok && industry && <p className="mt-1 text-xs text-ink-light">Choose a topic, or describe the problem in at least a sentence.</p>}
             </div>
           </>
@@ -238,11 +239,12 @@ export default function NewToolkitPage() {
                 id="context"
                 rows={7}
                 className={inputCls}
-                maxLength={8000}
+                maxLength={20000}
                 value={contextText}
                 onChange={(e) => setContextText(e.target.value)}
                 placeholder="Size, products or services, customers, locations, recent performance, what you have already tried, constraints…"
               />
+              <p className="mt-1 text-xs text-ink-light">{contextText.length.toLocaleString()} / 20,000 characters. For longer material, upload files below.</p>
               <p className="mt-1 text-xs text-ink-light">The more specific you are, the better the form and AI drafts. Optional, but recommended.</p>
             </div>
             <div>

@@ -76,3 +76,14 @@ test("draftFields passes a diag collector to the generator", async () => {
   await draftFields({ ...base, gen: async (a) => { got = a.diag; a.diag.push("Groq: HTTP 401"); return null; } });
   assert.ok(Array.isArray(got));
 });
+
+test("long client write-ups reach the AI (no silent cut at 3,000 characters)", async () => {
+  const marker = "MARKER_DEEP_DETAIL";
+  const longContext = "x".repeat(9000) + marker;
+  const gen = mock('{"suggestions":[]}');
+  await draftFields({ ...base, contextText: longContext, gen });
+  assert.ok(`${gen.last.system}\n${gen.last.user}`.includes(marker));
+  const gen2 = mock('{"suggestions":[]}');
+  await draftFields({ ...base, evidence: [{ fileName: "big.txt", text: "y".repeat(9000) + marker }], gen: gen2 });
+  assert.ok(gen2.last.user.includes(marker));
+});
