@@ -5,36 +5,22 @@
  */
 import type { Blueprint, KitField, ProposedModule } from "./engine";
 
-const MODEL = "llama-3.3-70b-versatile";
+export type Generator = (a: { system: string; user: string; maxTokens: number; timeoutMs?: number }) => Promise<{ text: string } | null>;
 
-async function callGroq(system: string, user: string, maxTokens: number, timeoutMs = 25000): Promise<string | null> {
-  const key = process.env.GROQ_API_KEY;
-  if (!key) return null;
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), timeoutMs);
-  try {
-    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      signal: ctrl.signal,
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-      body: JSON.stringify({
-        model: MODEL,
-        temperature: 0.3,
-        max_tokens: maxTokens,
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: user },
-        ],
-      }),
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data.choices?.[0]?.message?.content ?? null;
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(t);
-  }
+/** Default generator uses the admin-selected provider(s). Loaded lazily so tests can inject a mock. */
+async function defaultGenerator(): Promise<Generator> {
+  const { generateText } = await import("@/lib/ai/gateway");
+  return generateText;
+}
+async function isAvailable(gen?: Generator): Promise<boolean> {
+  if (gen) return true;
+  const { aiAvailable } = await import("@/lib/ai/gateway");
+  return aiAvailable();
+}
+async function callAi(gen: Generator | undefined, system: string, user: string, maxTokens: number): Promise<string | null> {
+  const g = gen ?? (await defaultGenerator());
+  const out = await g({ system, user, maxTokens, timeoutMs: 25000 });
+  return out?.text ?? null;
 }
 
 function parseJson<T>(text: string | null): T | null {
@@ -56,7 +42,9 @@ export async function tailorDiagnosticModules(input: {
   topic: string;
   problemText?: string;
   contextText?: string;
+  gen?: Generator;
 }): Promise<ProposedModule[] | null> {
+  if (!(await isAvailable(input.gen))) return null;
   const system = `You are a senior management consultant designing a diagnostic for an Indian business. ${SAFETY} Return ONLY JSON.`;
   const user = `Design the assessment dimensions for a Diagnostic Kit.
 Industry: ${input.industry}
@@ -67,7 +55,7 @@ Context: ${(input.contextText ?? "").slice(0, 2000)}
 </client_data>
 Requirements: 5 to 7 dimensions that are MECE (no overlap, together cover the topic). For each, 5 to 7 diagnostic questions answerable on a 1-4 maturity scale (1 Ad hoc, 2 Developing, 3 Established, 4 Leading). Questions must be specific to the topic and industry, one idea each, no yes/no questions.
 JSON shape: {"modules":[{"name":"","purpose":"","questions":["",""]}]}`;
-  const out = parseJson<{ modules?: ProposedModule[] }>(await callGroq(system, user, 3500));
+  const out = parseJson<{ modules?: ProposedModule[] }>(await callAi(input.gen, system, user, 3500));
   return out?.modules ?? null;
 }
 
@@ -85,9 +73,10 @@ export async function draftFields(args: {
   problemText: string;
   evidence: Array<{ fileName: string; text: string }>;
   answers: Record<string, string>;
+  gen?: Generator;
 }): Promise<{ suggestions: Suggestion[]; available: boolean }> {
   const { blueprint, fields } = args;
-  if (!process.env.GROQ_API_KEY) return { suggestions: [], available: false };
+  if (!(await isAvailable(args.gen))) return { suggestions: [], available: false };
 
   const evidence = args.evidence
     .map((e) => `[${e.fileName}]\n${e.text.slice(0, 5000)}`)
@@ -115,7 +104,7 @@ Fields:
 ${fields.map((f) => `- id=${f.id} | type=${f.type} | ${f.label} | hint: ${f.guidance.slice(0, 160)}`).join("\n")}
 JSON shape: {"suggestions":[{"fieldId":"","value":"","confidence":"Low","basis":""}]}`;
 
-  const out = parseJson<{ suggestions?: Suggestion[] }>(await callGroq(system, user, 3800));
+  const out = parseJson<{ suggestions?: Suggestion[] }>(await callAi(args.gen, system, user, 3800));
   const valid = new Map(fields.map((f) => [f.id, f]));
   const suggestions: Suggestion[] = [];
   for (const s of out?.suggestions ?? []) {
