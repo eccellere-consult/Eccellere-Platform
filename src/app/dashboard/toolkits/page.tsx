@@ -1,5 +1,7 @@
 "use client";
 
+import { readJson } from "@/lib/toolkit/http";
+
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Plus, FileText, Trash2 } from "lucide-react";
@@ -39,7 +41,7 @@ export default function MyToolkitsPage() {
         setError("Please sign in to see your toolkits.");
         return;
       }
-      const d = await r.json();
+      const d = await readJson(r);
       setKits(d.kits ?? []);
     } catch {
       setError("Could not load your toolkits. Please refresh.");

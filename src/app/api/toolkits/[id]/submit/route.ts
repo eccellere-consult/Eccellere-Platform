@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireUserId, unauthorized, loadOwnedKit, asBlueprint } from "@/lib/toolkit/server";
+import { requireUserId, unauthorized, loadOwnedKit, asBlueprint, guard } from "@/lib/toolkit/server";
 import { overallProgress, scoreDiagnostic, type StoredResponse } from "@/lib/toolkit/engine";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +12,7 @@ type Ctx = { params: Promise<{ id: string }> };
  * Body: { approvedBy: string }. A named human must approve; AI never approves.
  * Freezes a snapshot (blueprint + responses + evidence manifest + scores).
  */
-export async function POST(req: NextRequest, { params }: Ctx) {
+async function POST_(req: NextRequest, { params }: Ctx) {
   const userId = await requireUserId();
   if (!userId) return unauthorized();
   const { id } = await params;
@@ -87,3 +87,5 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   ]);
   return NextResponse.json({ ok: true, submission });
 }
+
+export const POST = guard(POST_);

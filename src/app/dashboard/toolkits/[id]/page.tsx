@@ -1,5 +1,7 @@
 "use client";
 
+import { readJson } from "@/lib/toolkit/http";
+
 import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
@@ -59,7 +61,7 @@ export default function ToolkitWorkspace({ params }: { params: Promise<{ id: str
     const r = await fetch(`/api/toolkits/${id}`);
     if (r.status === 401) { setLoadErr("Please sign in to open this toolkit."); return; }
     if (!r.ok) { setLoadErr("This toolkit could not be found."); return; }
-    const d = await r.json();
+    const d = await readJson(r);
     setKit(d.kit);
     const m: Record<string, Resp> = {};
     for (const x of d.responses) m[x.fieldId] = { value: x.value, provenance: x.provenance, confidence: x.confidence };
@@ -137,7 +139,7 @@ export default function ToolkitWorkspace({ params }: { params: Promise<{ id: str
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sectionId: section.id, moduleId }),
       });
-      const d = await r.json();
+      const d = await readJson(r);
       if (!r.ok) { setAiNote(d.error ?? "AI draft failed."); return; }
       let applied = 0;
       for (const s of d.suggestions as Array<{ fieldId: string; value: Val; confidence: string; basis: string }>) {
@@ -163,7 +165,7 @@ export default function ToolkitWorkspace({ params }: { params: Promise<{ id: str
     for (const f of Array.from(list)) {
       const fd = new FormData(); fd.append("file", f);
       const r = await fetch(`/api/toolkits/${id}/evidence`, { method: "POST", body: fd });
-      const d = await r.json().catch(() => ({}));
+      const d = await readJson(r);
       if (r.ok) { setEvidence((e) => [...e, { id: d.id, fileName: d.fileName, size: d.size, status: d.status }]); if (d.note) setUploadMsg(d.note); }
       else setUploadMsg(`${f.name}: ${d.error ?? "upload failed"}`);
     }
@@ -182,7 +184,7 @@ export default function ToolkitWorkspace({ params }: { params: Promise<{ id: str
     const r = await fetch(`/api/toolkits/${id}/submit`, {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ approvedBy: approver }),
     });
-    const d = await r.json();
+    const d = await readJson(r);
     if (!r.ok) { setSubmitErr(d.missingSections?.length ? d.missingSections : d.error ?? "Could not submit."); return; }
     setShowSubmit(false);
     await load();

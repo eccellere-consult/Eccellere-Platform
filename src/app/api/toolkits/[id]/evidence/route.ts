@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireUserId, unauthorized, loadOwnedKit } from "@/lib/toolkit/server";
+import { requireUserId, unauthorized, loadOwnedKit, guard } from "@/lib/toolkit/server";
 import { getStorage } from "@/lib/storage";
 import { rateLimit } from "@/lib/rate-limit";
 
@@ -42,7 +42,7 @@ async function extractText(buffer: Buffer, type: string): Promise<string> {
 }
 
 /** POST /api/toolkits/[id]/evidence - multipart upload with text extraction */
-export async function POST(req: NextRequest, { params }: Ctx) {
+async function POST_(req: NextRequest, { params }: Ctx) {
   const userId = await requireUserId();
   if (!userId) return unauthorized();
   const { id } = await params;
@@ -116,7 +116,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
 }
 
 /** DELETE /api/toolkits/[id]/evidence?evidenceId=... */
-export async function DELETE(req: NextRequest, { params }: Ctx) {
+async function DELETE_(req: NextRequest, { params }: Ctx) {
   const userId = await requireUserId();
   if (!userId) return unauthorized();
   const { id } = await params;
@@ -133,3 +133,6 @@ export async function DELETE(req: NextRequest, { params }: Ctx) {
   await prisma.kitEvidence.delete({ where: { id: evidenceId } });
   return NextResponse.json({ ok: true });
 }
+
+export const POST = guard(POST_);
+export const DELETE = guard(DELETE_);

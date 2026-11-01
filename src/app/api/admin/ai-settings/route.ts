@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guard } from "@/lib/toolkit/server";
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/rbac";
 import { PROVIDERS, normalizeSettings } from "@/lib/ai/providers";
@@ -7,7 +8,7 @@ import { SETTINGS_KEY, clearAiSettingsCache, loadAiSettings, providerStatus } fr
 export const dynamic = "force-dynamic";
 
 /** GET /api/admin/ai-settings - current toggles/selection and which keys are configured (never the keys). */
-export async function GET() {
+async function GET_() {
   const auth = await requirePermission("admin:settings:read");
   if (auth.error) return auth.error;
   clearAiSettingsCache();
@@ -27,7 +28,7 @@ export async function GET() {
 }
 
 /** PUT /api/admin/ai-settings - save toggles, models, primary and fallback order. */
-export async function PUT(req: NextRequest) {
+async function PUT_(req: NextRequest) {
   const auth = await requirePermission("admin:settings:write");
   if (auth.error) return auth.error;
 
@@ -63,3 +64,6 @@ export async function PUT(req: NextRequest) {
     warning: anyUsable ? undefined : "No enabled provider has an API key configured, so AI features will be unavailable.",
   });
 }
+
+export const GET = guard(GET_);
+export const PUT = guard(PUT_);

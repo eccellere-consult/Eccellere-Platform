@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireUserId, unauthorized, loadOwnedKit, asBlueprint } from "@/lib/toolkit/server";
+import { requireUserId, unauthorized, loadOwnedKit, asBlueprint, guard } from "@/lib/toolkit/server";
 import { draftFields } from "@/lib/toolkit/ai";
 import { rateLimit } from "@/lib/rate-limit";
 
@@ -18,7 +18,7 @@ const MAX_FIELDS = 14;
  * Returns suggestions only. Nothing is saved: the client reviews each one and
  * saves it with provenance "AI-suggested" (skill s4 step 4/8).
  */
-export async function POST(req: NextRequest, { params }: Ctx) {
+async function POST_(req: NextRequest, { params }: Ctx) {
   const userId = await requireUserId();
   if (!userId) return unauthorized();
   const { id } = await params;
@@ -84,3 +84,5 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     note: result.suggestions.length ? undefined : "AI could not draft these from the information provided. Add more context or evidence and try again.",
   });
 }
+
+export const POST = guard(POST_);

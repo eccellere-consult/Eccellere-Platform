@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireUserId, unauthorized, loadOwnedKit, asBlueprint } from "@/lib/toolkit/server";
+import { requireUserId, unauthorized, loadOwnedKit, asBlueprint, guard } from "@/lib/toolkit/server";
 import { PROVENANCE } from "@/lib/toolkit/engine";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +14,7 @@ const MAX_VALUE_CHARS = 20000;
  * Autosave. Body: { responses: [{ fieldId, value, provenance?, confidence?, sourceRef? }] }
  * Only fields that exist in the kit's blueprint are accepted.
  */
-export async function PUT(req: NextRequest, { params }: Ctx) {
+async function PUT_(req: NextRequest, { params }: Ctx) {
   const userId = await requireUserId();
   if (!userId) return unauthorized();
   const { id } = await params;
@@ -69,3 +69,5 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
   }
   return NextResponse.json({ saved: ops.length, skipped });
 }
+
+export const PUT = guard(PUT_);

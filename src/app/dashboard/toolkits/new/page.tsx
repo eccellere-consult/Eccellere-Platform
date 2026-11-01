@@ -1,5 +1,7 @@
 "use client";
 
+import { readJson } from "@/lib/toolkit/http";
+
 import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -136,7 +138,7 @@ export default function NewToolkitPage() {
           mode,
         }),
       });
-      const d = await r.json();
+      const d = await readJson(r);
       if (r.status === 401) throw new Error("Please sign in to create a toolkit.");
       if (!r.ok) throw new Error(d.error ?? "Could not create the toolkit.");
 
