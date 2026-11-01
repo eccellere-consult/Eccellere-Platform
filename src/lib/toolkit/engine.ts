@@ -449,7 +449,7 @@ export function slugId(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 24) || "x";
 }
 
-function buildModules(topic: string): KitModule[] {
+function buildModules(): KitModule[] {
   const n = GENERIC_DIMENSIONS.length;
   const base = Math.floor(100 / n);
   const rem = 100 - base * n;
@@ -489,7 +489,7 @@ export interface BlueprintInput {
 export function buildTemplateBlueprint(input: BlueprintInput): Blueprint {
   const { type, industry } = input;
   const topic = (input.topic || input.problemText || "your priority area").trim().slice(0, 160);
-  const modules = type === "DIAGNOSTIC" ? buildModules(topic) : [];
+  const modules = type === "DIAGNOSTIC" ? buildModules() : [];
 
   const sections: KitSection[] = CANONICAL[type].map((spec, i) => {
     const seq = i + 1;
@@ -638,4 +638,63 @@ export function scoreDiagnostic(bp: Blueprint, responses: Record<string, StoredR
     : null;
   const rag = (s: number | null) => (s === null ? "Not scored" : s < 2 ? "Red" : s < 3 ? "Amber" : "Green");
   return { modules: out.map((m) => ({ ...m, rag: rag(m.score) })), overall, overallRag: rag(overall) };
+}
+
+// ─── Topic-tailored diagnostic modules (AI or consultant supplied) ─────────
+
+export interface ProposedModule {
+  name: string;
+  purpose?: string;
+  questions: string[];
+}
+
+const clean = (s: unknown, max: number): string =>
+  String(s ?? "").replace(/[\u0000-\u001f<>]/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
+
+/**
+ * Replace the generic diagnostic dimensions with topic-specific ones.
+ * Returns null when the proposal is unusable so callers keep the template.
+ * Rules: 4-8 modules, 4-10 questions each, equal proposed weights totalling 100.
+ */
+export function withDiagnosticModules(bp: Blueprint, proposed: ProposedModule[]): Blueprint | null {
+  if (bp.type !== "DIAGNOSTIC" || !Array.isArray(proposed)) return null;
+  const mods = proposed
+    .map((m) => ({
+      name: clean(m?.name, 80),
+      purpose: clean(m?.purpose, 200),
+      questions: (Array.isArray(m?.questions) ? m.questions : [])
+        .map((q) => clean(q, 220)).filter((q) => q.length >= 12).slice(0, 10),
+    }))
+    .filter((m) => m.name && m.questions.length >= 4)
+    .slice(0, 8);
+  if (mods.length < 4) return null;
+  const names = new Set(mods.map((m) => m.name.toLowerCase()));
+  if (names.size !== mods.length) return null;
+
+  const base = Math.floor(100 / mods.length);
+  const rem = 100 - base * mods.length;
+  const modules: KitModule[] = mods.map((m, i) => ({
+    id: `M${i + 1}`,
+    name: m.name,
+    purpose: m.purpose || "Assessed against the diagnostic question set.",
+    weight: base + (i === 0 ? rem : 0),
+  }));
+  const fields: KitField[] = [];
+  mods.forEach((m, i) => {
+    m.questions.forEach((q, k) => {
+      fields.push({
+        id: `DX10.M${i + 1}.${k + 1}`,
+        label: q,
+        type: "scale4",
+        guidance: `Choose the level that best matches today. Use 'Not known' if you cannot say. Anchors: ${SCALE4.join("; ")}.`,
+        required: false,
+        options: SCALE4,
+        aiDraftable: true,
+        module: `M${i + 1}`,
+      });
+    });
+  });
+  const sections = bp.sections.map((s) => (s.seq === 10 ? { ...s, fields } : s));
+  const out: Blueprint = { ...bp, modules, sections };
+  return validateBlueprint(out).length === 0 ? out : null;
 }
