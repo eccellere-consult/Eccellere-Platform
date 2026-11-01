@@ -162,11 +162,17 @@ export default async function AssetDetailPage({ params }: { params: Promise<{ sl
 
               {/* Meta row */}
               <div className="mt-4 flex flex-wrap items-center gap-5 text-sm text-ink-mid">
-                <span className="flex items-center gap-1">
-                  <Star className="h-4 w-4 fill-eccellere-gold text-eccellere-gold" />
-                  <strong className="text-eccellere-ink">{asset.rating}</strong>
-                  <span className="text-ink-light">({asset.reviews} reviews)</span>
-                </span>
+                {asset.rating > 0 ? (
+                  <span className="flex items-center gap-1">
+                    <Star className="h-4 w-4 fill-eccellere-gold text-eccellere-gold" />
+                    <strong className="text-eccellere-ink">{asset.rating}</strong>
+                    <span className="text-ink-light">({asset.reviews} reviews)</span>
+                  </span>
+                ) : (
+                  <span className="rounded-sm bg-eccellere-gold/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-eccellere-gold">
+                    New
+                  </span>
+                )}
                 <span className="flex items-center gap-1.5">
                   <FileText className="h-4 w-4 text-ink-light" />
                   {asset.format}
