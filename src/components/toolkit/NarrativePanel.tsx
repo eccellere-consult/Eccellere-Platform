@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Sparkles, Loader2, Trash2, Check, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { readJson } from "@/lib/toolkit/http";
-import { narrativeSpec } from "@/lib/toolkit/narrative";
+import { narrativeSpec } from "@/lib/toolkit/narrative-plan";
 import type { KitType } from "@/lib/toolkit/engine";
 
 export interface NarrEntry {

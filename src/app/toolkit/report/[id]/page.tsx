@@ -13,7 +13,7 @@ import { analyseDiagnostic, type DiagnosticAnalysis } from "@/lib/toolkit/analys
 import { analyseProblemSolving, answerFor, type PSAnalysis } from "@/lib/toolkit/analysis-ps";
 import { analysePlaybook, type PBAnalysis } from "@/lib/toolkit/analysis-pb";
 import { MarkdownLite } from "@/components/toolkit/MarkdownLite";
-import { isNarrativeField } from "@/lib/toolkit/narrative";
+import { isNarrativeField } from "@/lib/toolkit/narrative-plan";
 import { analyseGuide, type GuideAnalysis } from "@/lib/toolkit/analysis-gd";
 import { analyseLearning, type LearningAnalysis } from "@/lib/toolkit/analysis-lk";
 import { diagnosticBody, problemSolvingBody, playbookBody, guideBody, learningBody } from "@/components/toolkit/ReportBodies";

@@ -1,11 +1,28 @@
 // Run: node --test unit/toolkit-narrative.test.mjs   (generator is mocked; no network, no keys)
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildTemplateBlueprint } from "../src/lib/toolkit/engine.ts";
-import {
+import fs from "node:fs";
+import path from "node:path";
+import { createRequire } from "node:module";
+import { pathToFileURL, fileURLToPath } from "node:url";
+
+// narrative.ts imports narrative-plan.ts, so the real TypeScript is compiled first (no bundler, no server).
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const ts = createRequire(path.join(root, "package.json"))("typescript");
+const out = path.join(root, "node_modules", ".cache", "toolkit-narrative-unit");
+fs.rmSync(out, { recursive: true, force: true });
+fs.mkdirSync(out, { recursive: true });
+fs.writeFileSync(path.join(out, "package.json"), '{"type":"module"}');
+for (const [name, rel] of Object.entries({ "engine.ts": "src/lib/toolkit/engine.ts", "narrative-plan.ts": "src/lib/toolkit/narrative-plan.ts", "narrative.ts": "src/lib/toolkit/narrative.ts" })) {
+  const js = ts.transpileModule(fs.readFileSync(path.join(root, rel), "utf8"), { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText
+    .replace(/from "\.\/(engine|narrative-plan|narrative)"/g, 'from "./$1.mjs"');
+  fs.writeFileSync(path.join(out, name.replace(/\.ts$/, ".mjs")), js);
+}
+const { buildTemplateBlueprint } = await import(pathToFileURL(path.join(out, "engine.mjs")).href);
+const {
   NARRATIVE_PLAN, narrativeSpec, narrativeFieldId, isNarrativeField, buildNarrativePrompt, cleanNarrative,
   unsupportedFigures, draftNarrative, MAX_NARRATIVE_CHARS,
-} from "../src/lib/toolkit/narrative.ts";
+} = await import(pathToFileURL(path.join(out, "narrative.mjs")).href);
 
 const TYPES = ["DIAGNOSTIC", "PROBLEM_SOLVING", "PLAYBOOK", "GUIDE", "LEARNING"];
 const bpOf = (type) => buildTemplateBlueprint({ type, industry: "Retail", topic: "Inventory optimisation" });

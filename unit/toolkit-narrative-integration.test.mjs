@@ -20,13 +20,13 @@ fs.writeFileSync(path.join(out, "package.json"), '{"type":"module"}');
 const FILES = {
   "engine.ts": "src/lib/toolkit/engine.ts", "analysis.ts": "src/lib/toolkit/analysis.ts", "analysis-ps.ts": "src/lib/toolkit/analysis-ps.ts",
   "analysis-pb.ts": "src/lib/toolkit/analysis-pb.ts", "analysis-gd.ts": "src/lib/toolkit/analysis-gd.ts", "analysis-lk.ts": "src/lib/toolkit/analysis-lk.ts",
-  "narrative.ts": "src/lib/toolkit/narrative.ts", "narrative-digest.ts": "src/lib/toolkit/narrative-digest.ts", "MarkdownLite.tsx": "src/components/toolkit/MarkdownLite.tsx",
+  "narrative-plan.ts": "src/lib/toolkit/narrative-plan.ts", "narrative.ts": "src/lib/toolkit/narrative.ts", "narrative-digest.ts": "src/lib/toolkit/narrative-digest.ts", "MarkdownLite.tsx": "src/components/toolkit/MarkdownLite.tsx",
 };
 for (const [name, rel] of Object.entries(FILES)) {
   let js = ts.transpileModule(fs.readFileSync(path.join(root, rel), "utf8"), {
     compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX },
   }).outputText;
-  js = js.replace(/from "\.\/(engine|analysis|analysis-ps|analysis-pb|analysis-gd|analysis-lk|narrative|narrative-digest)"/g, 'from "./$1.mjs"');
+  js = js.replace(/from "\.\/(engine|analysis|analysis-ps|analysis-pb|analysis-gd|analysis-lk|narrative-plan|narrative|narrative-digest)"/g, 'from "./$1.mjs"');
   fs.writeFileSync(path.join(out, name.replace(/\.tsx?$/, ".mjs")), js);
 }
 const imp = (n) => import(pathToFileURL(path.join(out, n)).href);

@@ -2,7 +2,7 @@
 
 import { readJson } from "@/lib/toolkit/http";
 import { NarrativePanel, type NarrEntry } from "@/components/toolkit/NarrativePanel";
-import { isNarrativeField } from "@/lib/toolkit/narrative";
+import { isNarrativeField } from "@/lib/toolkit/narrative-plan";
 
 import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
