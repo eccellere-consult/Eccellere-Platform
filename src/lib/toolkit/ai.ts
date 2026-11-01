@@ -5,7 +5,7 @@
  */
 import type { Blueprint, KitField, ProposedModule } from "./engine";
 
-export type Generator = (a: { system: string; user: string; maxTokens: number; timeoutMs?: number }) => Promise<{ text: string } | null>;
+export type Generator = (a: { system: string; user: string; maxTokens: number; timeoutMs?: number; diag?: string[] }) => Promise<{ text: string } | null>;
 
 /** Default generator uses the admin-selected provider(s). Loaded lazily so tests can inject a mock. */
 async function defaultGenerator(): Promise<Generator> {
@@ -17,9 +17,9 @@ async function isAvailable(gen?: Generator): Promise<boolean> {
   const { aiAvailable } = await import("@/lib/ai/gateway");
   return aiAvailable();
 }
-async function callAi(gen: Generator | undefined, system: string, user: string, maxTokens: number): Promise<string | null> {
+async function callAi(gen: Generator | undefined, system: string, user: string, maxTokens: number, diag?: string[]): Promise<string | null> {
   const g = gen ?? (await defaultGenerator());
-  const out = await g({ system, user, maxTokens, timeoutMs: 25000 });
+  const out = await g({ system, user, maxTokens, timeoutMs: 25000, diag });
   return out?.text ?? null;
 }
 
@@ -74,7 +74,7 @@ export async function draftFields(args: {
   evidence: Array<{ fileName: string; text: string }>;
   answers: Record<string, string>;
   gen?: Generator;
-}): Promise<{ suggestions: Suggestion[]; available: boolean }> {
+}): Promise<{ suggestions: Suggestion[]; available: boolean; failure?: "call" | "format"; detail?: string }> {
   const { blueprint, fields } = args;
   if (!(await isAvailable(args.gen))) return { suggestions: [], available: false };
 
@@ -104,7 +104,10 @@ Fields:
 ${fields.map((f) => `- id=${f.id} | type=${f.type} | ${f.label} | hint: ${f.guidance.slice(0, 160)}`).join("\n")}
 JSON shape: {"suggestions":[{"fieldId":"","value":"","confidence":"Low","basis":""}]}`;
 
-  const out = parseJson<{ suggestions?: Suggestion[] }>(await callAi(args.gen, system, user, 3800));
+  const diag: string[] = [];
+  const raw = await callAi(args.gen, system, user, 3800, diag);
+  const out = parseJson<{ suggestions?: Suggestion[] }>(raw);
+  if (!out) return { suggestions: [], available: true, failure: raw ? "format" : "call", detail: diag.join("; ") };
   const valid = new Map(fields.map((f) => [f.id, f]));
   const suggestions: Suggestion[] = [];
   for (const s of out?.suggestions ?? []) {
