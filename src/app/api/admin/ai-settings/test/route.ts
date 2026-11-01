@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guard } from "@/lib/toolkit/server";
 import { requirePermission } from "@/lib/rbac";
 import { PROVIDER_BY_ID, hasKey, type ProviderId } from "@/lib/ai/providers";
 import { generateText, clearAiSettingsCache } from "@/lib/ai/gateway";
@@ -14,7 +15,7 @@ const testLimiter = rateLimit({ limit: 20, windowSeconds: 600 });
  * Sends one tiny fixed prompt to a single provider to verify its key and model.
  * No user data is sent. Returns only pass/fail and the model name.
  */
-export async function POST(req: NextRequest) {
+async function POST_(req: NextRequest) {
   const auth = await requirePermission("admin:settings:write");
   if (auth.error) return auth.error;
   if (!testLimiter.check(auth.user.id).success) {
@@ -41,3 +42,5 @@ export async function POST(req: NextRequest) {
     ? NextResponse.json({ ok: true, model: out.model })
     : NextResponse.json({ ok: false, reason: "The provider rejected the request (invalid key, wrong model name, or no access)." });
 }
+
+export const POST = guard(POST_);

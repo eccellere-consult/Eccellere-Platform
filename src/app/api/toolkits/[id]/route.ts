@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireUserId, unauthorized, loadOwnedKit } from "@/lib/toolkit/server";
+import { requireUserId, unauthorized, loadOwnedKit, guard } from "@/lib/toolkit/server";
 
 export const dynamic = "force-dynamic";
 
 type Ctx = { params: Promise<{ id: string }> };
 
 /** GET /api/toolkits/[id] - kit, blueprint, responses, evidence, latest submission */
-export async function GET(_req: Request, { params }: Ctx) {
+async function GET_(_req: Request, { params }: Ctx) {
   const userId = await requireUserId();
   if (!userId) return unauthorized();
   const { id } = await params;
@@ -34,7 +34,7 @@ export async function GET(_req: Request, { params }: Ctx) {
 }
 
 /** DELETE /api/toolkits/[id] - owner removes the kit and its data */
-export async function DELETE(_req: Request, { params }: Ctx) {
+async function DELETE_(_req: Request, { params }: Ctx) {
   const userId = await requireUserId();
   if (!userId) return unauthorized();
   const { id } = await params;
@@ -43,3 +43,6 @@ export async function DELETE(_req: Request, { params }: Ctx) {
   await prisma.customKit.delete({ where: { id } });
   return NextResponse.json({ ok: true });
 }
+
+export const GET = guard(GET_);
+export const DELETE = guard(DELETE_);

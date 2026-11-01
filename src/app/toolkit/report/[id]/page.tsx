@@ -1,5 +1,7 @@
 "use client";
 
+import { readJson } from "@/lib/toolkit/http";
+
 import { use, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Printer, ArrowLeft } from "lucide-react";
@@ -39,7 +41,7 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
       const r = await fetch(`/api/toolkits/${id}`);
       if (r.status === 401) return setErr("Please sign in to view this report.");
       if (!r.ok) return setErr("Report not found.");
-      const d = await r.json();
+      const d = await readJson(r);
       const sub = d.submission;
       // A submitted kit reports from its frozen snapshot. If it was reopened, the live draft is shown and labelled.
       if (d.kit.status === "SUBMITTED" && sub?.snapshot) {

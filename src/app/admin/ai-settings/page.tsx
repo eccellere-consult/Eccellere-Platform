@@ -1,5 +1,7 @@
 "use client";
 
+import { readJson } from "@/lib/toolkit/http";
+
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ChevronLeft, ArrowUp, ArrowDown, CheckCircle2, XCircle, Loader2, KeyRound } from "lucide-react";
@@ -23,7 +25,7 @@ export default function AiSettingsPage() {
       const r = await fetch("/api/admin/ai-settings");
       if (r.status === 401 || r.status === 403) return setErr("You do not have permission to manage AI settings.");
       if (!r.ok) return setErr("Could not load AI settings.");
-      const d = await r.json();
+      const d = await readJson(r);
       setInfo(d.providers);
       setS(d.settings);
     })().catch(() => setErr("Could not load AI settings."));
@@ -50,7 +52,7 @@ export default function AiSettingsPage() {
   async function save() {
     setSaving(true); setMsg(null);
     const r = await fetch("/api/admin/ai-settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ settings: s }) });
-    const d = await r.json().catch(() => ({}));
+    const d = await readJson(r);
     setSaving(false);
     if (!r.ok) return setMsg({ kind: "warn", text: d.error ?? "Could not save." });
     setS(d.settings);
@@ -60,7 +62,7 @@ export default function AiSettingsPage() {
   async function test(id: PId) {
     setTesting(id);
     const r = await fetch("/api/admin/ai-settings/test", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ provider: id }) });
-    const d = await r.json().catch(() => ({}));
+    const d = await readJson(r);
     setTests((t) => ({ ...t, [id]: d.ok ? { ok: true, text: `Working (${d.model})` } : { ok: false, text: d.reason ?? d.error ?? "Failed" } }));
     setTesting(null);
   }

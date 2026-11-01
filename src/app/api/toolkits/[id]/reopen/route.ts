@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireUserId, unauthorized, loadOwnedKit } from "@/lib/toolkit/server";
+import { requireUserId, unauthorized, loadOwnedKit, guard } from "@/lib/toolkit/server";
 
 export const dynamic = "force-dynamic";
 
 type Ctx = { params: Promise<{ id: string }> };
 
 /** POST /api/toolkits/[id]/reopen - unlock a submitted kit as a new version. Prior submissions are preserved. */
-export async function POST(_req: Request, { params }: Ctx) {
+async function POST_(_req: Request, { params }: Ctx) {
   const userId = await requireUserId();
   if (!userId) return unauthorized();
   const { id } = await params;
@@ -23,3 +23,5 @@ export async function POST(_req: Request, { params }: Ctx) {
   });
   return NextResponse.json({ ok: true, ...updated });
 }
+
+export const POST = guard(POST_);

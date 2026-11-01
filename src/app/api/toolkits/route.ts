@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireUserId, unauthorized } from "@/lib/toolkit/server";
+import { requireUserId, unauthorized, guard } from "@/lib/toolkit/server";
 import {
   routeKit,
   buildTemplateBlueprint,
@@ -24,7 +24,7 @@ const MODES = ["CLIENT_LED", "AI_FIRST_CUT", "AI_ANALYSIS"];
 const str = (v: unknown, max: number) => String(v ?? "").trim().slice(0, max);
 
 /** GET /api/toolkits - the signed-in user's kits */
-export async function GET() {
+async function GET_() {
   const userId = await requireUserId();
   if (!userId) return unauthorized();
   const kits = await prisma.customKit.findMany({
@@ -46,7 +46,7 @@ export async function GET() {
 }
 
 /** POST /api/toolkits - create a kit: route + generate blueprint */
-export async function POST(req: NextRequest) {
+async function POST_(req: NextRequest) {
   const userId = await requireUserId();
   if (!userId) return unauthorized();
   if (!createLimiter.check(userId).success) {
@@ -120,3 +120,6 @@ export async function POST(req: NextRequest) {
   });
   return NextResponse.json({ id: kit.id, kitType, route, blueprintSource }, { status: 201 });
 }
+
+export const GET = guard(GET_);
+export const POST = guard(POST_);
