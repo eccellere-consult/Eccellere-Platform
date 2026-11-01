@@ -5,6 +5,8 @@ import type { Blueprint } from "@/lib/toolkit/engine";
 import { GOVERNANCE_CALENDAR, type DiagnosticAnalysis } from "@/lib/toolkit/analysis";
 import type { PSAnalysis } from "@/lib/toolkit/analysis-ps";
 import type { PBAnalysis } from "@/lib/toolkit/analysis-pb";
+import type { GuideAnalysis } from "@/lib/toolkit/analysis-gd";
+import type { LearningAnalysis } from "@/lib/toolkit/analysis-lk";
 import { METHOD_CARDS, PLAYBOOK_TEMPLATES } from "@/lib/toolkit/methods";
 
 /** Section bodies for the printable report. Pure rendering: no data fetching. */
@@ -246,6 +248,7 @@ export function problemSolvingBody(
             <tbody>{ps.options.rows.map((o) => <tr key={o.id}><td>{o.id}</td><td>{o.name}</td></tr>)}</tbody></table>
         )}
         {ps.options.notes.map((n, i) => <p key={i} className="flag">{n}</p>)}
+        {extra}
         <p className="muted">Generate widely first, then narrow. Include a &quot;do nothing&quot; and a &quot;do the minimum&quot; option so the case for change is visible.</p>
       </>
     );
@@ -257,6 +260,7 @@ export function problemSolvingBody(
         <table><thead><tr><th>Criterion</th><th style={{ width: 90 }}>Weight %</th><th style={{ width: 90 }}>Basis</th></tr></thead>
           <tbody>{ps.criteria.map((c) => <tr key={c.name}><td>{c.name}</td><td>{c.weight}</td><td>{c.proposed ? "Proposed" : "Entered"}</td></tr>)}</tbody></table>
         {ps.criteriaNotes.map((n, i) => <p key={i} className="muted">{n}</p>)}
+        {ps.unread.criteria.length > 0 && <p className="flag">These criteria lines could not be read as &quot;criterion | weight&quot; and were not used: {ps.unread.criteria.join("; ")}</p>}
         <h3>Scores (1 = poor, 5 = excellent) and ranking</h3>
         {ps.options.rows.length === 0 ? none("No options to appraise.") : (
           <table><thead><tr><th style={{ width: 36 }}>ID</th><th>Option</th>{ps.criteria.map((c, i) => <th key={i} title={c.name}>C{i + 1}</th>)}<th>Weighted</th><th>Rank</th></tr></thead>
@@ -265,6 +269,7 @@ export function problemSolvingBody(
                 {o.scores.map((s, i) => <td key={i}>{s === null ? <span className="muted">?</span> : s}</td>)}
                 <td>{o.weighted === null ? <span className="muted">Not scored</span> : o.weighted}</td><td>{o.rank ?? "-"}</td></tr>))}</tbody></table>
         )}
+        {ps.unread.scores.length > 0 && <p className="flag">These score lines did not match any option and were not used: {ps.unread.scores.join("; ")}</p>}
         <p className="muted">Criteria C1 to C{ps.criteria.length} follow the order in the table above. An unknown score (?) is left out and the remaining weights are rescaled; it is never treated as zero.</p>
         {ps.topOption && (
           <p>
@@ -513,6 +518,292 @@ export function playbookBody(seq: number, pb: PBAnalysis, extra: ReactNode) {
               <tbody>{t.rows.map((r, i) => <tr key={i}>{r.map((c, j) => <td key={j} style={{ height: 24 }}>{c}</td>)}</tr>)}</tbody></table>
           </div>
         ))}
+      </>
+    );
+  }
+  return null;
+}
+
+export function guideBody(seq: number, gd: GuideAnalysis, extra: ReactNode) {
+  const none = (msg: string) => <p className="muted">{msg}</p>;
+  const cell = (v: string, missing = "Not provided") => (v && !/^(not known|not provided)$/i.test(v) ? v : <span className="flag">{missing}</span>);
+  const flagList = (f: string[]) => (f.length ? <div className="flag">{f.join("; ")}</div> : null);
+
+  if (seq === 3) {
+    return (
+      <>
+        <table><tbody>
+          <tr><td>Concepts defined</td><td>{gd.concepts.length}{gd.conceptCompletePct === null ? "" : ` (${gd.conceptCompletePct}% complete)`}</td></tr>
+          <tr><td>Frameworks, steps, examples</td><td>{gd.frameworks.length} frameworks, {gd.steps.length} steps, {gd.examples.length} worked examples</td></tr>
+          <tr><td>Mistakes and criteria</td><td>{gd.mistakes.length} common mistakes, {gd.criteria.length} decision criteria</td></tr>
+          <tr><td>References</td><td>{gd.references.length}{gd.unresolvedSources.length ? `, ${gd.unresolvedSources.length} cited source(s) missing from the list` : ""}</td></tr>
+          <tr><td>Reference checks</td><td><b>{gd.status}</b>{gd.openChecks ? ` (${gd.openChecks} of ${gd.checks.length} open)` : ""}</td></tr>
+        </tbody></table>
+        {extra}
+        <p className="muted">This Guide explains a subject. It does not assess your company or recommend a decision for it.</p>
+      </>
+    );
+  }
+  if (seq === 7) {
+    return gd.concepts.length === 0 ? none("No concepts were defined.") : (
+      <>
+        {gd.concepts.map((c) => (
+          <div key={c.id} className="method avoid">
+            <div className="ibanner">{c.id} · {c.term}</div>
+            <table><tbody>
+              <tr><td style={{ width: 150 }}>Plain-language definition</td><td>{cell(c.definition)}</td></tr>
+              <tr><td>Why it matters</td><td>{cell(c.why)}</td></tr>
+              <tr><td>Example</td><td>{cell(c.example)}</td></tr>
+              <tr><td>Limitation</td><td>{cell(c.limitation)}</td></tr>
+              <tr><td>Source</td><td>{cell(c.source)}</td></tr>
+            </tbody></table>
+            {flagList(c.flags)}
+          </div>
+        ))}
+        <p className="muted">{gd.concepts.filter((c) => c.missing.length === 0).length} of {gd.concepts.length} concepts have all five parts. A missing part is shown, not filled in.</p>
+      </>
+    );
+  }
+  if (seq === 9) {
+    return gd.frameworks.length === 0 ? none("No frameworks were recorded.") : (
+      <table><thead><tr><th style={{ width: 36 }}>ID</th><th>Framework</th><th>What it is</th><th>Use when</th><th>Key steps</th><th>Limitation</th><th>Source</th></tr></thead>
+        <tbody>{gd.frameworks.map((f) => (
+          <tr key={f.id}><td>{f.id}</td><td>{f.name}{flagList(f.flags)}</td><td>{cell(f.what)}</td><td>{cell(f.when)}</td><td>{cell(f.steps)}</td><td>{cell(f.limitation)}</td><td>{cell(f.source)}</td></tr>))}</tbody></table>
+    );
+  }
+  if (seq === 10) {
+    return gd.steps.length === 0 ? none("No application steps were recorded.") : (
+      <table><thead><tr><th style={{ width: 36 }}>Step</th><th>Title</th><th>Action</th><th>Output</th><th>Common error</th></tr></thead>
+        <tbody>{gd.steps.map((s) => <tr key={s.n}><td>{s.n}</td><td>{s.title}{flagList(s.flags)}</td><td>{cell(s.action)}</td><td>{cell(s.output)}</td><td>{s.commonError || <span className="muted">-</span>}</td></tr>)}</tbody></table>
+    );
+  }
+  if (seq === 11) {
+    return gd.examples.length === 0 ? none("No worked examples were recorded.") : (
+      <>
+        {gd.examples.map((e, i) => (
+          <div key={i} className="method avoid">
+            <div className="ibanner">{e.title} <span>{e.kind}</span></div>
+            <table><tbody>
+              <tr><td style={{ width: 110 }}>Situation</td><td>{cell(e.situation)}</td></tr>
+              <tr><td>Approach</td><td>{cell(e.approach)}</td></tr>
+              <tr><td>Result</td><td>{cell(e.result)}</td></tr>
+              <tr><td>Lesson</td><td>{cell(e.lesson)}</td></tr>
+            </tbody></table>
+            {flagList(e.flags)}
+          </div>
+        ))}
+        <p className="muted">Every example is labelled Real or Illustrative. An illustrative example is not evidence about any real company.</p>
+      </>
+    );
+  }
+  if (seq === 12) {
+    return gd.criteria.length === 0 ? none("No decision criteria were recorded.") : (
+      <table><thead><tr><th>Approach or choice</th><th>Use when</th><th>Do not use when</th><th>Trade-off</th></tr></thead>
+        <tbody>{gd.criteria.map((c, i) => <tr key={i}><td>{c.choice}{flagList(c.flags)}</td><td>{cell(c.useWhen)}</td><td>{cell(c.notWhen)}</td><td>{cell(c.tradeoff)}</td></tr>)}</tbody></table>
+    );
+  }
+  if (seq === 13) {
+    return gd.mistakes.length === 0 ? none("No common mistakes were recorded.") : (
+      <table><thead><tr><th>Mistake</th><th>How it shows up</th><th>Fix</th></tr></thead>
+        <tbody>{gd.mistakes.map((m, i) => <tr key={i}><td>{m.mistake}</td><td>{cell(m.symptom)}</td><td>{cell(m.fix)}</td></tr>)}</tbody></table>
+    );
+  }
+  if (seq === 14) {
+    return (
+      <>
+        {gd.checklists.length === 0 ? none("No checklists were recorded.") : gd.checklists.map((c, i) => (
+          <div key={i} className="avoid"><h3>{c.heading}</h3>
+            <table><thead><tr><th style={{ width: 30 }}>Done</th><th>Item</th><th>When</th></tr></thead>
+              <tbody>{c.items.map((it, j) => <tr key={j}><td>[ ]</td><td>{it.item}</td><td>{it.when || "-"}</td></tr>)}</tbody></table></div>
+        ))}
+        {gd.glossary.length > 0 && (
+          <>
+            <h3>Quick reference</h3>
+            <table><thead><tr><th>Term</th><th>In one line</th></tr></thead>
+              <tbody>{gd.glossary.map((g, i) => <tr key={i}><td>{g.term}</td><td>{g.definition}</td></tr>)}</tbody></table>
+          </>
+        )}
+      </>
+    );
+  }
+  if (seq === 15) {
+    return (
+      <>
+        {extra}
+        <h3>Reference checks</h3>
+        <table><thead><tr><th style={{ width: 40 }}>Check</th><th>Condition</th><th style={{ width: 70 }}>Status</th><th>Detail</th></tr></thead>
+          <tbody>{gd.checks.map((c) => <tr key={c.id}><td>{c.id}</td><td>{c.label}</td><td>{c.met ? <span className="ok">Met</span> : <span className="flag">Open</span>}</td><td>{c.detail}</td></tr>)}</tbody></table>
+        <p><b>{gd.status}.</b> These checks test completeness and sourcing. They do not judge whether the content is correct; have a subject expert review it before relying on it.</p>
+      </>
+    );
+  }
+  if (seq === 16) {
+    return gd.glossary.length === 0 ? none("The glossary is built from the concepts and frameworks, and none were recorded.") : (
+      <>
+        <table><thead><tr><th style={{ width: 200 }}>Term</th><th>Definition</th><th style={{ width: 90 }}>From</th></tr></thead>
+          <tbody>{gd.glossary.map((g, i) => <tr key={i}><td>{g.term}</td><td>{g.definition}</td><td>{g.from}</td></tr>)}</tbody></table>
+        <p className="muted">Built only from the concepts and frameworks above, in alphabetical order.</p>
+      </>
+    );
+  }
+  if (seq === 17) {
+    return (
+      <>
+        {gd.references.length === 0 ? none("No references were recorded. Do not rely on claims here that have no source.") : (
+          <table><thead><tr><th>Source</th><th>Citation or URL</th><th style={{ width: 80 }}>Date</th><th>Supports</th></tr></thead>
+            <tbody>{gd.references.map((r, i) => <tr key={i}><td>{r.source}{flagList(r.flags)}</td><td>{cell(r.citation, "None")}</td><td>{cell(r.date, "None")}</td><td>{r.supports || "-"}</td></tr>)}</tbody></table>
+        )}
+        {gd.unresolvedSources.length > 0 && <p className="flag">Cited in the text but not in this list: {gd.unresolvedSources.join("; ")}.</p>}
+        <p className="muted">Benchmarks and figures appear only where a source is cited. Verify legal, tax and regulatory statements with a qualified specialist.</p>
+      </>
+    );
+  }
+  return null;
+}
+
+export function learningBody(seq: number, lk: LearningAnalysis, extra: ReactNode) {
+  const none = (msg: string) => <p className="muted">{msg}</p>;
+  const flagList = (f: string[]) => (f.length ? <div className="flag">{f.join("; ")}</div> : null);
+  const used = lk.modules.filter((m) => m.used);
+
+  if (seq === 3) {
+    return (
+      <>
+        <table><tbody>
+          <tr><td>Modules used</td><td>{lk.usedModules}</td></tr>
+          <tr><td>Expected outcomes</td><td>{lk.outcomes.length} ({lk.outcomes.filter((o) => o.ok).length} observable)</td></tr>
+          <tr><td>Knowledge checks / rubric criteria</td><td>{lk.knowledgeChecks.length} / {lk.rubric.length}</td></tr>
+          <tr><td>Transfer-to-work actions</td><td>{lk.transfer.length} ({lk.transfer.filter((t) => t.verifiable).length} verifiable)</td></tr>
+          <tr><td>Release checks</td><td><b>{lk.status}</b>{lk.openChecks ? ` (${lk.openChecks} of ${lk.checks.length} open)` : ""}</td></tr>
+        </tbody></table>
+        {extra}
+      </>
+    );
+  }
+  if (seq === 4) {
+    return (
+      <>
+        {extra}
+        {lk.outcomes.length > 0 && (
+          <>
+            <h3>Outcome check</h3>
+            <table><thead><tr><th>Expected outcome</th><th style={{ width: 90 }}>Observable</th><th>Note</th></tr></thead>
+              <tbody>{lk.outcomes.map((o, i) => <tr key={i}><td>{o.text}</td><td>{o.ok ? <span className="ok">Yes</span> : <span className="flag">No</span>}</td><td>{o.note}</td></tr>)}</tbody></table>
+            <p className="muted">An outcome should describe something you can watch the learner do. &quot;Understand&quot; and &quot;know&quot; cannot be observed.</p>
+          </>
+        )}
+      </>
+    );
+  }
+  if (seq === 6) {
+    return used.length === 0 ? none("No modules were filled in, so there is no learning journey yet.") : (
+      <table><thead><tr><th style={{ width: 50 }}>Module</th><th>Title</th><th>Learning outcome</th><th>Learner output</th></tr></thead>
+        <tbody>{used.map((m) => <tr key={m.n}><td>{m.n}</td><td>{m.title || <span className="flag">No title</span>}</td><td>{m.outcome || <span className="flag">None</span>}</td><td>{m.learnerOutput || <span className="flag">None</span>}</td></tr>)}</tbody></table>
+    );
+  }
+  if (seq === 7) {
+    return lk.competencies.length === 0 ? none("No competencies were recorded.") : (
+      <table><thead><tr><th>Competency</th><th>Level required</th><th>How it will be evidenced</th></tr></thead>
+        <tbody>{lk.competencies.map((c, i) => <tr key={i}><td>{c.competency}{flagList(c.flags)}</td><td>{c.level || "-"}</td><td>{c.evidence || "-"}</td></tr>)}</tbody></table>
+    );
+  }
+  if (seq === 8) {
+    return used.length === 0 ? none("No modules were filled in. Fill in at least Module 1.") : (
+      <>
+        {used.map((m) => (
+          <div key={m.n} className="method avoid">
+            <div className="ibanner">Module {m.n} · {m.title || "Untitled"} <span>{m.contentWords} words of teaching content</span></div>
+            <table><tbody>
+              <tr><td style={{ width: 150 }}>Learning outcome</td><td>{m.outcome || <span className="flag">Not provided</span>}{m.outcome && !m.outcomeOk && <div className="flag">Check that this outcome is observable.</div>}</td></tr>
+              <tr><td>Framework and tools</td><td>{m.framework || <span className="flag">Not provided</span>}</td></tr>
+              <tr><td>Learner output</td><td>{m.learnerOutput || <span className="flag">Not provided</span>}</td></tr>
+              <tr><td>Teach-back prompt</td><td>{m.teachBack || <span className="flag">Not provided</span>}</td></tr>
+              <tr><td>Action items</td><td>{m.actions.length ? <ol>{m.actions.map((a, i) => <li key={i}>{a}</li>)}</ol> : <span className="flag">None</span>}</td></tr>
+            </tbody></table>
+            {(["Business need", "Concept explained simply", "Analogy and technical explanation", "Worked example", "Guided exercise (with hints)"] as const).map((k) => m.values[k] ? (
+              <div key={k} className="field avoid"><div className="label">{k}</div><div className="answer" style={{ whiteSpace: "pre-wrap" }}>{m.values[k]}</div></div>
+            ) : null)}
+            {m.checks.length > 0 && (
+              <>
+                <h3>Knowledge check</h3>
+                <table><thead><tr><th>Question</th><th>Answer guidance</th></tr></thead>
+                  <tbody>{m.checks.map((c, i) => <tr key={i}><td>{c.question}</td><td>{c.guidance || <span className="flag">None</span>}</td></tr>)}</tbody></table>
+              </>
+            )}
+            <p className="muted">Elements present: {m.elements.filter((e) => e.present).length} of {m.elements.length}.{m.missing.length ? " Missing: " + m.missing.join(", ") + "." : ""}</p>
+            {m.shortFor800 && <p className="flag">Teaching content is {m.contentWords} words; an applied chapter normally runs 800 to 1,200 words.</p>}
+            {flagList(m.flags)}
+          </div>
+        ))}
+      </>
+    );
+  }
+  if (seq === 10) {
+    return lk.knowledgeChecks.length === 0 ? none("No knowledge checks were recorded.") : (
+      <table><thead><tr><th style={{ width: 60 }}>Module</th><th>Question</th><th>Answer guidance</th></tr></thead>
+        <tbody>{lk.knowledgeChecks.map((k, i) => <tr key={i}><td>{k.module}</td><td>{k.question}</td><td>{k.guidance || <span className="flag">None</span>}</td></tr>)}</tbody></table>
+    );
+  }
+  if (seq === 11) {
+    return (
+      <>
+        {lk.rubric.length === 0 ? none("No rubric criteria were recorded.") : (
+          <table><thead><tr><th style={{ width: 200 }}>Criterion</th><th>What good looks like</th></tr></thead>
+            <tbody>{lk.rubric.map((r, i) => <tr key={i}><td>{r.criterion}</td><td>{r.good || <span className="flag">Not described</span>}</td></tr>)}</tbody></table>
+        )}
+        <p className="muted">A practical assessment asks the learner to produce something and be judged against these criteria.</p>
+      </>
+    );
+  }
+  if (seq === 12) {
+    return (
+      <>
+        {extra}
+        {used.some((m) => m.teachBack) && (
+          <>
+            <h3>Teach-back prompts by module</h3>
+            <table><thead><tr><th style={{ width: 60 }}>Module</th><th>Learner explains</th></tr></thead>
+              <tbody>{used.filter((m) => m.teachBack).map((m) => <tr key={m.n}><td>{m.n}</td><td>{m.teachBack}</td></tr>)}</tbody></table>
+          </>
+        )}
+      </>
+    );
+  }
+  if (seq === 13) {
+    return lk.transfer.length === 0 ? <>{none("No transfer-to-work actions were recorded.")}{extra}</> : (
+      <>
+        <table><thead><tr><th>Action</th><th>Owner</th><th>Date</th><th style={{ width: 90 }}>Verifiable</th></tr></thead>
+          <tbody>{lk.transfer.map((t, i) => <tr key={i}><td>{t.action}{flagList(t.flags)}</td><td>{t.owner || "-"}</td><td>{t.date || "-"}</td><td>{t.verifiable ? <span className="ok">Yes</span> : <span className="flag">No</span>}</td></tr>)}</tbody></table>
+        <p className="muted">Five to seven actions, each with an owner and a date, so that completion can be checked.</p>
+      </>
+    );
+  }
+  if (seq === 14) {
+    return (
+      <>
+        {extra}
+        <h3>Release checks</h3>
+        <table><thead><tr><th style={{ width: 40 }}>Check</th><th>Condition</th><th style={{ width: 70 }}>Status</th><th>Detail</th></tr></thead>
+          <tbody>{lk.checks.map((c) => <tr key={c.id}><td>{c.id}</td><td>{c.label}</td><td>{c.met ? <span className="ok">Met</span> : <span className="flag">Open</span>}</td><td>{c.detail}</td></tr>)}</tbody></table>
+        <p><b>{lk.status}.</b> These checks test completeness. They do not show that anyone has learned the skill; that is shown by the assessment.</p>
+      </>
+    );
+  }
+  if (seq === 15) {
+    return (
+      <>
+        {lk.glossary.length > 0 && (
+          <>
+            <h3>Glossary</h3>
+            <table><thead><tr><th style={{ width: 200 }}>Term</th><th>Definition</th></tr></thead>
+              <tbody>{lk.glossary.map((g, i) => <tr key={i}><td>{g.term}</td><td>{g.definition || "-"}</td></tr>)}</tbody></table>
+          </>
+        )}
+        <h3>References and sources</h3>
+        {lk.references.length === 0 ? none("No references were recorded.") : (
+          <table><thead><tr><th>Source</th><th>Citation or URL</th><th>Supports</th></tr></thead>
+            <tbody>{lk.references.map((r, i) => <tr key={i}><td>{r.source}</td><td>{r.citation || "-"}</td><td>{r.supports || "-"}</td></tr>)}</tbody></table>
+        )}
       </>
     );
   }

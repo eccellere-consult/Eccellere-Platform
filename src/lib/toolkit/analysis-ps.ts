@@ -80,6 +80,8 @@ export interface PSAnalysis {
   options: { rows: OptionRow[]; distinct: number; notes: string[] };
   criteria: Criterion[];
   criteriaNotes: string[];
+  /** lines the client typed that could not be read in the expected format (shown, never dropped) */
+  unread: { criteria: string[]; scores: string[] };
   topOption: OptionRow | null;
   topStable: boolean | null;
   closeCall: boolean;
@@ -210,7 +212,10 @@ export function analyseProblemSolving(bp: Blueprint, responses: Record<string, P
   if (!optNames.length) optNotes.push("No options were listed.");
   else if (distinct < 5) optNotes.push(`Only ${distinct} distinct option${distinct === 1 ? "" : "s"}: the skill asks for a wide longlist (5 or more) before converging.`);
 
-  const critLines = parseLines(A(14, /criteria and weights/i)).map(cells).filter((c) => c[0] && Number.isFinite(parseFloat(c[1] ?? "")));
+  const critAll = parseLines(A(14, /criteria and weights/i)).map(cells);
+  const critOk = (c: string[]) => Boolean(c[0]) && Number.isFinite(parseFloat(c[1] ?? ""));
+  const critLines = critAll.filter(critOk);
+  const unreadCriteria = critAll.filter((c) => !critOk(c)).map((c) => c.join(" | "));
   const criteriaNotes: string[] = [];
   let rawCrit: Array<{ name: string; weight: number }>;
   let proposed = false;
@@ -238,18 +243,23 @@ export function analyseProblemSolving(bp: Blueprint, responses: Record<string, P
   };
   const parseScores = (c: string[]) =>
     (c[1] ?? "").split(/[,\s]+/).filter(Boolean).map((t) => (/^\d$/.test(t) && +t >= 1 && +t <= 5 ? +t : NaN));
+  const usedScoreLines = new Set<string[]>();
+  const take = (c: string[]) => {
+    usedScoreLines.add(c);
+    return parseScores(c);
+  };
   const scoresFor = (opt: string, idx: number): number[] | null => {
     for (const c of scoreLines) {
       const key = c[0] ?? "";
       const m = key.match(/^O?(\d+)$/i);
-      if (m && parseInt(m[1], 10) - 1 === idx) return parseScores(c);
-      if (!m && norm(key) === norm(opt)) return parseScores(c);
+      if (m && parseInt(m[1], 10) - 1 === idx) return take(c);
+      if (!m && norm(key) === norm(opt)) return take(c);
     }
     for (const c of scoreLines) {
       const key = c[0] ?? "";
       if (/^O?\d+$/i.test(key) || !looselyMatches(key, opt)) continue;
       const candidates = optNames.filter((o) => looselyMatches(key, o)).length;
-      if (candidates === 1) return parseScores(c);
+      if (candidates === 1) return take(c);
     }
     return null;
   };
@@ -329,6 +339,7 @@ export function analyseProblemSolving(bp: Blueprint, responses: Record<string, P
     options: { rows, distinct, notes: optNotes },
     criteria,
     criteriaNotes,
+    unread: { criteria: unreadCriteria, scores: scoreLines.filter((c) => !usedScoreLines.has(c)).map((c) => c.join(" | ")) },
     topOption: top,
     topStable,
     closeCall,
