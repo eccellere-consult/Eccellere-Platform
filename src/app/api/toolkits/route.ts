@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUserId, unauthorized, guard } from "@/lib/toolkit/server";
 import {
   routeKit,
+  KIT_LABEL,
   buildTemplateBlueprint,
   withDiagnosticModules,
   validateBlueprint,
@@ -80,6 +81,12 @@ async function POST_(req: NextRequest) {
 
   const route = routeKit({ problemClarity, solutionClarity, intent, growth: Boolean(b.growth) });
   const override = TYPES.includes(String(b.kitType)) ? (b.kitType as KitType) : null;
+  if (override && route.type && override !== route.type && b.overrideApproved !== true) {
+    return NextResponse.json(
+      { error: `We recommended a ${KIT_LABEL[route.type]}. Please confirm you approve building a ${KIT_LABEL[override]} instead.` },
+      { status: 422 },
+    );
+  }
   const kitType = override ?? route.type;
   if (!kitType) {
     return NextResponse.json(
