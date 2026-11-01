@@ -12,6 +12,8 @@ import {
 import { analyseDiagnostic, type DiagnosticAnalysis } from "@/lib/toolkit/analysis";
 import { analyseProblemSolving, answerFor, type PSAnalysis } from "@/lib/toolkit/analysis-ps";
 import { analysePlaybook, type PBAnalysis } from "@/lib/toolkit/analysis-pb";
+import { MarkdownLite } from "@/components/toolkit/MarkdownLite";
+import { isNarrativeField } from "@/lib/toolkit/narrative";
 import { analyseGuide, type GuideAnalysis } from "@/lib/toolkit/analysis-gd";
 import { analyseLearning, type LearningAnalysis } from "@/lib/toolkit/analysis-lk";
 import { diagnosticBody, problemSolvingBody, playbookBody, guideBody, learningBody } from "@/components/toolkit/ReportBodies";
@@ -33,7 +35,7 @@ const HOW_TO: Record<KitType, string> = {
   LEARNING: "Work through the modules in order. Each combines a concept, an example, practice and an assessment. Finish with the capstone, teach-back and your transfer-to-work plan.",
 };
 
-const brand = { navy: "#1B2A4A", gold: "#C9A84C", blue: "#2563A8", cream: "#FDF8EC", lightBlue: "#EAF0FA", grey: "#F5F5F5", ink: "#2C2C2C", red: "#B03A2E", green: "#1D6A3A" };
+const brand = { navy: "#1B2A4A", gold: "#C9A84C", blue: "#2563A8", teal: "#1A6B72", cream: "#FDF8EC", lightBlue: "#EAF0FA", grey: "#F5F5F5", ink: "#2C2C2C", red: "#B03A2E", green: "#1D6A3A" };
 
 const fmtDate = (d: string | Date) => new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" });
 
@@ -78,18 +80,32 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
 
   const { blueprint: bp } = data;
   const stored: Record<string, StoredResponse> = {};
-  data.responses.forEach((r) => (stored[r.fieldId] = { fieldId: r.fieldId, value: r.value, provenance: r.provenance }));
+  const answerRows = data.responses.filter((r) => !isNarrativeField(r.fieldId));
+  answerRows.forEach((r) => (stored[r.fieldId] = { fieldId: r.fieldId, value: r.value, provenance: r.provenance }));
   const scores = bp.type === "DIAGNOSTIC" ? scoreDiagnostic(bp, stored) : null;
   const storedA: Record<string, StoredResponse & { confidence?: string | null }> = {};
-  data.responses.forEach((r) => (storedA[r.fieldId] = { fieldId: r.fieldId, value: r.value, provenance: r.provenance, confidence: r.confidence }));
+  answerRows.forEach((r) => (storedA[r.fieldId] = { fieldId: r.fieldId, value: r.value, provenance: r.provenance, confidence: r.confidence }));
   const an: DiagnosticAnalysis | null = bp.type === "DIAGNOSTIC" && scores ? analyseDiagnostic(bp, storedA, scores) : null;
   const ps: PSAnalysis | null = bp.type === "PROBLEM_SOLVING" ? analyseProblemSolving(bp, storedA) : null;
   const pb: PBAnalysis | null = bp.type === "PLAYBOOK" ? analysePlaybook(bp, storedA) : null;
   const gd: GuideAnalysis | null = bp.type === "GUIDE" ? analyseGuide(bp, storedA) : null;
   const lk: LearningAnalysis | null = bp.type === "LEARNING" ? analyseLearning(bp, storedA) : null;
 
-  const aiUnconfirmed = data.responses.filter((r) => r.provenance === "AI-suggested").length;
-  const notKnown = data.responses.filter((r) => r.provenance === "Not-known").length;
+  const aiUnconfirmed = answerRows.filter((r) => r.provenance === "AI-suggested").length;
+  const notKnown = answerRows.filter((r) => r.provenance === "Not-known").length;
+
+  // AI-drafted section narratives (stored as NARR.<section number>)
+  const narrative: Record<number, { text: string; unsupported: string[]; provenance: string }> = {};
+  for (const r of data.responses) {
+    if (!isNarrativeField(r.fieldId)) continue;
+    const v = (r.value ?? {}) as { text?: string; unsupported?: string[] };
+    const seq = Number(r.fieldId.slice(5));
+    if (seq && v.text) narrative[seq] = { text: v.text, unsupported: v.unsupported ?? [], provenance: r.provenance };
+  }
+  const narrativeList = Object.values(narrative);
+  const narrAi = narrativeList.filter((n) => n.provenance === "AI-suggested").length;
+  const narrEdited = narrativeList.length - narrAi;
+  const narrFlagged = narrativeList.filter((n) => n.unsupported.length > 0).length;
   const isDraft = data.status !== "SUBMITTED" || !data.frozen;
 
   const answer = (f: KitField) => {
@@ -201,6 +217,13 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
             <>
               <h2>{s.seq}. {s.title}</h2>
               <p className="purpose">{s.purpose}</p>
+              {narrative[s.seq] && (
+                <div className="narr">
+                  <div className="narrtag">{narrative[s.seq].provenance === "AI-suggested" ? "AI-drafted narrative, not yet reviewed by the client" : narrative[s.seq].provenance === "Client-confirmed" ? "AI-drafted narrative, confirmed by the client" : "Narrative edited by the client"}</div>
+                  <MarkdownLite text={narrative[s.seq].text} />
+                  {narrative[s.seq].unsupported.length > 0 && <p className="flag">Figures to verify (not found in the inputs): {narrative[s.seq].unsupported.join(", ")}</p>}
+                </div>
+              )}
               {sectionBody(s)}
               {s.seq === 2 && data.approvedBy && (
                 <div className="field"><div className="label">Approved by</div><div className="answer">{data.approvedBy}{data.submittedAt ? `, ${fmtDate(data.submittedAt)}` : ""}</div></div>
@@ -218,6 +241,7 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
               <ul>
                 <li>{data.mode === "CLIENT_LED" ? "This report was completed by the client; AI help was available on request." : "AI was used to draft some answers. Each AI draft is labelled in this report and counts as the client's answer only once confirmed or edited."}</li>
                 <li>{aiUnconfirmed} answer(s) remain AI-suggested and unconfirmed. {notKnown} answer(s) are recorded as Not known.</li>
+                {narrativeList.length > 0 && <li>{narrativeList.length} section narrative(s) were drafted with AI from the client&apos;s own answers, the computed analysis and uploaded evidence: {narrAi} not yet reviewed, {narrEdited} reviewed or edited by the client.{narrFlagged > 0 ? ` ${narrFlagged} contain figures that could not be matched to the inputs and are marked for verification.` : ""} AI-written text is not independent evidence.</li>}
                 <li>Client statements have not been independently verified. Benchmarks are included only where a source is cited; otherwise &quot;Benchmark not established&quot; applies.</li>
                 <li>This report supports a management decision. It is not legal, tax, regulatory or financial advice. Verify such matters with qualified specialists.</li>
                 <li>Report generated {fmtDate(data.generatedAt)}. Reviewer and approver names are as entered by the client; no certification or expert review is implied.</li>
@@ -269,7 +293,10 @@ tbody tr:nth-child(even) td{background:${c.grey}}
 tr.total td{font-weight:700;background:${c.lightBlue}!important}
 .rag{font-weight:700}.rag.Red{color:${c.red}}.rag.Amber{color:#b7791f}.rag.Green{color:${c.green}}
 .avoid{break-inside:avoid}
-.ok{color:#1d6a3a;font-weight:600}.method{margin:16px 0}
+.ok{color:#1d6a3a;font-weight:600}
+.narr{border-left:4px solid ${c.teal};background:#fff;padding:2px 14px 6px;margin:10px 0 16px}
+.narrtag{font-size:7.5pt;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#5b21b6;margin:6px 0 4px}
+.narr .md p{margin:6px 0}.narr .md h3{margin:12px 0 4px}.narr .md ul,.narr .md ol{margin:6px 0;padding-left:22px}.method{margin:16px 0}
 .heat{margin:6px 0}.heatrow{display:flex;gap:10px;align-items:center;margin:3px 0}.heatname{width:240px;font-size:9.5pt}.heatcells{display:flex;gap:3px;flex-wrap:wrap}
 .heat i,.legend i{display:inline-block;width:14px;height:14px;border:1px solid #cfcfcf;vertical-align:middle}
 .h-1{background:#b03a2e}.h-2{background:#e6a23c}.h-3{background:#9bc98b}.h-4{background:#1d6a3a}.h-unk{background:#c7c7c7}.h-blank{background:#fff}
