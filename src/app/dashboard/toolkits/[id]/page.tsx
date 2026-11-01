@@ -1,6 +1,8 @@
 "use client";
 
 import { readJson } from "@/lib/toolkit/http";
+import { NarrativePanel, type NarrEntry } from "@/components/toolkit/NarrativePanel";
+import { isNarrativeField } from "@/lib/toolkit/narrative-plan";
 
 import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -41,6 +43,7 @@ export default function ToolkitWorkspace({ params }: { params: Promise<{ id: str
   const { id } = use(params);
   const [kit, setKit] = useState<KitData | null>(null);
   const [resp, setResp] = useState<Record<string, Resp>>({});
+  const [narr, setNarr] = useState<Record<number, NarrEntry>>({});
   const [evidence, setEvidence] = useState<Evidence[]>([]);
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string>("");
@@ -64,8 +67,18 @@ export default function ToolkitWorkspace({ params }: { params: Promise<{ id: str
     const d = await readJson(r);
     setKit(d.kit);
     const m: Record<string, Resp> = {};
-    for (const x of d.responses) m[x.fieldId] = { value: x.value, provenance: x.provenance, confidence: x.confidence };
+    const nm: Record<number, NarrEntry> = {};
+    for (const x of d.responses) {
+      if (isNarrativeField(x.fieldId)) {
+        const seq = Number(String(x.fieldId).slice(5));
+        const v = (x.value ?? {}) as { text?: string; unsupported?: string[]; provider?: string | null };
+        if (seq && v.text) nm[seq] = { text: v.text, unsupported: v.unsupported ?? [], provenance: x.provenance, provider: v.provider };
+        continue;
+      }
+      m[x.fieldId] = { value: x.value, provenance: x.provenance, confidence: x.confidence };
+    }
     setResp(m);
+    setNarr(nm);
     setEvidence(d.evidence);
     setActiveId((cur) => cur || d.kit.blueprint.sections.find((s: KitSection) => s.fields.length)?.id || d.kit.blueprint.sections[0].id);
   }, [id]);
@@ -282,6 +295,7 @@ export default function ToolkitWorkspace({ params }: { params: Promise<{ id: str
             <SectionView
               kit={kit} section={section} resp={resp} stored={stored} locked={Boolean(locked)}
               aiBusy={aiBusy} aiNote={aiNote} edit={edit} mark={mark} confirm={confirm} aiDraft={aiDraft}
+              narr={narr} onNarr={(seq, e) => setNarr((cur) => { const n = { ...cur }; if (e) n[seq] = e; else delete n[seq]; return n; })}
               onPrev={idx > 0 ? () => { setActiveId(bp.sections[idx - 1].id); window.scrollTo({ top: 0 }); } : undefined}
               onNext={idx < bp.sections.length - 1 ? () => { setActiveId(bp.sections[idx + 1].id); window.scrollTo({ top: 0 }); } : undefined}
             />
@@ -322,8 +336,9 @@ function SectionView(props: {
   aiBusy: string | null; aiNote: string | null;
   edit: (id: string, v: Val) => void; mark: (id: string, p: "Not-known" | "Not-applicable") => void; confirm: (id: string) => void;
   aiDraft: (s: KitSection, moduleId?: string) => void; onPrev?: () => void; onNext?: () => void;
+  narr: Record<number, NarrEntry>; onNarr: (seq: number, e: NarrEntry | undefined) => void;
 }) {
-  const { kit, section, resp, stored, locked, aiBusy, aiNote, edit, mark, confirm, aiDraft, onPrev, onNext } = props;
+  const { kit, section, resp, stored, locked, aiBusy, aiNote, edit, mark, confirm, aiDraft, onPrev, onNext, narr, onNarr } = props;
   const bp = kit.blueprint;
   const hasAi = section.fields.some((f) => f.aiDraftable);
   const isModules = kit.kitType === "DIAGNOSTIC" && section.seq === 10;
@@ -391,6 +406,8 @@ function SectionView(props: {
             </div>
           ))
         : <div className="mt-6 space-y-5">{section.fields.map(renderField)}</div>}
+
+      <NarrativePanel kitId={kit.id} type={kit.kitType} seq={section.seq} entry={narr[section.seq]} locked={locked} onChange={(e) => onNarr(section.seq, e)} />
 
       <div className="mt-10 flex justify-between">
         <Button variant="ghost" disabled={!onPrev} onClick={onPrev}><ArrowLeft className="h-4 w-4" /> Previous</Button>
