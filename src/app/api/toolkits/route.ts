@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUserId, unauthorized, guard } from "@/lib/toolkit/server";
 import {
   routeKit,
+  KIT_LABEL,
   buildTemplateBlueprint,
   withDiagnosticModules,
   validateBlueprint,
@@ -20,6 +21,10 @@ const CLARITY = ["clear", "unclear", "unsure"];
 const INTENTS = ["discover", "solve", "implement", "learn", "reference", "grow"];
 const TYPES = ["DIAGNOSTIC", "PROBLEM_SOLVING", "PLAYBOOK", "GUIDE", "LEARNING"];
 const MODES = ["CLIENT_LED", "AI_FIRST_CUT", "AI_ANALYSIS"];
+
+// The database column holds up to ~65k bytes; 20,000 characters is safe even for non-English text.
+// Longer material can be uploaded as files (extracted separately).
+const MAX_INTAKE_CHARS = 20000;
 
 const str = (v: unknown, max: number) => String(v ?? "").trim().slice(0, max);
 
@@ -62,8 +67,8 @@ async function POST_(req: NextRequest) {
 
   const industry = str(b.industry, 100);
   const topic = str(b.topic, 160);
-  const problemText = str(b.problemText, 4000);
-  const contextText = str(b.contextText, 8000);
+  const problemText = str(b.problemText, MAX_INTAKE_CHARS);
+  const contextText = str(b.contextText, MAX_INTAKE_CHARS);
   if (!industry) return NextResponse.json({ error: "Please choose an industry." }, { status: 422 });
   if (!topic && problemText.length < 10) {
     return NextResponse.json({ error: "Choose a topic or describe the problems you want to address." }, { status: 422 });
@@ -76,6 +81,12 @@ async function POST_(req: NextRequest) {
 
   const route = routeKit({ problemClarity, solutionClarity, intent, growth: Boolean(b.growth) });
   const override = TYPES.includes(String(b.kitType)) ? (b.kitType as KitType) : null;
+  if (override && route.type && override !== route.type && b.overrideApproved !== true) {
+    return NextResponse.json(
+      { error: `We recommended a ${KIT_LABEL[route.type]}. Please confirm you approve building a ${KIT_LABEL[override]} instead.` },
+      { status: 422 },
+    );
+  }
   const kitType = override ?? route.type;
   if (!kitType) {
     return NextResponse.json(

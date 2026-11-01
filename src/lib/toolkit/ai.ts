@@ -5,7 +5,7 @@
  */
 import type { Blueprint, KitField, ProposedModule } from "./engine";
 
-export type Generator = (a: { system: string; user: string; maxTokens: number; timeoutMs?: number }) => Promise<{ text: string } | null>;
+export type Generator = (a: { system: string; user: string; maxTokens: number; timeoutMs?: number; diag?: string[] }) => Promise<{ text: string } | null>;
 
 /** Default generator uses the admin-selected provider(s). Loaded lazily so tests can inject a mock. */
 async function defaultGenerator(): Promise<Generator> {
@@ -17,9 +17,9 @@ async function isAvailable(gen?: Generator): Promise<boolean> {
   const { aiAvailable } = await import("@/lib/ai/gateway");
   return aiAvailable();
 }
-async function callAi(gen: Generator | undefined, system: string, user: string, maxTokens: number): Promise<string | null> {
+async function callAi(gen: Generator | undefined, system: string, user: string, maxTokens: number, diag?: string[]): Promise<string | null> {
   const g = gen ?? (await defaultGenerator());
-  const out = await g({ system, user, maxTokens, timeoutMs: 25000 });
+  const out = await g({ system, user, maxTokens, timeoutMs: 25000, diag });
   return out?.text ?? null;
 }
 
@@ -50,8 +50,8 @@ export async function tailorDiagnosticModules(input: {
 Industry: ${input.industry}
 Topic: ${input.topic}
 <client_data>
-Problems to address: ${(input.problemText ?? "").slice(0, 1500)}
-Context: ${(input.contextText ?? "").slice(0, 2000)}
+Problems to address: ${(input.problemText ?? "").slice(0, 6000)}
+Context: ${(input.contextText ?? "").slice(0, 10000)}
 </client_data>
 Requirements: 5 to 7 dimensions that are MECE (no overlap, together cover the topic). For each, 5 to 7 diagnostic questions answerable on a 1-4 maturity scale (1 Ad hoc, 2 Developing, 3 Established, 4 Leading). Questions must be specific to the topic and industry, one idea each, no yes/no questions.
 JSON shape: {"modules":[{"name":"","purpose":"","questions":["",""]}]}`;
@@ -74,26 +74,26 @@ export async function draftFields(args: {
   evidence: Array<{ fileName: string; text: string }>;
   answers: Record<string, string>;
   gen?: Generator;
-}): Promise<{ suggestions: Suggestion[]; available: boolean }> {
+}): Promise<{ suggestions: Suggestion[]; available: boolean; failure?: "call" | "format"; detail?: string }> {
   const { blueprint, fields } = args;
   if (!(await isAvailable(args.gen))) return { suggestions: [], available: false };
 
   const evidence = args.evidence
-    .map((e) => `[${e.fileName}]\n${e.text.slice(0, 5000)}`)
+    .map((e) => `[${e.fileName}]\n${e.text.slice(0, 12000)}`)
     .join("\n\n")
-    .slice(0, 14000);
+    .slice(0, 30000);
   const answered = Object.entries(args.answers)
     .filter(([, v]) => v && v.trim())
-    .slice(0, 40)
-    .map(([k, v]) => `${k}: ${v.slice(0, 300)}`)
+    .slice(0, 60)
+    .map(([k, v]) => `${k}: ${v.slice(0, 800)}`)
     .join("\n");
 
   const system = `You are a consulting analyst helping a client complete a ${blueprint.type} form. ${SAFETY} Return ONLY JSON.`;
   const user = `Industry: ${blueprint.industry}
 Topic: ${blueprint.topic}
 <client_data>
-Problems: ${args.problemText.slice(0, 2000)}
-Company context: ${args.contextText.slice(0, 3000)}
+Problems: ${args.problemText.slice(0, 6000)}
+Company context: ${args.contextText.slice(0, 12000)}
 Already answered:
 ${answered || "(nothing yet)"}
 Uploaded evidence:
@@ -104,7 +104,10 @@ Fields:
 ${fields.map((f) => `- id=${f.id} | type=${f.type} | ${f.label} | hint: ${f.guidance.slice(0, 160)}`).join("\n")}
 JSON shape: {"suggestions":[{"fieldId":"","value":"","confidence":"Low","basis":""}]}`;
 
-  const out = parseJson<{ suggestions?: Suggestion[] }>(await callAi(args.gen, system, user, 3800));
+  const diag: string[] = [];
+  const raw = await callAi(args.gen, system, user, 6000, diag);
+  const out = parseJson<{ suggestions?: Suggestion[] }>(raw);
+  if (!out) return { suggestions: [], available: true, failure: raw ? "format" : "call", detail: diag.join("; ") };
   const valid = new Map(fields.map((f) => [f.id, f]));
   const suggestions: Suggestion[] = [];
   for (const s of out?.suggestions ?? []) {
@@ -115,7 +118,7 @@ JSON shape: {"suggestions":[{"fieldId":"","value":"","confidence":"Low","basis":
       const n = typeof value === "number" ? value : parseInt(String(value ?? ""), 10);
       value = Number.isFinite(n) && n >= 1 && n <= 4 ? n : null;
     } else if (value !== null) {
-      value = String(value).slice(0, 4000);
+      value = String(value).slice(0, 8000);
     }
     suggestions.push({
       fieldId: f.id,

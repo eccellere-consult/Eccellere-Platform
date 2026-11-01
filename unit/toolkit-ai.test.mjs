@@ -61,3 +61,29 @@ test("tailorDiagnosticModules output flows through the validator end to end", as
   assert.ok(out); assert.deepEqual(validateBlueprint(out), []);
   assert.equal(await tailorDiagnosticModules({ industry: "x", topic: "y", gen: mock("garbage") }), null);
 });
+
+test("draftFields tells a failed AI call apart from 'too little context'", async () => {
+  const none = await draftFields({ ...base, gen: async () => null });
+  assert.equal(none.available, true); assert.equal(none.failure, "call");
+  const junk = await draftFields({ ...base, gen: mock("not json at all") });
+  assert.equal(junk.failure, "format");
+  const okEmpty = await draftFields({ ...base, gen: mock('{"suggestions":[]}') });
+  assert.equal(okEmpty.failure, undefined); // valid answer, simply nothing to suggest
+});
+
+test("draftFields passes a diag collector to the generator", async () => {
+  let got;
+  await draftFields({ ...base, gen: async (a) => { got = a.diag; a.diag.push("Groq: HTTP 401"); return null; } });
+  assert.ok(Array.isArray(got));
+});
+
+test("long client write-ups reach the AI (no silent cut at 3,000 characters)", async () => {
+  const marker = "MARKER_DEEP_DETAIL";
+  const longContext = "x".repeat(9000) + marker;
+  const gen = mock('{"suggestions":[]}');
+  await draftFields({ ...base, contextText: longContext, gen });
+  assert.ok(`${gen.last.system}\n${gen.last.user}`.includes(marker));
+  const gen2 = mock('{"suggestions":[]}');
+  await draftFields({ ...base, evidence: [{ fileName: "big.txt", text: "y".repeat(9000) + marker }], gen: gen2 });
+  assert.ok(gen2.last.user.includes(marker));
+});

@@ -2,7 +2,7 @@
 
 import { readJson } from "@/lib/toolkit/http";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Paperclip, X, Loader2 } from "lucide-react";
@@ -100,6 +100,8 @@ export default function NewToolkitPage() {
   const [intent, setIntent] = useState<Intent | "">("");
   const [override, setOverride] = useState<KitType | "">("");
   const [mode, setMode] = useState<"CLIENT_LED" | "AI_FIRST_CUT">("AI_FIRST_CUT");
+  const [overrideOk, setOverrideOk] = useState(false);
+  const [coverage, setCoverage] = useState<Array<{ slug: string; title: string; price: number; memberPrice: number | null }>>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -111,7 +113,22 @@ export default function NewToolkitPage() {
   const finalType: KitType | null = (override || route.type) as KitType | null;
 
   const step0Ok = Boolean(industry) && (Boolean(topic) || problemText.trim().length >= 10);
-  const canNext = step === 0 ? step0Ok : step === 2 ? Boolean(finalType) : true;
+  const needsApproval = Boolean(override && route.type && override !== route.type);
+  const canNext = step === 0 ? step0Ok : step === 2 ? Boolean(finalType) && (!needsApproval || overrideOk) : true;
+
+  // Coverage check: a ready-made marketplace kit may already cover this topic (read-only lookup).
+  useEffect(() => {
+    const q = `${topic} ${problemText.slice(0, 300)}`.trim();
+    if (!industry || q.length < 3) { setCoverage([]); return; }
+    const t = setTimeout(async () => {
+      try {
+        const r = await fetch(`/api/toolkits/coverage?q=${encodeURIComponent(`${q} ${industry}`)}`);
+        const d = await readJson(r);
+        setCoverage(r.ok && Array.isArray(d.matches) ? d.matches : []);
+      } catch { setCoverage([]); }
+    }, 700);
+    return () => clearTimeout(t);
+  }, [industry, topic, problemText]);
 
   function addFiles(list: FileList | null) {
     if (!list) return;
@@ -135,6 +152,7 @@ export default function NewToolkitPage() {
           solutionClarity,
           intent: intent || undefined,
           kitType: override || undefined,
+          overrideApproved: needsApproval ? overrideOk : undefined,
           mode,
         }),
       });
@@ -220,13 +238,28 @@ export default function NewToolkitPage() {
                 id="problem"
                 rows={5}
                 className={inputCls}
-                maxLength={4000}
+                maxLength={20000}
                 value={problemText}
                 onChange={(e) => setProblemText(e.target.value)}
                 placeholder="e.g. Scrap on our main line is 8% against a 3% target and customers are complaining about late deliveries."
               />
+              <p className="mt-1 text-xs text-ink-light">{problemText.length.toLocaleString()} / 20,000 characters. For longer material, upload a file in the next step.</p>
               {!step0Ok && industry && <p className="mt-1 text-xs text-ink-light">Choose a topic, or describe the problem in at least a sentence.</p>}
             </div>
+            {coverage.length > 0 && (
+              <div className="rounded-lg border border-eccellere-gold/50 bg-eccellere-cream/60 p-4" role="status">
+                <p className="text-sm font-medium text-eccellere-ink">A ready-made kit may already cover this</p>
+                <p className="mt-0.5 text-xs text-ink-mid">These published kits matched your topic. You can still draft your own below if they do not fit.</p>
+                <ul className="mt-2 space-y-1.5">
+                  {coverage.map((c) => (
+                    <li key={c.slug} className="flex items-center justify-between gap-3 text-sm">
+                      <Link href={`/marketplace/${c.slug}`} target="_blank" className="text-eccellere-blue underline-offset-2 hover:underline">{c.title}</Link>
+                      <span className="shrink-0 text-xs text-ink-light">₹{c.price.toLocaleString("en-IN")}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </>
         )}
 
@@ -238,11 +271,12 @@ export default function NewToolkitPage() {
                 id="context"
                 rows={7}
                 className={inputCls}
-                maxLength={8000}
+                maxLength={20000}
                 value={contextText}
                 onChange={(e) => setContextText(e.target.value)}
                 placeholder="Size, products or services, customers, locations, recent performance, what you have already tried, constraints…"
               />
+              <p className="mt-1 text-xs text-ink-light">{contextText.length.toLocaleString()} / 20,000 characters. For longer material, upload files below.</p>
               <p className="mt-1 text-xs text-ink-light">The more specific you are, the better the form and AI drafts. Optional, but recommended.</p>
             </div>
             <div>
@@ -318,7 +352,7 @@ export default function NewToolkitPage() {
               <label className="mb-1.5 block text-sm font-medium" htmlFor="override">
                 Prefer a different type? <span className="font-normal text-ink-light">(optional)</span>
               </label>
-              <select id="override" className={inputCls} value={override} onChange={(e) => setOverride(e.target.value as KitType | "")}>
+              <select id="override" className={inputCls} value={override} onChange={(e) => { setOverride(e.target.value as KitType | ""); setOverrideOk(false); }}>
                 <option value="">Use the recommendation</option>
                 {(Object.keys(KIT_LABEL) as KitType[]).map((k) => (
                   <option key={k} value={k}>{KIT_LABEL[k]}</option>
@@ -328,6 +362,12 @@ export default function NewToolkitPage() {
                 <p className="mt-1 text-xs text-amber-700">
                   We recommended a {route.label}. Choosing {KIT_LABEL[override]} is fine, but it may not answer the decision you face.
                 </p>
+              )}
+              {needsApproval && override && (
+                <label className="mt-2 flex items-start gap-2 text-xs text-ink-mid">
+                  <input type="checkbox" className="mt-0.5" checked={overrideOk} onChange={(e) => setOverrideOk(e.target.checked)} />
+                  <span>I understand the recommendation was {route.label} and I approve building a {KIT_LABEL[override]} instead.</span>
+                </label>
               )}
             </div>
           </>

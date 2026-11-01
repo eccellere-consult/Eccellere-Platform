@@ -7,7 +7,8 @@ export const dynamic = "force-dynamic";
 
 type Ctx = { params: Promise<{ id: string }> };
 const MAX_PER_REQUEST = 60;
-const MAX_VALUE_CHARS = 20000;
+// Effectively unlimited for a single answer; we reject (never silently cut) anything beyond this.
+const MAX_VALUE_CHARS = 200000;
 
 /**
  * PUT /api/toolkits/[id]/responses
@@ -47,8 +48,13 @@ async function PUT_(req: NextRequest, { params }: Ctx) {
     }
     const provenance = prov.has(String(r.provenance)) ? String(r.provenance) : "Client-entered";
     let value: unknown = r.value ?? null;
-    if (typeof value === "string") value = value.slice(0, MAX_VALUE_CHARS);
-    else if (typeof value !== "number" && value !== null) value = String(value).slice(0, MAX_VALUE_CHARS);
+    if (typeof value !== "number" && value !== null) value = String(value);
+    if (typeof value === "string" && value.length > MAX_VALUE_CHARS) {
+      return NextResponse.json(
+        { error: `One answer is longer than ${MAX_VALUE_CHARS.toLocaleString()} characters. Please shorten it or move the detail into an uploaded file.` },
+        { status: 413 },
+      );
+    }
     const confidence = ["High", "Medium", "Low"].includes(String(r.confidence)) ? String(r.confidence) : null;
     const sourceRef = r.sourceRef ? String(r.sourceRef).slice(0, 255) : null;
 

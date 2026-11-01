@@ -9,6 +9,7 @@ import {
   scoreDiagnostic, KIT_LABEL, KIT_PURPOSE, SCALE4,
   type Blueprint, type KitField, type KitSection, type KitType, type StoredResponse,
 } from "@/lib/toolkit/engine";
+import { analyseDiagnostic, GOVERNANCE_CALENDAR, type DiagnosticAnalysis } from "@/lib/toolkit/analysis";
 
 type Val = string | number | null;
 interface RRow { fieldId: string; value: Val; provenance: string; confidence?: string | null }
@@ -74,6 +75,9 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
   const stored: Record<string, StoredResponse> = {};
   data.responses.forEach((r) => (stored[r.fieldId] = { fieldId: r.fieldId, value: r.value, provenance: r.provenance }));
   const scores = bp.type === "DIAGNOSTIC" ? scoreDiagnostic(bp, stored) : null;
+  const storedA: Record<string, StoredResponse & { confidence?: string | null }> = {};
+  data.responses.forEach((r) => (storedA[r.fieldId] = { fieldId: r.fieldId, value: r.value, provenance: r.provenance, confidence: r.confidence }));
+  const an: DiagnosticAnalysis | null = bp.type === "DIAGNOSTIC" && scores ? analyseDiagnostic(bp, storedA, scores) : null;
 
   const aiUnconfirmed = data.responses.filter((r) => r.provenance === "AI-suggested").length;
   const notKnown = data.responses.filter((r) => r.provenance === "Not-known").length;
@@ -95,6 +99,8 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
   };
 
   const sectionBody = (s: KitSection) => {
+    const dx = an ? diagnosticBody(s.seq, an, bp) : null;
+    if (dx) return dx;
     if (bp.type === "DIAGNOSTIC" && s.seq === 7) {
       return (
         <table><thead><tr><th>ID</th><th>Dimension</th><th>Purpose</th><th>Weight</th></tr></thead>
@@ -204,6 +210,155 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
   );
 }
 
+const TEMPLATE_NOTE =
+  "Built from the answers in this report using Eccellere's standard method. The wording of steps is a template; refine it with the owner. Nothing here is a verified fact beyond the client's own answers.";
+const heatCls = (level: number | null, kind: string) =>
+  kind === "unknown" ? "h-unk" : level === null ? "h-blank" : `h-${level}`;
+
+function diagnosticBody(seq: number, an: DiagnosticAnalysis, bp: Blueprint) {
+  if (seq === 3) {
+    return (
+      <>
+        <p>This brief summarises what the answers in this report show. Scores are indicative maturity levels (1 to 4), not precise measurements, and every finding is a hypothesis until it is tested.</p>
+        <table><tbody>
+          <tr><td>Overall maturity (weighted)</td><td>{an.overall ?? "Not scored"} <span className={`rag ${an.overallRag}`}>{an.overallRag}</span></td></tr>
+          <tr><td>Dimensions Red / Amber / Green</td><td>{an.counts.red} / {an.counts.amber} / {an.counts.green}{an.counts.notScored ? ` (${an.counts.notScored} not scored)` : ""}</td></tr>
+          <tr><td>Questions answered, or marked Not known / N/A</td><td>{an.evidenceCoverage}%</td></tr>
+          <tr><td>Weak answers recorded as findings</td><td>{an.findings.length}</td></tr>
+          <tr><td>AI-suggested answers not yet confirmed</td><td>{an.aiUnconfirmed}</td></tr>
+        </tbody></table>
+        {an.topGaps.length > 0 ? (
+          <>
+            <h3>Largest gaps to the target</h3>
+            <ol>{an.topGaps.map((g) => <li key={g.moduleId}><b>{g.name}</b>: score {g.score} against a target of {g.target} (priority index {g.priorityIndex}).</li>)}</ol>
+          </>
+        ) : <p className="muted">No dimension is below the target level, or there are not yet enough scored answers to rank gaps.</p>}
+      </>
+    );
+  }
+  if (seq === 12) {
+    return (
+      <>
+        <table><thead><tr><th>Dimension</th><th>Weight</th><th>Score (1-4)</th><th>Rating</th><th>Evidence coverage</th></tr></thead>
+          <tbody>
+            {an.gaps.map((g) => <tr key={g.moduleId}><td>{g.name}</td><td>{g.weight}%</td><td>{g.score ?? "n/a"}</td><td className={`rag ${g.rag}`}>{g.rag}</td><td>{g.coverage}%</td></tr>)}
+            <tr className="total"><td>Overall (weighted)</td><td>100%</td><td>{an.overall ?? "n/a"}</td><td className={`rag ${an.overallRag}`}>{an.overallRag}</td><td /></tr>
+          </tbody></table>
+        <h3>Heatmap by question</h3>
+        <p className="muted">One square per question. Grey means Not known or N/A; white means not answered. Darker red means a weaker answer.</p>
+        <div className="heat">{an.heat.map((h) => (
+          <div key={h.moduleId} className="heatrow avoid"><span className="heatname">{h.name}</span>
+            <span className="heatcells">{h.cells.map((c) => <i key={c.id} className={heatCls(c.level, c.kind)} title={`${c.id}: ${c.level ?? c.kind}`} />)}</span></div>))}</div>
+        <p className="legend"><i className="h-1" /> 1 Ad hoc <i className="h-2" /> 2 Developing <i className="h-3" /> 3 Established <i className="h-4" /> 4 Leading <i className="h-unk" /> Not known / N/A <i className="h-blank" /> Not answered</p>
+      </>
+    );
+  }
+  if (seq === 13) {
+    return (
+      <>
+        <table><thead><tr><th>Dimension</th><th>Weight</th><th>Current</th><th>Target</th><th>Gap</th><th>Priority index</th><th>Rank</th></tr></thead>
+          <tbody>{an.gaps.map((g) => <tr key={g.moduleId}><td>{g.name}</td><td>{g.weight}%</td><td>{g.score ?? "n/a"}</td><td>{g.target}</td><td>{g.gap ?? "n/a"}</td><td>{g.priorityIndex}</td><td>{g.rank ?? "-"}</td></tr>)}</tbody></table>
+        <p className="muted">Priority index = weight x gap. The target of {an.target} (Established) is a default assumption, not a sourced benchmark. Benchmark not established: no external benchmark with a cited source was provided, so do not read these gaps as comparisons with other companies.</p>
+      </>
+    );
+  }
+  if (seq === 14) {
+    return (
+      <>
+        <p>Each branch below is a dimension rated Red or Amber. The leaves are the weakest answers, written as <b>hypotheses to test</b>. They are not confirmed root causes.</p>
+        {an.tree.length === 0 ? <p className="muted">No dimension is rated Red or Amber, or there are not yet enough scored answers.</p> : (
+          <ul className="tree">{an.tree.map((t) => (
+            <li key={t.moduleId}><b>{t.name}</b> <span className={`rag ${t.rag}`}>{t.rag}</span>
+              <ul>{t.causes.length
+                ? t.causes.map((c) => <li key={c.findingId}><span className="fid">{c.findingId}</span> Weak answer to test: {c.text}</li>)
+                : <li className="muted">No single answer scored 1 or 2; review the dimension as a whole.</li>}</ul></li>))}</ul>
+        )}
+      </>
+    );
+  }
+  if (seq === 15) {
+    return (
+      <>
+        {an.findings.length === 0 ? <p className="muted">No answer scored 1 or 2, so no findings are recorded.</p> : (
+          <table><thead><tr><th style={{ width: 40 }}>ID</th><th>Observation</th><th>Evidence</th><th style={{ width: 70 }}>Confidence</th><th style={{ width: 80 }}>Severity</th><th style={{ width: 60 }}>Action</th></tr></thead>
+            <tbody>{an.findings.map((f) => (
+              <tr key={f.id}><td>{f.id}</td><td><b>{f.moduleName}.</b> {f.question}</td><td>{f.evidence}. Status: {f.status}.</td><td>{f.confidence}</td><td>{f.severity}</td><td>{f.initiativeId}</td></tr>))}</tbody></table>
+        )}
+        <p className="muted">Confidence is Low for client statements and AI suggestions, and Medium when the answer was extracted from an uploaded source. It is never High until a finding has been independently validated.</p>
+        <h3>Evidence gaps</h3>
+        {an.evidenceGaps.length === 0 ? <p className="muted">Every question has an answer.</p> : (
+          <table><thead><tr><th>Dimension</th><th>Question</th><th style={{ width: 90 }}>Status</th></tr></thead>
+            <tbody>{an.evidenceGaps.slice(0, 40).map((g) => <tr key={g.questionId}><td>{g.moduleName}</td><td>{g.question}</td><td>{g.reason}</td></tr>)}</tbody></table>
+        )}
+        {an.evidenceGaps.length > 40 && <p className="muted">{an.evidenceGaps.length - 40} more evidence gaps are not listed.</p>}
+      </>
+    );
+  }
+  if (seq === 16) {
+    const hi = Math.max(1, Math.ceil(an.initiatives.length / 3));
+    return (
+      <>
+        <p>Value is ranked, not priced. No financial baseline or target values were provided, so no rupee figure is stated.</p>
+        {an.initiatives.length === 0 ? <p className="muted">No dimension is below target, so no opportunity is ranked.</p> : (
+          <table><thead><tr><th>Rank</th><th>Dimension</th><th>Priority index</th><th>Opportunity band</th><th>Value at stake</th></tr></thead>
+            <tbody>{an.initiatives.map((i, idx) => (
+              <tr key={i.id}><td>{idx + 1}</td><td>{an.gaps.find((g) => g.moduleId === i.moduleId)?.name}</td><td>{i.priorityIndex}</td><td>{idx < hi ? "High" : idx < hi * 2 ? "Medium" : "Lower"}</td><td className="muted">Not quantified</td></tr>))}</tbody></table>
+        )}
+        <p className="muted">To quantify value, record a baseline, target, period and formula for each KPI in section 9. Keep benefit types (cash release, revenue, margin, cost, risk) separate to avoid double counting.</p>
+      </>
+    );
+  }
+  if (seq === 17) {
+    return (
+      <>
+        {an.initiatives.length === 0 ? <p className="muted">No initiatives are proposed because no dimension is below target.</p> : (
+          <>
+            <table><thead><tr><th style={{ width: 40 }}>ID</th><th>Initiative</th><th>Priority</th><th>Wave</th><th>Findings addressed</th></tr></thead>
+              <tbody>{an.initiatives.map((i) => <tr key={i.id}><td>{i.id}</td><td>{i.title}</td><td>{i.priorityIndex}</td><td>{i.horizon}</td><td>{i.findingIds.join(", ") || "-"}</td></tr>)}</tbody></table>
+            {an.initiatives.map((i) => (
+              <div key={i.id} className="initiative avoid">
+                <div className="ibanner">{i.id} · {i.title} <span>{i.horizon}</span></div>
+                <table><tbody>
+                  <tr><td style={{ width: 130 }}>Objective</td><td>{i.objective}</td></tr>
+                  <tr><td>Owner</td><td className="muted">To be named by the sponsor (none assumed)</td></tr>
+                  <tr><td>KPI</td><td>{i.kpi}</td></tr>
+                  <tr><td>Completion gate</td><td>{i.gate}</td></tr>
+                </tbody></table>
+                <ol>{i.steps.map((st, k) => <li key={k}>{st}</li>)}</ol>
+              </div>))}
+            <p className="muted">{TEMPLATE_NOTE}</p>
+          </>
+        )}
+      </>
+    );
+  }
+  if (seq === 18) {
+    return (
+      <>
+        {an.initiatives.length === 0 ? <p className="muted">No roadmap is proposed because no initiatives were identified.</p> : (
+          <table><thead><tr><th>Horizon</th><th>Initiative</th><th>Key activities</th><th>Decision gate</th><th>KPI</th></tr></thead>
+            <tbody>{an.initiatives.slice().sort((a, b) => a.wave - b.wave).map((i) => (
+              <tr key={i.id}><td>{i.horizon}</td><td>{i.id} {i.title}</td><td>{i.steps.slice(0, 3).join(" ")}</td><td>{i.gate}</td><td>{i.kpi}</td></tr>))}</tbody></table>
+        )}
+        <h3>Governance calendar</h3>
+        <table><thead><tr><th>Cadence</th><th>Forum</th><th>Purpose</th></tr></thead>
+          <tbody>{GOVERNANCE_CALENDAR.map((g) => <tr key={g.cadence}><td>{g.cadence}</td><td>{g.forum}</td><td>{g.purpose}</td></tr>)}</tbody></table>
+        <p className="muted">{TEMPLATE_NOTE} Dates are not fixed because no start date was provided; count each horizon from the date the sponsor approves the plan.</p>
+      </>
+    );
+  }
+  if (seq === 19) {
+    return (
+      <>
+        <p>These are the decisions this report asks the sponsor to take. The report does not take them on the sponsor&apos;s behalf.</p>
+        <ol>{an.decisions.map((d, i) => <li key={i}>{d}</li>)}</ol>
+        <p className="muted">Recommendations follow the answers and are limited by the evidence listed in section 15.{bp.industry ? ` Industry context: ${bp.industry}.` : ""}</p>
+      </>
+    );
+  }
+  return null;
+}
+
 const css = (c: typeof brand) => `
 .report{font-family:Calibri,Carlito,'Segoe UI',Arial,sans-serif;color:${c.ink};background:#fff;max-width:900px;margin:0 auto;padding:0 28px 60px;font-size:11pt;line-height:1.5}
 .report h1,.report h2,.report h3{font-family:Cambria,Georgia,serif;color:${c.navy}}
@@ -242,6 +397,13 @@ tbody tr:nth-child(even) td{background:${c.grey}}
 tr.total td{font-weight:700;background:${c.lightBlue}!important}
 .rag{font-weight:700}.rag.Red{color:${c.red}}.rag.Amber{color:#b7791f}.rag.Green{color:${c.green}}
 .avoid{break-inside:avoid}
+.heat{margin:6px 0}.heatrow{display:flex;gap:10px;align-items:center;margin:3px 0}.heatname{width:240px;font-size:9.5pt}.heatcells{display:flex;gap:3px;flex-wrap:wrap}
+.heat i,.legend i{display:inline-block;width:14px;height:14px;border:1px solid #cfcfcf;vertical-align:middle}
+.h-1{background:#b03a2e}.h-2{background:#e6a23c}.h-3{background:#9bc98b}.h-4{background:#1d6a3a}.h-unk{background:#c7c7c7}.h-blank{background:#fff}
+.legend{font-size:9pt;color:#555}.legend i{margin:0 3px 0 10px}
+ul.tree,ul.tree ul{list-style:none;padding-left:18px;margin:4px 0}ul.tree>li{margin:8px 0;border-left:3px solid #C9A84C;padding-left:10px}
+.initiative{margin:14px 0}.ibanner{background:#1A6B72;color:#fff;padding:6px 10px;font-weight:700;display:flex;justify-content:space-between}
+.ibanner span{font-weight:400}
 @media print{
   @page{size:A4;margin:18mm 16mm 20mm}
   @page{@bottom-center{content:"Page " counter(page);font-size:9pt;color:#666}}
@@ -249,7 +411,7 @@ tr.total td{font-weight:700;background:${c.lightBlue}!important}
   .report{max-width:none;padding:0;font-size:10.5pt}
   .cover{margin:0;min-height:250mm;break-after:page;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   .toc{break-after:page}
-  .sec h2,th,.field,.tag,tr.total td,.draftmark{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .sec h2,th,.field,.tag,tr.total td,.draftmark,.heat i,.legend i,.ibanner{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   .sec h2{break-after:avoid}
 }
 `;

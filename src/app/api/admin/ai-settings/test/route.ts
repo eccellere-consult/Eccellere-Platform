@@ -31,16 +31,18 @@ async function POST_(req: NextRequest) {
     return NextResponse.json({ ok: false, reason: `${def.envKey} is not set on the server.` });
   }
   clearAiSettingsCache();
+  const diag: string[] = [];
   const out = await generateText({
     system: "You are a connectivity check. Reply with the single word OK.",
     user: "Reply OK",
     maxTokens: 10,
     timeoutMs: 15000,
     only: def.id,
+    diag,
   });
   return out
     ? NextResponse.json({ ok: true, model: out.model })
-    : NextResponse.json({ ok: false, reason: "The provider rejected the request (invalid key, wrong model name, or no access)." });
+    : NextResponse.json({ ok: false, reason: diag.length ? diag.join("; ") : "The provider rejected the request (invalid key, wrong model name, or no access)." });
 }
 
 export const POST = guard(POST_);

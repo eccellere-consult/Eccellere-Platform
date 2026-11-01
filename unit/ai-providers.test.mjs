@@ -113,3 +113,25 @@ test("no usable provider -> null and no network call", async () => {
   assert.equal(await runProviders(defaultSettings(), {}, args), null);
   assert.equal(called, false); globalThis.fetch = realFetch;
 });
+
+test("diag records the HTTP status and provider message, and never the key", async () => {
+  globalThis.fetch = async () => ({ ok: false, status: 401, text: async () => '{"error":{"message":"Invalid API Key: secret-g"}}', json: async () => ({}) });
+  const diag = [];
+  const keys = { GROQ_API_KEY: "secret-g" };
+  assert.equal(await callProvider(PROVIDER_BY_ID.groq, "m", { ...args, diag }, keys), null);
+  assert.equal(diag.length, 1);
+  assert.match(diag[0], /HTTP 401/);
+  assert.ok(!diag[0].includes("secret-g"), "key must be redacted");
+  globalThis.fetch = realFetch;
+});
+
+test("diag records a missing key and a timeout", async () => {
+  const d1 = [];
+  await callProvider(PROVIDER_BY_ID.openai, "m", { ...args, diag: d1 }, {});
+  assert.match(d1[0], /key not set/);
+  globalThis.fetch = async () => { const e = new Error("x"); e.name = "AbortError"; throw e; };
+  const d2 = [];
+  await callProvider(PROVIDER_BY_ID.openai, "m", { ...args, diag: d2 }, allKeys);
+  assert.match(d2[0], /timed out/);
+  globalThis.fetch = realFetch;
+});

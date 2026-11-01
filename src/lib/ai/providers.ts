@@ -137,6 +137,8 @@ export interface GenerateArgs {
   timeoutMs?: number;
   /** force one provider (admin "Test" button); skips fallbacks */
   only?: ProviderId;
+  /** collects short, key-free failure reasons per provider (for diagnostics) */
+  diag?: string[];
 }
 export interface GenerateResult {
   text: string;
@@ -144,11 +146,26 @@ export interface GenerateResult {
   model: string;
 }
 
+async function recordHttp(
+  a: GenerateArgs, p: ProviderDef, res: Response, key: string,
+): Promise<void> {
+  if (!a.diag) return;
+  let detail = "";
+  try {
+    if (typeof res.text === "function") detail = (await res.text()).replace(/s+/g, " ").slice(0, 160);
+  } catch { /* ignore */ }
+  if (key) detail = detail.split(key).join("***");
+  a.diag.push(`${p.label}: HTTP ${res.status}${detail ? " - " + detail : ""}`);
+}
+
 export async function callProvider(
   p: ProviderDef, model: string, a: GenerateArgs, env: Record<string, string | undefined>,
 ): Promise<string | null> {
   const key = (env[p.envKey] ?? "").trim();
-  if (!key) return null;
+  if (!key) {
+    a.diag?.push(`${p.label}: key not set`);
+    return null;
+  }
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), a.timeoutMs ?? 25000);
   try {
@@ -162,7 +179,10 @@ export async function callProvider(
           messages: [{ role: "user", content: a.user }],
         }),
       });
-      if (!res.ok) return null;
+      if (!res.ok) {
+        await recordHttp(a, p, res, key);
+        return null;
+      }
       const data = await res.json();
       const text = (data.content ?? [])
         .filter((b: { type: string }) => b.type === "text")
@@ -179,10 +199,14 @@ export async function callProvider(
         messages: [{ role: "system", content: a.system }, { role: "user", content: a.user }],
       }),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      await recordHttp(a, p, res, key);
+      return null;
+    }
     const data = await res.json();
     return data.choices?.[0]?.message?.content ?? null;
-  } catch {
+  } catch (e) {
+    a.diag?.push(`${p.label}: ${(e as Error)?.name === "AbortError" ? "timed out" : "network error"}`);
     return null;
   } finally {
     clearTimeout(t);

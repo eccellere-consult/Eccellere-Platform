@@ -18,6 +18,19 @@ const MAX_FIELDS = 14;
  * Returns suggestions only. Nothing is saved: the client reviews each one and
  * saves it with provenance "AI-suggested" (skill s4 step 4/8).
  */
+function aiFailureNote(r: { failure?: "call" | "format"; detail?: string }): string {
+  if (r.failure === "format") return "The AI answered in a format we could not read. Please try again, or draft one section at a time.";
+  if (r.failure === "call") {
+    const d = r.detail ?? "";
+    if (/HTTP 401|HTTP 403/.test(d)) return "The AI service rejected our access key. The administrator needs to check the key in AI Settings. You can complete this section yourself meanwhile.";
+    if (/HTTP 404|HTTP 400|model/i.test(d)) return "The AI service did not accept the configured model name. The administrator can fix this in AI Settings.";
+    if (/HTTP 429|HTTP 413|rate/i.test(d)) return "The AI service is busy or the request was too large. Please wait a minute and try again, or draft one section at a time.";
+    if (/timed out/.test(d)) return "The AI service took too long to respond. Please try again.";
+    return "The AI service could not be reached or returned an error. Please try again later, or complete this section yourself.";
+  }
+  return "AI could not draft these from the information provided. Add more context or evidence and try again.";
+}
+
 async function POST_(req: NextRequest, { params }: Ctx) {
   const userId = await requireUserId();
   if (!userId) return unauthorized();
@@ -81,7 +94,7 @@ async function POST_(req: NextRequest, { params }: Ctx) {
   return NextResponse.json({
     suggestions: result.suggestions,
     available: true,
-    note: result.suggestions.length ? undefined : "AI could not draft these from the information provided. Add more context or evidence and try again.",
+    note: result.suggestions.length ? undefined : aiFailureNote(result),
   });
 }
 
