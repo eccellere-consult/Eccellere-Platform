@@ -27,7 +27,7 @@ export async function GET(_req: Request, { params }: Ctx) {
     prisma.kitSubmission.findFirst({
       where: { kitId: id },
       orderBy: { submittedAt: "desc" },
-      select: { id: true, version: true, approvedBy: true, submittedAt: true },
+      select: { id: true, version: true, approvedBy: true, submittedAt: true, snapshot: true },
     }),
   ]);
   return NextResponse.json({ kit, responses, evidence, submission });

@@ -347,6 +347,9 @@ export default function MarketplacePage() {
             </p>
             <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
               <Button asChild size="lg">
+                <Link href="/dashboard/toolkits/new">Configure your own toolkit</Link>
+              </Button>
+              <Button asChild variant="ghostLight">
                 <Link href="/contact?type=quote">Get a Custom Quote</Link>
               </Button>
               <Button asChild variant="ghostLight">

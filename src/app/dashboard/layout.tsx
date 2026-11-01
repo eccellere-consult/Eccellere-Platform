@@ -9,6 +9,7 @@ import {
   ShoppingBag,
   ClipboardList,
   BrainCircuit,
+  Wand2,
   MessageCircle,
   Settings,
   Bell,
@@ -33,6 +34,7 @@ const navItems = [
   { label: "Orders", href: "/dashboard/orders", icon: ShoppingBag },
   { label: "Assignments", href: "/dashboard/assignments", icon: ClipboardList },
   { label: "Assessments", href: "/dashboard/assessments", icon: BrainCircuit },
+  { label: "My Toolkits", href: "/dashboard/toolkits", icon: Wand2 },
   { label: "AI Advisor", href: "/dashboard/advisor", icon: MessageCircle },
   { label: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
@@ -92,7 +94,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </p>
         <ul className="space-y-0.5">
           {navItems.map((item) => {
-            const active = pathname === item.href;
+            const active =
+              pathname === item.href ||
+              (item.href !== "/dashboard" && pathname.startsWith(item.href + "/"));
             return (
               <li key={item.href}>
                 <Link

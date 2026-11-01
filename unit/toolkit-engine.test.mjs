@@ -3,7 +3,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   routeKit, CANONICAL, buildTemplateBlueprint, validateBlueprint,
-  overallProgress, sectionProgress, scoreDiagnostic, KIT_LABEL,
+  overallProgress, sectionProgress, scoreDiagnostic, KIT_LABEL, withDiagnosticModules,
 } from "../src/lib/toolkit/engine.ts";
 
 // ── Routing: the four quadrants (skill s2.4 / s19) ─────────────────────────
@@ -121,4 +121,37 @@ test("RAG thresholds", () => {
   const mk = (v) => scoreDiagnostic(bp, { [q.id]: { fieldId: q.id, value: v, provenance: "Client-entered" } })
     .modules.find((m) => m.moduleId === "M2").rag;
   assert.equal(mk(1), "Red"); assert.equal(mk(2), "Amber"); assert.equal(mk(3), "Green");
+});
+
+// ── AI-proposed modules are sanitised and validated ───────────────────────
+const goodMods = () => Array.from({ length: 5 }, (_, i) => ({
+  name: `Dimension ${i + 1}`, purpose: "p",
+  questions: Array.from({ length: 5 }, (_, k) => `How well is aspect ${k + 1} of dimension ${i + 1} managed today?`),
+}));
+test("withDiagnosticModules applies valid AI modules; weights total 100; TOC intact", () => {
+  const bp = buildTemplateBlueprint({ type: "DIAGNOSTIC", industry: "Retail", topic: "x" });
+  const out = withDiagnosticModules(bp, goodMods());
+  assert.ok(out);
+  assert.equal(out.modules.length, 5);
+  assert.equal(out.modules.reduce((a, m) => a + m.weight, 0), 100);
+  assert.deepEqual(validateBlueprint(out), []);
+  assert.equal(out.sections.length, 20);
+});
+test("withDiagnosticModules rejects too few modules, duplicates, thin questions, wrong type", () => {
+  const bp = buildTemplateBlueprint({ type: "DIAGNOSTIC", industry: "Retail", topic: "x" });
+  assert.equal(withDiagnosticModules(bp, goodMods().slice(0, 3)), null);
+  const dup = goodMods(); dup[1].name = dup[0].name;
+  assert.equal(withDiagnosticModules(bp, dup), null);
+  const thin = goodMods().map((m) => ({ ...m, questions: ["short", "tiny"] }));
+  assert.equal(withDiagnosticModules(bp, thin), null);
+  assert.equal(withDiagnosticModules(bp, "not an array"), null);
+  const pb = buildTemplateBlueprint({ type: "PLAYBOOK", industry: "Retail", topic: "x" });
+  assert.equal(withDiagnosticModules(pb, goodMods()), null);
+});
+test("withDiagnosticModules strips markup and control characters", () => {
+  const bp = buildTemplateBlueprint({ type: "DIAGNOSTIC", industry: "Retail", topic: "x" });
+  const m = goodMods(); m[0].name = "<script>alert(1)</script>Cash"; m[0].questions[0] = "How is <b>cash</b>  forecast each week by the team?";
+  const out = withDiagnosticModules(bp, m);
+  assert.ok(!/[<>]/.test(out.modules[0].name));
+  assert.ok(!/[<> ]/.test(out.sections[9].fields[0].label));
 });
