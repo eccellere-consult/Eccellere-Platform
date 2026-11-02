@@ -7,11 +7,12 @@
  * real <text> (selectable and testable), nothing smaller than 9.5 px, sharp corners, the brand palette, and the same output for the same input.
  * A tool that fits no template simply has no diagram: the page shows its reference card only.
  */
-import { C, badge, box, caption, line, rect, svg, text } from './svg';
+import { C, badge, box, caption, line, rect, svg, text, wrap } from './svg';
 
 export interface Axis { label: string; low: string; high: string }
 export type Tone4 = 'good' | 'warn' | 'bad' | 'neutral';
-export interface Quad { name: string; hint?: string; tone?: Tone4 }
+/** `tag` is a few words shown as a small outlined label at the foot of the quadrant, for example "Lowest risk" or "Do first". */
+export interface Quad { name: string; hint?: string; tag?: string; tone?: Tone4 }
 export interface Step { name: string; hint?: string }
 
 export type DiagramSpec =
@@ -83,9 +84,18 @@ function axes(x0: number, y0: number, w: number, h: number, xa: Axis, ya: Axis):
 function matrix2x2(d: Extract<DiagramSpec, { template: 'matrix2x2' }>): string {
   const x0 = 104, y0 = 36, w = 560, h = 320, cw = w / 2, ch = h / 2;
   let body = '';
+  // Drawn like the hand-built Strategy Hub diagrams: tinted cells with white gutters, a bold name, the hint in plain lines, and a small outlined tag ("Lowest risk", "Do first") at the foot.
   d.quadrants.forEach((q, i) => {
     const t = TONE[q.tone ?? 'neutral'];
-    body += box(x0 + (i % 2) * cw + 2, y0 + Math.floor(i / 2) * ch + 2, cw - 4, ch - 4, q.name, q.hint ? [cut(q.hint, 90)] : [], { fill: t.fill, stroke: t.stroke, align: 'start', valign: 'top' });
+    const x = x0 + (i % 2) * cw, y = y0 + Math.floor(i / 2) * ch;
+    body += rect(x, y, cw, ch, { fill: t.fill, stroke: C.white, sw: 2 });
+    body += text(x + 16, y + 30, cut(q.name, 30), { size: 14, weight: 700 });
+    wrap(cut(q.hint, 110), Math.floor((cw - 32) / 6.4)).slice(0, 3).forEach((l, k) => { body += text(x + 16, y + 54 + k * 18, l, { size: 12, fill: C.inkMid }); });
+    if (q.tag?.trim()) {
+      const tag = cut(q.tag.trim(), 22), tw = Math.max(70, tag.length * 6.4 + 22);
+      body += rect(x + 16, y + ch - 34, tw, 20, { fill: C.white, stroke: t.stroke });
+      body += text(x + 16 + tw / 2, y + ch - 20, tag, { size: 9.5, weight: 700, fill: t.stroke === C.border ? C.inkMid : t.stroke, anchor: 'middle' });
+    }
   });
   body += axes(x0, y0, w, h, d.xAxis, d.yAxis) + cap(d);
   return svg({

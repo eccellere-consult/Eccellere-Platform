@@ -80,6 +80,9 @@
   --color-eccellere-teal: #0F6E56;
   --color-eccellere-error: #EF4444;
   --color-eccellere-info: #3B82F6;
+  /* The darker gold used for small labels and the main buttons on the Strategy Hub pages, and the hairline round their cards */
+  --color-eccellere-gold-deep: #7F611A;
+  --color-eccellere-border: #E5E2DB;
 
   /* Fonts */
   --font-display: var(--font-cormorant);

@@ -1,6 +1,6 @@
-// @vitest-environment jsdom
+﻿// @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import Workspace from '@/app/tools/[slug]/Workspace';
 import { EXAMPLE_TOOL } from '@/lib/tools/draft';
 
@@ -35,7 +35,7 @@ afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 const open = async () => {
   render(<Workspace slug="impact-effort-matrix" definition={EXAMPLE_TOOL} toolName="Impact-Effort Matrix" />);
-  await screen.findByText(/parts started/);
+  await screen.findByText(/parts answered/);
 };
 const settle = async (ms = 1300) => { await act(async () => { await vi.advanceTimersByTimeAsync(ms); }); };
 const puts = () => calls.filter((c) => c.method === 'PUT');
@@ -43,8 +43,8 @@ const puts = () => calls.filter((c) => c.method === 'PUT');
 describe('the workspace', () => {
   it('opens an empty worksheet with every section, the results box and the limitations note', async () => {
     await open();
-    expect(screen.getByText(/0 of 6 parts started/)).toBeTruthy();
-    for (const t of ['The decision', 'Score the options', 'Action plan', 'Results at a glance', 'Analysis and actions', 'Sources, assumptions and limitations']) {
+    expect(screen.getByText(/0 of 6 parts answered/)).toBeTruthy();
+    for (const t of ['The decision', 'Score the options', 'Action plan', 'Results at a glance', 'Analysis, Recommendations', 'Analyse & recommend', 'Methodology']) {
       expect(screen.getAllByText(new RegExp(t)).length).toBeGreaterThan(0);
     }
     expect(screen.getByText(/never as zero/)).toBeTruthy();
@@ -78,11 +78,12 @@ describe('the workspace', () => {
     await open();
     const options = screen.getAllByLabelText('Option');
     fireEvent.change(options[0], { target: { value: 'Auto reminders' } });
-    fireEvent.change(screen.getAllByLabelText(/^Impact \(/)[0], { target: { value: '4' } });
-    fireEvent.change(screen.getAllByLabelText(/^Effort \(/)[0], { target: { value: '2' } });
+    const rate = (group: RegExp, row: number, n: string) => fireEvent.click(within(screen.getAllByRole('radiogroup', { name: group })[row]).getByRole('radio', { name: n }));
+    rate(/^Impact \(/, 0, '4');
+    rate(/^Effort \(/, 0, '2');
     fireEvent.change(options[1], { target: { value: 'New system' } });
-    fireEvent.change(screen.getAllByLabelText(/^Impact \(/)[1], { target: { value: '3' } });
-    fireEvent.change(screen.getAllByLabelText(/^Effort \(/)[1], { target: { value: '2' } });
+    rate(/^Impact \(/, 1, '3');
+    rate(/^Effort \(/, 1, '2');
     expect(screen.getByText('Auto reminders', { selector: 'dd' })).toBeTruthy(); // 4 / 2 = 2 beats 3 / 2 = 1.5, and the table shows the worked-out figure
     expect(screen.getByText('1.5')).toBeTruthy();
     await settle();
@@ -169,7 +170,8 @@ describe('the workspace', () => {
 
   it('prints through the browser', async () => {
     await open();
-    fireEvent.click(screen.getByText(/Print or save as PDF/));
+    fireEvent.click(screen.getByText(/^Print$/));
     expect(window.print).toHaveBeenCalled();
   });
 });
+

@@ -52,12 +52,13 @@ export const EXAMPLE_TOOL: DeclarativeTool = {
     xAxis: { label: 'Effort', low: 'Low', high: 'High' },
     yAxis: { label: 'Impact', low: 'Low', high: 'High' },
     quadrants: [
-      { name: 'Quick wins', hint: 'Do these first', tone: 'good' },
-      { name: 'Big bets', hint: 'Plan carefully', tone: 'warn' },
-      { name: 'Fill-ins', hint: 'Do if there is spare time', tone: 'neutral' },
-      { name: 'Money pits', hint: 'Avoid', tone: 'bad' },
+      { name: 'Quick wins', hint: 'High impact for low effort. Start here.', tag: 'Do first', tone: 'good' },
+      { name: 'Big bets', hint: 'High impact but high effort. Plan carefully before committing.', tag: 'Plan', tone: 'warn' },
+      { name: 'Fill-ins', hint: 'Low impact for low effort. Do if there is spare time.', tag: 'If spare time', tone: 'neutral' },
+      { name: 'Money pits', hint: 'Low impact for high effort. Avoid.', tag: 'Avoid', tone: 'bad' },
     ],
   },
+  links: { buildsOn: ['Problem statement', 'Option long-list'], feeds: ['90-day action plan'] },
   sections: [
     {
       key: 'decision',
@@ -135,7 +136,7 @@ SHAPE (JSON object; every key shown is allowed, nothing else):
   "reference": { "originator": "", "year": "", "summary", "caption", "howToRead": [2 to 4 short lines] },
   "originatorSuggestion": { "name": "who is commonly credited with the method, or empty if you are not sure", "year": "four digits or empty", "confidence": "high|medium|low" },
   "diagram": REQUIRED, ONE of
-     { "template": "matrix2x2", "title", "xAxis": {"label","low","high"}, "yAxis": {...}, "quadrants": [4 x {"name","hint","tone": good|warn|bad|neutral}] (top-left, top-right, bottom-left, bottom-right) }
+     { "template": "matrix2x2", "title", "xAxis": {"label","low","high"}, "yAxis": {...}, "quadrants": [4 x {"name","hint","tag","tone": good|warn|bad|neutral}] (top-left, top-right, bottom-left, bottom-right; "hint" is one plain sentence on what the quadrant means, "tag" is two or three words such as "Lowest risk" or "Do first") }
      { "template": "matrix3x3", "title", "xAxis", "yAxis", "cells": [9 strings, top row first] }
      { "template": "steps" | "cycle", "title", "steps": [3 to 8 x {"name","hint"}] }
      { "template": "canvasGrid", "title", "cols", "rows", "boxes": [{"name","hint","col","row","colSpan","rowSpan"}] }
@@ -143,6 +144,7 @@ SHAPE (JSON object; every key shown is allowed, nothing else):
   "sections": [ { "key", "title", "summary", "parts": [ FIELD or TABLE ] } ],
   "derived": [ { "key", "label", "help", "rule" } ],
   "outputs": [ { "key", "label", "rule" } ]   (at least one),
+  "links": { "buildsOn": [2 or 3 names of tools or inputs this one draws on], "feeds": [1 to 3 names of what it hands its result to] },
   "analysisGuide": "how an analyst should read a filled-in tool",
   "sample": REQUIRED, a short FICTIONAL worked example: { "scenario": "2 or 3 sentences", "values": { "<field key>": "text" }, "tables": { "<table key>": [ { "<column key>": "text" } ] } } using only the keys you defined above }
 FIELD: { "kind":"field", "key", "label", "type": text|longtext|select|rating|number, "help", "example", "options": [for select, 2+], "scale": {min,max,low,high} for rating, "unit": required for number }
