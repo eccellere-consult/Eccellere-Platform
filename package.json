@@ -11,6 +11,7 @@
     "lint": "eslint",
     "test": "playwright test",
     "test:engine": "vitest run",
+    "typecheck:tests": "tsc --noEmit -p tsconfig.tests.json",
     "test:ui": "playwright test --ui",
     "test:report": "playwright show-report test-results/report",
     "agent:submit-asset": "playwright test --config=scripts/agent-playwright.config.ts",
