@@ -41,3 +41,17 @@ describe('the standard tool frame', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 });
+
+describe('the frame in the consulting library', () => {
+  it('points its menu, root link and home link at the library', () => {
+    render(
+      <ToolFrame groups={groups} slug="rice" name="RICE" category="Decision Models" where={{ base: '/consulting/library', rootLabel: 'Consulting library', homeHref: '/consulting/library', homeLabel: 'Library home' }}>
+        <p>x</p>
+      </ToolFrame>,
+    );
+    const nav = screen.getAllByRole('navigation', { name: 'Tools' })[0];
+    expect(within(nav).getByRole('link', { name: 'Ansoff Matrix' }).getAttribute('href')).toBe('/consulting/library/ansoff');
+    expect(within(nav).getByRole('link', { name: 'Library home' }).getAttribute('href')).toBe('/consulting/library');
+    expect(within(screen.getByRole('navigation', { name: 'Breadcrumb' })).getByRole('link', { name: 'Consulting library' })).toBeTruthy();
+  });
+});
