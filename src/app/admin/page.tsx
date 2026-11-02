@@ -148,6 +148,14 @@ const adminModules = [
     badge: null,
   },
   {
+    label: "Tools Marketplace",
+    href: "/admin/tools",
+    description: "Add strategy and problem-solving tools by name, review the AI drafts, publish by section",
+    icon: Package,
+    stat: "new",
+    badge: null,
+  },
+  {
     label: "Audit Log",
     href: "/admin/audit-log",
     description: "Full platform audit trail",

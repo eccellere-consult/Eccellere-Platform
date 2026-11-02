@@ -10,6 +10,7 @@
     "start": "node scripts/start.mjs",
     "lint": "eslint",
     "test": "playwright test",
+    "test:engine": "vitest run",
     "test:ui": "playwright test --ui",
     "test:report": "playwright show-report test-results/report",
     "agent:submit-asset": "playwright test --config=scripts/agent-playwright.config.ts",
@@ -62,11 +63,14 @@
     "sharp": "^0.35.2",
     "tailwind-merge": "^3.5.0",
     "tailwindcss": "^4",
+    "xlsx-js-style": "^1.2.0",
     "zustand": "^5.0.12"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
     "@playwright/test": "^1.59.1",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20",
     "@types/nodemailer": "^8.0.0",
@@ -75,7 +79,10 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "^15.5.28",
-    "typescript": "^5"
+    "jsdom": "^29.1.1",
+    "pptxgenjs": "^4.0.1",
+    "typescript": "^5",
+    "vitest": "^4.1.12"
   },
   "browserslist": [
     "chrome >= 90",

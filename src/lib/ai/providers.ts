@@ -139,12 +139,20 @@ export interface GenerateArgs {
   only?: ProviderId;
   /** collects short, key-free failure reasons per provider (for diagnostics) */
   diag?: string[];
+  /** ask for a single JSON object back (native JSON mode where the provider has one) */
+  json?: boolean;
+  /** out-param: why the model stopped ("length" = it ran out of room and the answer is cut off) */
+  finish?: { reason?: string };
 }
 export interface GenerateResult {
   text: string;
   provider: ProviderId;
   model: string;
+  /** "stop" | "length" | other provider value; undefined if the provider did not say */
+  finishReason?: string;
 }
+
+const JSON_ONLY = "\n\nReply with one valid JSON object only. No markdown fences, no text before or after it.";
 
 async function recordHttp(
   a: GenerateArgs, p: ProviderDef, res: Response, key: string,
@@ -152,7 +160,7 @@ async function recordHttp(
   if (!a.diag) return;
   let detail = "";
   try {
-    if (typeof res.text === "function") detail = (await res.text()).replace(/s+/g, " ").slice(0, 160);
+    if (typeof res.text === "function") detail = (await res.text()).replace(/\s+/g, " ").slice(0, 160);
   } catch { /* ignore */ }
   if (key) detail = detail.split(key).join("***");
   a.diag.push(`${p.label}: HTTP ${res.status}${detail ? " - " + detail : ""}`);
@@ -175,7 +183,7 @@ export async function callProvider(
         signal: ctrl.signal,
         headers: { "Content-Type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
         body: JSON.stringify({
-          model, max_tokens: a.maxTokens, temperature: 0.3, system: a.system,
+          model, max_tokens: a.maxTokens, temperature: 0.3, system: a.json ? a.system + JSON_ONLY : a.system,
           messages: [{ role: "user", content: a.user }],
         }),
       });
@@ -184,6 +192,7 @@ export async function callProvider(
         return null;
       }
       const data = await res.json();
+      if (a.finish) a.finish.reason = data.stop_reason === "max_tokens" ? "length" : data.stop_reason ?? undefined;
       const text = (data.content ?? [])
         .filter((b: { type: string }) => b.type === "text")
         .map((b: { text: string }) => b.text)
@@ -196,7 +205,8 @@ export async function callProvider(
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
       body: JSON.stringify({
         model, temperature: 0.3, max_tokens: a.maxTokens,
-        messages: [{ role: "system", content: a.system }, { role: "user", content: a.user }],
+        messages: [{ role: "system", content: a.json ? a.system + JSON_ONLY : a.system }, { role: "user", content: a.user }],
+        ...(a.json ? { response_format: { type: "json_object" } } : {}),
       }),
     });
     if (!res.ok) {
@@ -204,6 +214,7 @@ export async function callProvider(
       return null;
     }
     const data = await res.json();
+    if (a.finish) a.finish.reason = data.choices?.[0]?.finish_reason ?? undefined;
     return data.choices?.[0]?.message?.content ?? null;
   } catch (e) {
     a.diag?.push(`${p.label}: ${(e as Error)?.name === "AbortError" ? "timed out" : "network error"}`);
@@ -222,8 +233,12 @@ export async function runProviders(
     : resolveOrder(s, env);
   for (const p of order) {
     const model = modelFor(p, s, env);
-    const text = await callProvider(p, model, a, env);
-    if (text) return { text, provider: p.id, model };
+    const finish: { reason?: string } = {};
+    const text = await callProvider(p, model, { ...a, finish }, env);
+    if (text) {
+      if (a.finish) a.finish.reason = finish.reason;
+      return { text, provider: p.id, model, finishReason: finish.reason };
+    }
   }
   return null;
 }
