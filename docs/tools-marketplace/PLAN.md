@@ -104,3 +104,11 @@ Never push to `master`; branch, pull request, merge by the owner. Plain-words er
 Labels are the saved ids: never rename a part label in a live tool without adding the old one to `legacyLabels`. Every figure is computed in code.
 Fictional sample data is labelled and never saved. This platform's own rules: additive database changes only, `Asset`/`Order`/payment tables and routes untouched,
 type-check, lint and the unit and engine tests green before any PR.
+
+## 10. Update 2 Nov 2026 (admin built)
+
+- **Marketplace sections (admin drop-down):** Problem solving, Business analysis, Strategy, Project Management, Change Management, Decision Models, Others. "Auto" works the section out from the list's headings. A tool can be moved later from the review screen. The list's own headings are kept as a sub-group.
+- **Adding tools:** write one, paste a list, or upload .txt/.md/.csv/.tsv/.xlsx (column A name, column B optional group).
+- **Standard:** every draft is drafted to, and scored against, the Eccellere Standards of Depth and Quality (route, intake, substance, help text, examples, calculation, interpretation guidance, 30/60/90 action plan, next step, diagram, worked example). Below 60/100 is an error; 75+ with an action plan is level L2. The same score shows on the admin review screen. The client page (phase 1c) renders the same structure.
+- **Reviewer:** the owner. Nothing is live until "Looks right" is ticked and the quality check has no errors. Signed-out visitors see nothing (sign in required). Editing a reviewed tool sends it back to review.
+- **Not yet built:** the public /tools pages and workspace (1c), the marketplace link (1d). Admin screens have not been opened in a browser against a real database or a real AI key; they are covered by unit tests and a render check only.

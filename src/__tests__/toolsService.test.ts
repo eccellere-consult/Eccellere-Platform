@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { createMemoryRepo } from '@/lib/tools/memoryRepo';
 import {
-  MAX_LIST_ITEMS, STALE_DRAFT_MS, VersionConflict, draftNext, estimateRun, getFillin, getPublishedTool, markReviewed, parseToolList,
+  MARKET_CATEGORIES, MAX_LIST_ITEMS, STALE_DRAFT_MS, asChoice, previewImport, setToolCategory, suggestCategory, VersionConflict, draftNext, estimateRun, getFillin, getPublishedTool, markReviewed, parseToolList,
   publishTool, recordEdit, retryFailed, saveFillin, slugify, startImport, undoFieldChange, resumeJob, type DrafterFn,
 } from '@/lib/tools/service';
 
@@ -24,11 +24,27 @@ describe('slugify', () => {
 });
 
 describe('parseToolList', () => {
-  it('reads Name | Category and headings as the default category', () => {
-    const r = parseToolList('# Root cause\n5 Why Analysis\nFishbone | Diagnosis\n\n## Decision\n- Pugh Matrix\n2. Kano Model *\nOODA Loop ~');
-    expect(r.entries.map((e) => [e.name, e.category])).toEqual([
-      ['5 Why Analysis', 'Root cause'], ['Fishbone', 'Diagnosis'], ['Pugh Matrix', 'Decision'], ['Kano Model', 'Decision'], ['OODA Loop', 'Decision'],
+  it('reads Name | Group and headings as the group, and works the marketplace category out from it in Auto', () => {
+    const r = parseToolList('# Root cause\n5 Why Analysis\nFishbone | Diagnosis\n\n## Decision making\n- Pugh Matrix\n2. Kano Model *\nOODA Loop ~');
+    expect(r.entries.map((e) => [e.name, e.groupName, e.category])).toEqual([
+      ['5 Why Analysis', 'Root cause', 'Problem solving'], ['Fishbone', 'Diagnosis', 'Problem solving'],
+      ['Pugh Matrix', 'Decision making', 'Decision Models'], ['Kano Model', 'Decision making', 'Decision Models'], ['OODA Loop', 'Decision making', 'Decision Models'],
     ]);
+  });
+  it('uses the chosen category for every line, unless a line names its own category', () => {
+    const r = parseToolList('Alpha\nBeta | Strategy\nGamma | Some group', 'Change Management');
+    expect(r.entries.map((e) => [e.name, e.category, e.groupName])).toEqual([
+      ['Alpha', 'Change Management', null], ['Beta', 'Strategy', null], ['Gamma', 'Change Management', 'Some group'],
+    ]);
+  });
+  it('knows the seven categories and refuses anything else', () => {
+    expect(MARKET_CATEGORIES).toEqual(['Problem solving', 'Business analysis', 'Strategy', 'Project Management', 'Change Management', 'Decision Models', 'Others']);
+    expect(asChoice(undefined)).toBe('Auto');
+    expect(asChoice('strategy')).toBe('Strategy');
+    expect(() => asChoice('Cooking')).toThrow(/not one of the categories/);
+    expect(suggestCategory('Risk management')).toBe('Business analysis');
+    expect(suggestCategory('Project and performance')).toBe('Project Management');
+    expect(suggestCategory('Whatever')).toBe('Others');
   });
   it('keeps repeats once, reports them, and reports prose lines instead of dropping them silently', () => {
     const r = parseToolList('Kaizen\nkaizen\nThis is a long explanatory sentence that someone pasted by mistake into the list of tool names, which should be reported.');
@@ -51,7 +67,10 @@ describe('parseToolList', () => {
     const r = parseToolList(readFileSync(file, 'utf8'));
     expect(r.entries.length).toBe(152);
     expect(new Set(r.entries.map((e) => e.slug)).size).toBe(152);
-    expect(r.entries.find((e) => e.name === 'Pugh Matrix')?.category).toBe('Decision making');
+    expect(r.entries.find((e) => e.name === 'Pugh Matrix')).toMatchObject({ category: 'Decision Models', groupName: 'Decision making' });
+    const per: Record<string, number> = {};
+    for (const e of r.entries) per[e.category] = (per[e.category] ?? 0) + 1;
+    expect(Object.keys(per).sort()).toEqual(['Business analysis', 'Decision Models', 'Problem solving', 'Project Management', 'Strategy']);
     expect(r.entries.find((e) => e.name === 'Balanced Scorecard')?.slug).toBe('balanced-scorecard');
   });
 });
@@ -246,5 +265,24 @@ describe('a person\'s work', () => {
     await saveFillin(repo, 'u1', 't', { fields: [f('A', 'case 7')] }, { caseId: 7 });
     expect((await getFillin(repo, 'u1', 't', 0))!.fields[0].value).toBe('case 0');
     expect((await getFillin(repo, 'u1', 't', 7))!.fields[0].value).toBe('case 7');
+  });
+});
+
+describe('preview and re-filing', () => {
+  it('previews without writing, counting tools per category', async () => {
+    const repo = createMemoryRepo();
+    await repo.saveTool({ slug: 'kaizen', name: 'Kaizen', category: 'Problem solving', definition: {} });
+    const p = await previewImport(repo, '# Strategy and alignment\nOKR\n# Process improvement\nKaizen\nKanban', 'Auto');
+    expect(p.byCategory).toEqual({ Strategy: 1, 'Problem solving': 1 });
+    expect(p.alreadyInCatalogue).toEqual(['Kaizen']);
+    expect(p.estimate.count).toBe(2);
+    expect(repo.items.size).toBe(0);
+  });
+  it('moves a tool to another category from the drop-down, and refuses an unknown one', async () => {
+    const repo = createMemoryRepo();
+    await repo.saveTool({ slug: 'okr', name: 'OKR', category: 'Others', definition: {} });
+    expect((await setToolCategory(repo, 'okr', 'Strategy')).category).toBe('Strategy');
+    await expect(setToolCategory(repo, 'okr', 'Cooking')).rejects.toMatchObject({ code: 'BAD_CATEGORY' });
+    await expect(setToolCategory(repo, 'nope', 'Strategy')).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 });

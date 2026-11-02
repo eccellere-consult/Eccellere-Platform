@@ -10,13 +10,19 @@ export type ToolStatus = 'DRAFT' | 'NEEDS_REVIEW' | 'REVIEWED' | 'PUBLISHED' | '
 export type ItemStatus = 'QUEUED' | 'DRAFTING' | 'DRAFT' | 'NEEDS_REVIEW' | 'FAILED' | 'REVIEWED' | 'PUBLISHED';
 export type JobStatus = 'RUNNING' | 'PAUSED' | 'DONE';
 
-export interface QualityResult { errors: string[]; warnings: string[] }
+export interface QualityResult {
+  errors: string[];
+  warnings: string[];
+  /** the Eccellere Standards of Depth and Quality score for the tool (see standards.ts) */
+  standards?: { score: number; level: string; band: string };
+}
 
 export interface ToolRecord {
   id: string;
   slug: string;
   name: string;
   category: string;
+  groupName: string | null;
   status: ToolStatus;
   source: 'ai' | 'hand' | 'strategy-hub';
   does: string | null;
@@ -33,7 +39,7 @@ export interface ToolRecord {
   updatedAt: Date;
 }
 export type ToolInput = Pick<ToolRecord, 'slug' | 'name' | 'category' | 'definition'> &
-  Partial<Pick<ToolRecord, 'status' | 'source' | 'does' | 'whenToUse' | 'whenNotToUse' | 'quality' | 'provenance' | 'sortOrder'>>;
+  Partial<Pick<ToolRecord, 'groupName' | 'status' | 'source' | 'does' | 'whenToUse' | 'whenNotToUse' | 'quality' | 'provenance' | 'sortOrder'>>;
 
 export interface FillinRow {
   id: string;
@@ -59,6 +65,7 @@ export interface ItemRecord {
   jobId: string;
   name: string;
   category: string;
+  groupName: string | null;
   slug: string;
   status: ItemStatus;
   attempts: number;
@@ -73,14 +80,14 @@ export interface ToolsRepo {
   listTools(filter?: { status?: ToolStatus; category?: string }): Promise<ToolRecord[]>;
   /** Creates the tool, or replaces its content if the slug exists. Never touches review/publish fields on replace. */
   saveTool(input: ToolInput): Promise<ToolRecord>;
-  patchTool(slug: string, patch: Partial<Pick<ToolRecord, 'status' | 'reviewedById' | 'reviewedAt' | 'publishedAt' | 'quality' | 'sortOrder'>>): Promise<ToolRecord | null>;
+  patchTool(slug: string, patch: Partial<Pick<ToolRecord, 'category' | 'groupName' | 'status' | 'reviewedById' | 'reviewedAt' | 'publishedAt' | 'quality' | 'sortOrder'>>): Promise<ToolRecord | null>;
   // people's work
   getFillinRow(userId: string, toolSlug: string, caseId: number): Promise<FillinRow | null>;
   listFillinRows(userId: string): Promise<FillinRow[]>;
   /** Insert (when `expectedVersion` is null) or update only if the stored version still equals `expectedVersion`. Returns the row, or null when the version moved. */
   writeFillinRow(userId: string, toolSlug: string, caseId: number, expectedVersion: number | null, data: FillinWrite): Promise<FillinRow | null>;
   // batch drafting
-  createJob(createdById: string, label: string, items: { name: string; category: string; slug: string }[]): Promise<{ job: JobRecord; items: ItemRecord[] }>;
+  createJob(createdById: string, label: string, items: { name: string; category: string; groupName: string | null; slug: string }[]): Promise<{ job: JobRecord; items: ItemRecord[] }>;
   getJob(jobId: string): Promise<{ job: JobRecord; items: ItemRecord[] } | null>;
   setJob(jobId: string, patch: { status?: JobStatus; pauseReason?: string | null }): Promise<void>;
   /** Atomically move ONE queued item (or one whose drafting started before `staleBefore`) to DRAFTING. Null when nothing is available. */

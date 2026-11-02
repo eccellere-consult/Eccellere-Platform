@@ -801,6 +801,7 @@ model WsTool {
   slug         String    @unique
   name         String
   category     String
+  groupName    String? // sub-group inside the category, for example "Root cause"
   status       String    @default("DRAFT") // DRAFT | NEEDS_REVIEW | REVIEWED | PUBLISHED | ARCHIVED
   source       String    @default("ai") // ai | hand | strategy-hub
   does         String?   @db.Text
@@ -862,6 +863,7 @@ model WsImportItem {
   job       WsImportJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
   name      String
   category  String
+  groupName String?
   slug      String
   status    String      @default("QUEUED") // QUEUED | DRAFTING | DRAFT | NEEDS_REVIEW | FAILED | REVIEWED | PUBLISHED
   attempts  Int         @default(0)

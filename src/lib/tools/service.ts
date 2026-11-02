@@ -27,7 +27,27 @@ export function slugify(name: string): string {
     .slice(0, 80);
 }
 
-export interface ListEntry { name: string; category: string; slug: string }
+/** The marketplace sections a tool can sit in. The admin picks one from a drop-down; this is the order they are shown in. */
+export const MARKET_CATEGORIES = ['Problem solving', 'Business analysis', 'Strategy', 'Project Management', 'Change Management', 'Decision Models', 'Others'] as const;
+export type MarketCategory = (typeof MARKET_CATEGORIES)[number];
+
+export const asMarketCategory = (x: string): MarketCategory | null =>
+  MARKET_CATEGORIES.find((c) => c.toLowerCase() === x.trim().toLowerCase()) ?? null;
+
+/** Where a list heading such as "Root cause" belongs when the admin lets the list decide ('Auto'). */
+export function suggestCategory(group: string): MarketCategory {
+  const g = group.toLowerCase();
+  if (!g) return 'Others';
+  if (/change|adoption|stakeholder/.test(g)) return 'Change Management';
+  if (/decision/.test(g)) return 'Decision Models';
+  if (/strateg|alignment/.test(g)) return 'Strategy';
+  if (/project|performance/.test(g)) return 'Project Management';
+  if (/(root cause|creative|problem|process improvement)/.test(g)) return 'Problem solving';
+  if (/(risk|quality|monitor|financ|analy)/.test(g)) return 'Business analysis';
+  return 'Others';
+}
+
+export interface ListEntry { name: string; category: MarketCategory; groupName: string | null; slug: string }
 export interface ParsedList {
   entries: ListEntry[];
   /** lines that were not a tool (too long, or empty after cleaning), shown back so nothing vanishes silently */
@@ -37,15 +57,16 @@ export interface ParsedList {
 }
 
 /**
- * One tool per line, `Name` or `Name | Category`. A line starting with `#` sets the category for the lines under it, so a
- * grouped list can be pasted as it is. Bullets and trailing `*` / `~` marks are ignored. Prose lines are skipped and reported.
+ * One tool per line, `Name` or `Name | Group`. A line starting with `#` sets the group for the lines under it, so a grouped list can be
+ * pasted as it is. The marketplace category is the one chosen in the drop-down, or, for 'Auto', worked out from the group; a line that ends
+ * `| Strategy` (any marketplace category) overrides both. Bullets and trailing `*` / `~` marks are ignored. Prose lines are skipped and reported.
  */
-export function parseToolList(text: string, defaultCategory = 'General'): ParsedList {
+export function parseToolList(text: string, chosen: MarketCategory | 'Auto' = 'Auto'): ParsedList {
   const entries: ListEntry[] = [];
   const skipped: ParsedList['skipped'] = [];
   const duplicates: string[] = [];
   const seen = new Set<string>();
-  let current = defaultCategory;
+  let current = '';
   for (const raw of String(text ?? '').split(/\r?\n/)) {
     let line = raw.trim();
     if (!line) continue;
@@ -58,7 +79,11 @@ export function parseToolList(text: string, defaultCategory = 'General'): Parsed
     line = line.replace(/^[-•·]\s+/, '').replace(/^\d+[.)]\s+/, '');
     const [namePart, ...rest] = line.split('|');
     const name = namePart.replace(/[*~]+\s*$/, '').trim();
-    const category = rest.join('|').trim() || current;
+    const tag = rest.join('|').trim();
+    // A tag after | that names a marketplace category wins; any other tag is a sub-group.
+    const tagCategory = tag ? asMarketCategory(tag) : null;
+    const groupName = (tagCategory ? current : tag || current) || null;
+    const category: MarketCategory = tagCategory ?? (chosen === 'Auto' ? suggestCategory(current || groupName || '') : chosen);
     if (!name) { skipped.push({ line: raw.trim(), reason: 'No name on this line.' }); continue; }
     if (/[`]|[.;,]$/.test(name)) { skipped.push({ line: raw.trim().slice(0, 120), reason: 'Looks like a sentence or a note, not a tool name.' }); continue; }
     if (name.length > MAX_NAME_LENGTH) { skipped.push({ line: raw.trim().slice(0, 120), reason: `Longer than ${MAX_NAME_LENGTH} characters, so it looks like a sentence, not a tool name.` }); continue; }
@@ -66,7 +91,7 @@ export function parseToolList(text: string, defaultCategory = 'General'): Parsed
     if (!slug) { skipped.push({ line: raw.trim(), reason: 'The name has no letters or numbers.' }); continue; }
     if (seen.has(slug)) { duplicates.push(name); continue; }
     seen.add(slug);
-    entries.push({ name, category, slug });
+    entries.push({ name, category, groupName, slug });
   }
   if (entries.length > MAX_LIST_ITEMS) {
     for (const e of entries.splice(MAX_LIST_ITEMS)) skipped.push({ line: e.name, reason: `Over the limit of ${MAX_LIST_ITEMS} per run. Paste the rest in a second run.` });
@@ -94,8 +119,30 @@ export interface StartedImport {
   duplicates: string[];
 }
 
-export async function startImport(repo: ToolsRepo, adminId: string, text: string, label?: string): Promise<StartedImport> {
-  const parsed = parseToolList(text);
+/** The value of the category drop-down: one of the seven, or "Auto" to let the list's own headings decide. */
+export function asChoice(x: unknown): MarketCategory | 'Auto' {
+  if (typeof x !== 'string' || x.trim().toLowerCase() === 'auto' || !x.trim()) return 'Auto';
+  const c = asMarketCategory(x);
+  if (!c) throw new ToolsError('BAD_CATEGORY', `"${x}" is not one of the categories: ${MARKET_CATEGORIES.join(', ')}.`);
+  return c;
+}
+
+/** What a pasted or uploaded list would do, without writing anything: shown to the admin before drafting starts. */
+export async function previewImport(repo: ToolsRepo, text: string, choice: MarketCategory | 'Auto') {
+  const parsed = parseToolList(text, choice);
+  const alreadyInCatalogue: string[] = [];
+  const fresh: ListEntry[] = [];
+  for (const e of parsed.entries) {
+    if (await repo.getToolBySlug(e.slug)) alreadyInCatalogue.push(e.name);
+    else fresh.push(e);
+  }
+  const byCategory: Record<string, number> = {};
+  for (const e of fresh) byCategory[e.category] = (byCategory[e.category] ?? 0) + 1;
+  return { entries: fresh, alreadyInCatalogue, skipped: parsed.skipped, duplicates: parsed.duplicates, byCategory, estimate: estimateRun(fresh.length) };
+}
+
+export async function startImport(repo: ToolsRepo, adminId: string, text: string, choice: MarketCategory | 'Auto' = 'Auto', label?: string): Promise<StartedImport> {
+  const parsed = parseToolList(text, choice);
   const alreadyInCatalogue: string[] = [];
   const fresh: ListEntry[] = [];
   for (const e of parsed.entries) {
@@ -113,7 +160,7 @@ export type DraftOutcome =
   | { kind: 'ai_down'; reason: string } // no provider answered: stop the whole run, nothing is the tool's fault
   | { kind: 'failed'; reason: string }; // this one name could not be drafted
 
-export type DrafterFn = (item: Pick<ItemRecord, 'name' | 'category' | 'slug'>) => Promise<DraftOutcome>;
+export type DrafterFn = (item: Pick<ItemRecord, 'name' | 'category' | 'groupName' | 'slug'>) => Promise<DraftOutcome>;
 
 export type DraftStep =
   | { kind: 'idle'; reason: 'no_more_items' | 'job_paused' }
@@ -137,7 +184,7 @@ export async function draftNext(repo: ToolsRepo, jobId: string, draft: DrafterFn
   }
   let outcome: DraftOutcome;
   try {
-    outcome = await draft({ name: item.name, category: item.category, slug: item.slug });
+    outcome = await draft({ name: item.name, category: item.category, groupName: item.groupName, slug: item.slug });
   } catch (e) {
     outcome = { kind: 'failed', reason: e instanceof Error ? e.message.slice(0, 300) : 'Unexpected error while drafting.' };
   }
@@ -334,4 +381,13 @@ export async function undoFieldChange(repo: ToolsRepo, userId: string, toolSlug:
     throw new VersionConflict(latest ? toRecord(latest) : { ...EMPTY_RECORD, version: 0 });
   }
   return toRecord(written);
+}
+
+/** Move a tool to another marketplace section (the admin drop-down). Allowed at any status; a live tool simply appears in its new section. */
+export async function setToolCategory(repo: ToolsRepo, slug: string, category: string): Promise<ToolRecord> {
+  const c = asMarketCategory(category);
+  if (!c) throw new ToolsError('BAD_CATEGORY', `"${category}" is not one of the categories: ${MARKET_CATEGORIES.join(', ')}.`);
+  const updated = await repo.patchTool(slug, { category: c });
+  if (!updated) throw new ToolsError('NOT_FOUND', 'That tool was not found.');
+  return updated;
 }
