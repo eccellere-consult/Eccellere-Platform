@@ -1,0 +1,8 @@
+{
+  // Type-checks the test files and the vitest config. They are left out of tsconfig.json because the production build on the host does not install
+  // development packages (vitest, jsdom, testing-library), so it cannot type-check files that import them.
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "incremental": false, "plugins": [] },
+  "include": ["next-env.d.ts", "src/**/*.ts", "src/**/*.tsx", "vitest.config.ts"],
+  "exclude": ["node_modules"]
+}

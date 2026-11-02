@@ -44,6 +44,9 @@ jobs:
       - name: TypeScript type check
         run: npx tsc --noEmit
 
+      - name: Type check the test files
+        run: npm run typecheck:tests
+
   # ── 2. Build ─────────────────────────────────────────────────────────────────
   build:
     name: Next.js Build
