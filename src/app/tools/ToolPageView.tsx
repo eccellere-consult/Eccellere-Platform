@@ -63,7 +63,7 @@ export default function ToolPageView(props: {
           </div>
         </section>
 
-        <section className={CARD} aria-label="Reference model">
+        <section id="stage-1" className={`${CARD} scroll-mt-24`} aria-label="Reference model">
           <p className={`${LABEL} mb-4`}>Reference model</p>
           {rt.diagramSvg
             ? <EnlargeDiagram svg={rt.diagramSvg} caption={ref.caption} />

@@ -8,6 +8,7 @@ import { prismaRepo } from "@/lib/tools/prismaRepo";
 import { getPublishedTool } from "@/lib/tools/service";
 import type { ToolRecord } from "@/lib/tools/repo";
 import ToolPageView, { PRINT_CSS } from "../ToolPageView";
+import ToolFrame, { type MenuGroup } from "@/components/standard/ToolFrame";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,20 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return { title: `${tool.name}: guided worksheet`, description: tool.does ?? undefined };
 }
 
+/** The side menu: every published tool, grouped by category, in the order the catalogue gives them. */
+async function menu(): Promise<MenuGroup[]> {
+  try {
+    const rows = await prismaRepo.listTools({ status: "PUBLISHED" });
+    const by = new Map<string, MenuGroup>();
+    for (const t of rows) {
+      const g = by.get(t.category) ?? { category: t.category, tools: [] };
+      g.tools.push({ slug: t.slug, name: t.name });
+      by.set(t.category, g);
+    }
+    return [...by.values()];
+  } catch { return []; }
+}
+
 /** A tool exposed to clients. Anyone can read about it; the worksheet needs a sign-in. */
 export default async function ToolPage({ params }: Props) {
   const { slug } = await params;
@@ -31,12 +46,22 @@ export default async function ToolPage({ params }: Props) {
   if (!tool) notFound();
   const session = await getServerSession(authOptions);
   const signedIn = !!session?.user?.email;
+  const view = <ToolPageView tool={tool} signedIn={signedIn} mode="client" backHref="/tools" backLabel="All tools" signInHref={`/login?next=/tools/${slug}`} />;
+  if (signedIn) {
+    // Signed-in work opens in the standard frame: side menu on the left, the tool on its right.
+    return (
+      <>
+        <style dangerouslySetInnerHTML={{ __html: PRINT_CSS }} />
+        <ToolFrame groups={await menu()} slug={slug} name={tool.name} category={tool.category}>{view}</ToolFrame>
+      </>
+    );
+  }
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: PRINT_CSS }} />
       <Header />
       <main id="main-content" className="bg-eccellere-cream pt-[72px]">
-        <ToolPageView tool={tool} signedIn={signedIn} mode="client" backHref="/tools" backLabel="All tools" signInHref={`/login?next=/tools/${slug}`} />
+        {view}
       </main>
       <Footer />
     </>

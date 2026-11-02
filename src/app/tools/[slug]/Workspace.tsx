@@ -434,7 +434,7 @@ function WorkspaceInner({ slug, def, toolName, sample }: { slug: string; def: Mo
 
       {/* progress and saving */}
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1" role="status" aria-live="polite">
-        <p className={LABEL}>Guided fill-in &mdash; no length limit, be as detailed as the evidence supports</p>
+        <p id="stage-2" className={cn(LABEL, "scroll-mt-24")}>Guided fill-in &mdash; no length limit, be as detailed as the evidence supports</p>
         <p className={cn("text-xs font-medium", saveState === "error" ? "text-red-700" : "text-eccellere-teal")}>
           {saveState === "saved" && <CheckCircle2 className="mr-1 inline h-3.5 w-3.5" />}{saveText}
         </p>
@@ -469,7 +469,7 @@ function WorkspaceInner({ slug, def, toolName, sample }: { slug: string; def: Mo
         <button type="button" onClick={download} className={BTN_LINE}>Download</button>
       </div>
 
-      <section className={CARD} aria-labelledby="analysis">
+      <section id="stage-3" className={cn(CARD, "scroll-mt-24")} aria-labelledby="analysis">
         <p className={LABEL}>End output</p>
         <h2 id="analysis" className="m-0 mt-1 font-display text-2xl font-light text-eccellere-ink">Analysis, Recommendations &amp; Actionables</h2>
         <button type="button" disabled={!!busy || filled < 1} onClick={() => ai("analyse")} className="no-print mt-4 w-full bg-eccellere-ink px-5 py-2.5 text-sm font-medium text-white hover:opacity-90 disabled:bg-ink-light disabled:opacity-100">
