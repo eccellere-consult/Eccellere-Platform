@@ -5,7 +5,7 @@ import { audit, toolsGuard, writeAuth } from "@/lib/tools/server";
 
 export const dynamic = "force-dynamic";
 
-const MAX_TEXT = 200_000;
+const MAX_TEXT = 1_000_000;
 
 /**
  * POST /api/admin/tools/import  { text, category, label?, dryRun? }

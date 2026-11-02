@@ -144,6 +144,8 @@ function WorkspaceInner({ slug, def, toolName, sample }: { slug: string; def: Mo
   const [brief, setBrief] = useState("");
   const [questions, setQuestions] = useState<{ question: string; why: string }[]>([]);
   const [showExample, setShowExample] = useState(false);
+  const fileRef = useRef<HTMLInputElement | null>(null);
+  const [uploadMsg, setUploadMsg] = useState<{ kind: "ok" | "warn"; text: string; notes: string[] } | null>(null);
   const [busy, setBusy] = useState<"fill" | "analyse" | "undo" | "questions" | null>(null);
   const [aiMsg, setAiMsg] = useState<{ kind: "ok" | "warn"; text: string } | null>(null);
   const conflictRef = useRef<Saved | null>(null);
@@ -230,6 +232,34 @@ function WorkspaceInner({ slug, def, toolName, sample }: { slug: string; def: Mo
     setSources((c) => { const n = { ...c, [part.key]: "Manual" }; sourcesRef.current = n; return n; });
     touch();
   };
+
+  async function downloadWorkbook(withSample: boolean) {
+    try {
+      const wbk = await import("@/lib/tools/workbook");
+      const bytes = wbk.workbookBytes(wbk.buildWorkbook(toolName, def, withSample ? sample : null));
+      const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+      const link = document.createElement("a");
+      link.href = url; link.download = `${slug}-${withSample ? "sample" : "template"}.xlsx`; link.click();
+      URL.revokeObjectURL(url);
+    } catch { setUploadMsg({ kind: "warn", text: "Your browser could not make the workbook. Please try again.", notes: [] }); }
+  }
+
+  /** Reads a filled template and puts its answers into the worksheet (autosave then keeps them). Answers not in the file stay as they are. */
+  async function uploadWorkbook(file: File) {
+    setUploadMsg(null);
+    if (!/\.xlsx$/i.test(file.name)) return setUploadMsg({ kind: "warn", text: "Please choose the Excel template (.xlsx) downloaded from this page.", notes: [] });
+    try {
+      const wbk = await import("@/lib/tools/workbook");
+      const r = wbk.readWorkbook(def, await file.arrayBuffer());
+      if (!r.answered) return setUploadMsg({ kind: "warn", text: "No answers were found in that file.", notes: r.notes });
+      const next: ModelValues = { fields: { ...valuesRef.current.fields, ...r.values.fields }, tables: { ...valuesRef.current.tables, ...r.values.tables } };
+      setValues(next); valuesRef.current = next;
+      const src = { ...sourcesRef.current, ...Object.fromEntries([...Object.keys(r.values.fields), ...Object.keys(r.values.tables)].map((k) => [k, "Manual"])) };
+      setSources(src); sourcesRef.current = src;
+      touch();
+      setUploadMsg({ kind: "ok", text: `Read ${r.answered} part${r.answered === 1 ? "" : "s"} from ${file.name}. Check them below; your work saves as usual.`, notes: r.notes });
+    } catch { setUploadMsg({ kind: "warn", text: "That file could not be read. Is it the Excel template from this page?", notes: [] }); }
+  }
 
   async function ai(action: "fill" | "analyse" | "undo" | "questions") {
     setAiMsg(null);
@@ -371,16 +401,28 @@ function WorkspaceInner({ slug, def, toolName, sample }: { slug: string; def: Mo
         )}
       </section>
 
-      {sample && (
-        <section className={cn(CARD, "no-print flex flex-wrap items-center gap-x-8 gap-y-4")} aria-label="Worked example and template">
+      <section className={cn(CARD, "no-print")} aria-label="Worked example and template">
+        <div className="flex flex-wrap items-center gap-x-8 gap-y-4">
           <div className="min-w-[260px] flex-1">
-            <p className={LABEL}>Worked example</p>
-            <h2 className="m-0 mt-1 font-display text-[clamp(18px,2.2vw,22px)] font-light text-eccellere-ink">See it worked</h2>
-            <p className="mt-2 text-sm text-ink-light">A fictional company&apos;s completed example, laid out with this page&apos;s own headings. It is never saved as your data.</p>
+            <p className={LABEL}>Worked example &amp; template</p>
+            <h2 className="m-0 mt-1 font-display text-[clamp(18px,2.2vw,22px)] font-light text-eccellere-ink">See it worked &mdash; or fill it in offline</h2>
+            <p className="mt-2 text-sm text-ink-light">{sample ? "A fictional company's completed example, a blank Excel template that mirrors the form below, and an upload that reads a filled one back. No AI is needed." : "A blank Excel template that mirrors the form below, and an upload that reads a filled one back. No AI is needed."}</p>
           </div>
-          <button type="button" onClick={() => setShowExample((v) => !v)} className={BTN_MAIN}>{showExample ? "Hide the worked example" : "See a worked example"}</button>
-        </section>
-      )}
+          <div className="flex flex-wrap gap-3">
+            {sample && <button type="button" onClick={() => setShowExample((v) => !v)} className={BTN_MAIN}>{showExample ? "Hide the worked example" : "See a worked example"}</button>}
+            <button type="button" disabled={!!busy} onClick={() => fileRef.current?.click()} className={BTN_LINE}>Upload a filled template</button>
+            <input ref={fileRef} type="file" accept=".xlsx" className="hidden" aria-label="Upload a filled template" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void uploadWorkbook(f); }} />
+          </div>
+        </div>
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-eccellere-border pt-4">
+          <p className="text-xs text-ink-light">New to this? The template has a &ldquo;How to fill&rdquo; sheet. The sample is a fictional company and is never saved as your data. Only a filled template of this tool is read; it fills your worksheet and replaces the answers it contains.</p>
+          <div className="flex gap-4 text-xs font-medium text-eccellere-gold-deep">
+            {sample && <button type="button" className="underline" onClick={() => void downloadWorkbook(true)}>Download sample workbook</button>}
+            <button type="button" className="underline" onClick={() => void downloadWorkbook(false)}>Download blank template</button>
+          </div>
+        </div>
+        {uploadMsg && <p className={cn("mt-3 text-sm", uploadMsg.kind === "ok" ? "text-eccellere-teal" : "text-red-700")}>{uploadMsg.text}{uploadMsg.notes.length > 0 && <span className="mt-1 block text-xs text-ink-mid">{uploadMsg.notes.join(" ")}</span>}</p>}
+      </section>
       {showExample && sample && <ExamplePanel def={def} sample={sample} onClose={() => setShowExample(false)} />}
 
       {saveState === "conflict" && (
