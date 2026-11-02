@@ -134,3 +134,14 @@ type-check, lint and the unit and engine tests green before any PR.
 - **SQL to run:** `tools_tables_update_1.sql` (adds `practice` and `brief` columns). Run it before the matching release is live.
 - **Not done:** images beyond the diagram (no AI-generated pictures); a chart of the person's own numbers; deck-to-many-tools import; per-field Not-known toggle; syncing actions to the Game Plan app; PDF text reading was not verified on this Windows machine (the same reader is used by the kit evidence upload on the server).
 - **List for approval:** `TOOL_LIST_v2_consulting.md` (231 names: 142 existing + 89 proposed across the practices).
+
+## 13. Update 3 Nov 2026 (clean-up, Fix and Modify with AI)
+
+Raised from first use of the admin: pasting the list failed, every draft showed errors with nothing to fix them, and there was no delete.
+
+- **List:** `TOOL_LIST_v2_consulting.txt` is plain, one `Name | Group` per line (231 tools), and the admin has a **Load the proposed consulting list** button, so nothing needs copying from a file. The markdown version is for reading only.
+- **Fix with AI** (per tool, on selected tools, or **Fix all** with problems): adds a missing diagram or worked example, then asks the AI for a corrected page given the exact problems. A correction that would make the page worse is not applied and says why. Name, slug, section, originator and review state are never taken from the AI. The result goes back to review.
+- **Modify with AI:** type what should change; same safeguards.
+- **Suggest tools with AI** at the add stage: a topic returns well-known tools (not already in the catalogue), added to the list box to edit before anything is drafted.
+- **Delete:** a tool (not while live for clients, and not once anyone has saved work in it; archive instead), a name inside a run, or a whole run (drafted tools stay). Hand-built Strategy Hub tools can be deleted from the library and added again.
+- **Bulk actions** on any selection: mark reviewed, expose to clients, withdraw, archive, delete; each tool follows the single-tool rules and failures are listed with the reason.

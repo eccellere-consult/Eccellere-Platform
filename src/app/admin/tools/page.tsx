@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ChevronLeft, Loader2, Upload, Play, Pause, RotateCcw } from "lucide-react";
+import { ChevronLeft, Loader2, Upload, Play, Pause, RotateCcw, Sparkles, Trash2 } from "lucide-react";
 import { readJson } from "@/lib/toolkit/http";
 import { cn } from "@/lib/utils";
 import { fileToListText, isDocument, LIST_FILE_TYPES } from "@/lib/tools/listFile";
-import ReviewPanel, { StatusChip, statusLabel } from "./ReviewPanel";
+import ReviewPanel from "./ReviewPanel";
 import SkillEditor from "./SkillEditor";
+import Catalogue from "./Catalogue";
+import { PROPOSED_LIST_TEXT } from "@/lib/tools/proposedList";
 
 const CONCURRENCY = 3;
 const RUN_KEY = "tools.currentRun";
@@ -51,9 +53,12 @@ export default function AdminToolsPage() {
   const stopRef = useRef(false);
   const [runNote, setRunNote] = useState<string | null>(null);
 
+  // suggest with AI
+  const [topic, setTopic] = useState("");
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestMsg, setSuggestMsg] = useState<string | null>(null);
+
   // catalogue
-  const [filterCat, setFilterCat] = useState("All");
-  const [filterStatus, setFilterStatus] = useState("All");
   const [open, setOpen] = useState<string | null>(null);
 
   const loadCatalogue = useCallback(async () => {
@@ -113,6 +118,38 @@ export default function AdminToolsPage() {
       setPreview(null);
     } catch (x) { setAddErr(x instanceof Error ? x.message : "Could not read that file."); }
     finally { setExtracting(null); }
+  }
+
+  /** Puts the proposed consulting list in the box, one tool per line, so nothing has to be copied from a file. */
+  function loadProposed() {
+    setMode("list"); setText(PROPOSED_LIST_TEXT); setPreview(null); setAddErr(null); setSuggestMsg(null);
+  }
+
+  /** The AI proposes well-known tools for a topic; they are added to the list box as lines to edit before anything is drafted. */
+  async function suggest() {
+    setSuggesting(true); setSuggestMsg(null); setAddErr(null);
+    const have = text.split(/\r?\n/).map((l) => l.split("|")[0].trim()).filter(Boolean);
+    const r = await fetch("/api/admin/tools/suggest", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ topic, practice, have }) });
+    const d = await readJson(r);
+    setSuggesting(false);
+    if (!r.ok) return setSuggestMsg(d.error ?? "Could not get suggestions.");
+    const lines = (d.tools as { name: string; group: string }[]).map((t) => (t.group ? `${t.name} | ${t.group}` : t.name));
+    setMode("list"); setText((t) => `${t.trim() ? `${t.trim()}\n` : ""}${lines.join("\n")}`); setPreview(null);
+    setSuggestMsg(`${lines.length} tools added to the list below. Delete any you do not want, then check the list.`);
+  }
+
+  async function removeItem(itemId: string) {
+    if (!run) return;
+    await fetch(`/api/admin/tools/jobs/${run.job.id}?item=${encodeURIComponent(itemId)}`, { method: "DELETE" });
+    await loadRun(run.job.id);
+  }
+
+  async function deleteRun() {
+    if (!run || !confirm("Delete this run from the list? Tools already drafted from it are kept in the catalogue below.")) return;
+    stopRef.current = true;
+    await fetch(`/api/admin/tools/jobs/${run.job.id}`, { method: "DELETE" });
+    try { localStorage.removeItem(RUN_KEY); } catch { /* ignore */ }
+    setRun(null); setRunNote(null);
   }
 
   async function seedHub() {
@@ -184,7 +221,6 @@ export default function AdminToolsPage() {
   const counts = (run?.items ?? []).reduce<Record<string, number>>((a, i) => ((a[i.status] = (a[i.status] ?? 0) + 1), a), {});
   const total = run?.items.length ?? 0;
   const finished = total - (counts.QUEUED ?? 0) - (counts.DRAFTING ?? 0);
-  const shown = rows.filter((r) => (filterCat === "All" || r.category === filterCat) && (filterStatus === "All" || r.status === filterStatus));
   const canCheck = listText().trim().length > 0 && !checking;
 
   return (
@@ -228,7 +264,21 @@ export default function AdminToolsPage() {
           <div className="mt-4">
             <textarea className={cn(field, "min-h-[150px] font-mono")} value={text} onChange={(e) => { setText(e.target.value); setPreview(null); }}
               placeholder={"One tool per line.\n5 Why Analysis\nFishbone Diagram | Root cause\n\nA line starting with # sets the group for the lines under it:\n# Decision making\nPugh Matrix\nKano Model"} aria-label="List of tool names" />
-            <label className="mt-2 inline-flex cursor-pointer items-center gap-2 border border-eccellere-ink/20 px-3 py-2 text-xs hover:bg-eccellere-cream">
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <button type="button" className="border border-eccellere-gold px-3 py-2 text-xs text-eccellere-gold hover:bg-eccellere-gold/10" onClick={loadProposed}>Load the proposed consulting list ({PROPOSED_LIST_TEXT.split("\n").filter(Boolean).length} tools)</button>
+              {text.trim() && <button type="button" className="inline-flex items-center gap-1 border border-eccellere-ink/20 px-3 py-2 text-xs hover:bg-eccellere-cream" onClick={() => { setText(""); setPreview(null); }}><Trash2 className="h-3.5 w-3.5" /> Clear the box</button>}
+            </div>
+            <div className="mt-3 rounded border border-violet-200 bg-violet-50/60 p-3">
+              <label className="text-xs font-medium text-eccellere-ink" htmlFor="topic"><Sparkles className="mr-1 inline h-3.5 w-3.5 text-violet-700" />Suggest tools with AI</label>
+              <div className="mt-1 flex flex-wrap gap-2">
+                <input id="topic" className={cn(field, "min-w-[260px] flex-1")} value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="What do you need tools for? For example: change management for a bank" />
+                <button type="button" className="bg-violet-700 px-4 py-2 text-xs text-white hover:opacity-90 disabled:opacity-40" disabled={suggesting || topic.trim().length < 3 || !aiReady} onClick={suggest}>
+                  {suggesting ? <Loader2 className="inline h-4 w-4 animate-spin" /> : "Suggest 15 tools"}
+                </button>
+              </div>
+              {suggestMsg && <p className="mt-1 text-xs text-ink-mid">{suggestMsg}</p>}
+            </div>
+            <label className="mt-3 inline-flex cursor-pointer items-center gap-2 border border-eccellere-ink/20 px-3 py-2 text-xs hover:bg-eccellere-cream">
               {extracting === "list" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />} Upload a list (.txt, .csv, .xlsx, .pdf, .docx, .pptx)
               <input type="file" accept={LIST_FILE_TYPES} className="sr-only" onChange={onFile} />
             </label>
@@ -319,6 +369,7 @@ export default function AdminToolsPage() {
             <h2 className="font-medium text-eccellere-ink">2. Drafting: {run.job.label}</h2>
             <span className="text-xs text-ink-mid">{finished} of {total} done</span>
             <div className="ml-auto flex gap-2">
+              <button className="inline-flex items-center gap-1 border border-red-300 px-3 py-2 text-xs text-red-700 hover:bg-red-50" onClick={deleteRun}><Trash2 className="h-3 w-3" /> Delete this run</button>
               {driving
                 ? <button className="inline-flex items-center gap-1 border border-eccellere-ink/20 px-3 py-2 text-xs hover:bg-eccellere-cream" onClick={() => { stopRef.current = true; }}><Pause className="h-3 w-3" /> Pause</button>
                 : (counts.QUEUED ?? 0) + (counts.DRAFTING ?? 0) > 0 && <button className="inline-flex items-center gap-1 bg-eccellere-ink px-3 py-2 text-xs text-white" onClick={() => runAction("resume")}><Play className="h-3 w-3" /> Continue</button>}
@@ -336,48 +387,17 @@ export default function AdminToolsPage() {
                 <span className="w-44 shrink-0 truncate text-eccellere-ink">{i.name}</span>
                 <span className={cn("shrink-0", i.status === "FAILED" ? "text-red-700" : i.status === "NEEDS_REVIEW" ? "text-amber-700" : "text-ink-light")}>{i.status === "DRAFT" ? "drafted" : i.status === "NEEDS_REVIEW" ? "needs fixing" : i.status.toLowerCase()}</span>
                 {i.error && <span className="text-red-700">{i.error}</span>}
+                <span className="ml-auto flex shrink-0 gap-2">
+                  {(i.status === "DRAFT" || i.status === "NEEDS_REVIEW") && <button className="underline" onClick={() => setOpen(i.slug)}>Open</button>}
+                  {i.status !== "DRAFTING" && <button className="text-red-700 underline" aria-label={`Remove ${i.name} from this run`} onClick={() => removeItem(i.id)}>Remove</button>}
+                </span>
               </li>
             ))}
           </ul>
         </section>
       )}
 
-      {/* 3. catalogue */}
-      <section className="mt-6 rounded bg-white p-5 shadow-sm">
-        <div className="flex flex-wrap items-center gap-3">
-          <h2 className="font-medium text-eccellere-ink">3. Review and publish</h2>
-          <span className="text-xs text-ink-mid">{rows.length} tool{rows.length === 1 ? "" : "s"}, {rows.filter((r) => r.status === "PUBLISHED").length} live</span>
-          <select aria-label="Filter by section" className={cn(field, "ml-auto w-48")} value={filterCat} onChange={(e) => setFilterCat(e.target.value)}>
-            <option>All</option>{categories.map((c) => <option key={c}>{c}</option>)}
-          </select>
-          <select aria-label="Filter by status" className={cn(field, "w-40")} value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
-            <option value="All">All statuses</option>
-            {["DRAFT", "NEEDS_REVIEW", "REVIEWED", "PUBLISHED", "ARCHIVED"].map((s) => <option key={s} value={s}>{statusLabel(s)}</option>)}
-          </select>
-        </div>
-        {shown.length === 0 ? (
-          <p className="mt-4 text-sm text-ink-light">{rows.length === 0 ? "No tools yet. Add some above." : "No tools match those filters."}</p>
-        ) : (
-          <div className="mt-3 overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="text-[11px] uppercase tracking-wider text-ink-light"><tr><th className="py-2 pr-3">Tool</th><th className="pr-3">Section</th><th className="pr-3">Practice</th><th className="pr-3">Status</th><th className="pr-3">Standard</th><th className="pr-3">Checks</th><th /></tr></thead>
-              <tbody>
-                {shown.map((r) => (
-                  <tr key={r.slug} className={cn("border-t border-eccellere-ink/5", open === r.slug && "bg-eccellere-cream")}>
-                    <td className="py-2 pr-3 font-medium text-eccellere-ink">{r.name}{r.groupName && <span className="block text-[11px] font-normal text-ink-light">{r.groupName}</span>}</td>
-                    <td className="pr-3 text-xs text-ink-mid">{r.category}</td>
-                    <td className="pr-3 text-xs text-ink-mid">{r.practice ?? "-"}</td>
-                    <td className="pr-3"><StatusChip s={r.status} /></td>
-                    <td className="pr-3 text-xs">{r.standards ? `${r.standards.score}/100 · ${r.standards.level}` : "-"}</td>
-                    <td className="pr-3 text-xs">{r.errors > 0 ? <span className="text-red-700">{r.errors} to fix</span> : <span className="text-emerald-700">clear</span>}{r.warnings > 0 && <span className="text-ink-light"> · {r.warnings} notes</span>}</td>
-                    <td className="text-right"><button className="border border-eccellere-ink/20 px-3 py-1 text-xs hover:bg-white" onClick={() => setOpen(open === r.slug ? null : r.slug)}>{open === r.slug ? "Close" : r.status === "PUBLISHED" ? "View" : "Review"}</button></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+      <Catalogue rows={rows} categories={categories} open={open} setOpen={setOpen} reload={() => loadCatalogue().catch(() => {})} aiReady={aiReady} />
 
       <section className="mt-6 rounded bg-white p-5 shadow-sm">
         <h2 className="font-medium text-eccellere-ink">Skill files</h2>

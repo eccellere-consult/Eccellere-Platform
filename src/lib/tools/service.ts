@@ -447,3 +447,52 @@ export async function setToolCategory(repo: ToolsRepo, slug: string, category: s
   if (!updated) throw new ToolsError('NOT_FOUND', 'That tool was not found.');
   return updated;
 }
+
+// ── Clean-up: delete ─────────────────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Permanently remove a tool. Not while it is live for clients (withdraw it first), and not once anyone has saved work in it: their
+ * work is theirs, so the tool is archived instead. Returns what happened so the screen can say it plainly.
+ */
+export async function deleteTool(repo: ToolsRepo, slug: string): Promise<void> {
+  const tool = await repo.getToolBySlug(slug);
+  if (!tool) throw new ToolsError('NOT_FOUND', 'That tool was not found.');
+  if (tool.status === 'PUBLISHED') throw new ToolsError('WRONG_STATE', 'This tool is live for clients. Withdraw it from clients first, then delete it.');
+  const work = await repo.countFillinsFor(slug);
+  if (work > 0) throw new ToolsError('HAS_WORK', `${work} ${work === 1 ? 'person has' : 'people have'} saved work in this tool, so it cannot be deleted. Archive it instead.`);
+  await repo.deleteTool(slug);
+}
+
+export type BulkAction = 'delete' | 'archive' | 'review' | 'expose' | 'withdraw';
+export interface BulkResult { slug: string; ok: boolean; message?: string }
+
+/** The same single-tool rules applied to many tools; one failure never stops the rest, and each says why it failed in plain words. */
+export async function bulkAction(repo: ToolsRepo, action: BulkAction, slugs: string[], reviewerId: string): Promise<BulkResult[]> {
+  const out: BulkResult[] = [];
+  for (const slug of [...new Set(slugs)].slice(0, 300)) {
+    try {
+      if (action === 'delete') await deleteTool(repo, slug);
+      else if (action === 'archive') await archiveTool(repo, slug);
+      else if (action === 'review') await markReviewed(repo, slug, reviewerId);
+      else if (action === 'expose') await publishTool(repo, slug);
+      else await unpublishTool(repo, slug);
+      out.push({ slug, ok: true });
+    } catch (e) {
+      out.push({ slug, ok: false, message: e instanceof Error ? e.message : 'Could not do that.' });
+    }
+  }
+  return out;
+}
+
+/** Remove one name from a run before or after drafting. A tool already drafted from it stays. */
+export async function removeRunItem(repo: ToolsRepo, jobId: string, itemId: string): Promise<void> {
+  const found = await repo.getJob(jobId);
+  if (!found || !found.items.some((i) => i.id === itemId)) throw new ToolsError('JOB_NOT_FOUND', 'That name was not found in this run.');
+  await repo.deleteItem(itemId);
+}
+
+/** Remove a whole run. Tools already drafted from it stay in the catalogue. */
+export async function removeRun(repo: ToolsRepo, jobId: string): Promise<void> {
+  if (!(await repo.getJob(jobId))) throw new ToolsError('JOB_NOT_FOUND', 'That run was not found.');
+  await repo.deleteJob(jobId);
+}

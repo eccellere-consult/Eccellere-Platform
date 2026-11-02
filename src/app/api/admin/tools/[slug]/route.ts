@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { generateText } from "@/lib/ai/gateway";
 import { prismaRepo } from "@/lib/tools/prismaRepo";
 import { completeTool, confirmOriginator, editTool, redraftTool } from "@/lib/tools/review";
-import { archiveTool, markReviewed, publishTool, restoreTool, setToolCategory, setToolPractice, unpublishTool } from "@/lib/tools/service";
-import { audit, readAuth, realDrafter, toolsGuard, writeAuth } from "@/lib/tools/server";
+import { archiveTool, deleteTool, markReviewed, publishTool, restoreTool, setToolCategory, setToolPractice, unpublishTool } from "@/lib/tools/service";
+import { audit, loadSkillInfo, readAuth, realDrafter, toolsGuard, writeAuth } from "@/lib/tools/server";
+import { fixTool } from "@/lib/tools/repair";
 import { toRuntime } from "@/lib/tools/runtime";
 
 export const dynamic = "force-dynamic";
@@ -56,7 +57,7 @@ export const POST = toolsGuard(async (req: NextRequest, ctx: Ctx) => {
   const auth = await writeAuth();
   if (auth.error) return auth.error;
   const { slug } = await ctx.params;
-  let body: { action?: unknown; brief?: unknown; name?: unknown; year?: unknown };
+  let body: { action?: unknown; brief?: unknown; name?: unknown; year?: unknown; instruction?: unknown };
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Invalid request." }, { status: 400 }); }
   const done = async (action: string, tool: unknown, extra: Record<string, unknown> = {}) => {
     await audit(auth.user.id, `tool_${action}`, slug);
@@ -77,6 +78,15 @@ export const POST = toolsGuard(async (req: NextRequest, ctx: Ctx) => {
       const r = await completeTool(prismaRepo, slug, (a) => generateText(a));
       return done("completed", r.tool, { added: r.added, notes: r.notes });
     }
+    case "fix": {
+      // "Fix with AI" (no instruction) corrects the listed problems; "Modify with AI" (an instruction) changes the page as asked
+      const skill = await loadSkillInfo("draft");
+      const r = await fixTool(prismaRepo, slug, (a) => generateText(a), {
+        instruction: typeof body.instruction === "string" ? body.instruction : "",
+        skill: skill.isCustom ? skill.text : undefined,
+      });
+      return done("fixed", r.tool, { applied: r.applied, before: r.before, after: r.after, notes: r.notes });
+    }
     case "redraft": {
       const r = await redraftTool(prismaRepo, slug, realDrafter(), typeof body.brief === "string" ? body.brief.slice(0, 16000) : undefined);
       if (r.paused) return NextResponse.json({ error: r.paused, code: "AI_DOWN" }, { status: 503 });
@@ -86,4 +96,14 @@ export const POST = toolsGuard(async (req: NextRequest, ctx: Ctx) => {
     default:
       return NextResponse.json({ error: "Unknown action." }, { status: 400 });
   }
+});
+
+/** DELETE /api/admin/tools/:slug - remove a tool for good (not while live for clients, and not once anyone has saved work in it). */
+export const DELETE = toolsGuard(async (_req: NextRequest, ctx: Ctx) => {
+  const auth = await writeAuth();
+  if (auth.error) return auth.error;
+  const { slug } = await ctx.params;
+  await deleteTool(prismaRepo, slug);
+  await audit(auth.user.id, "tool_deleted", slug);
+  return NextResponse.json({ ok: true });
 });

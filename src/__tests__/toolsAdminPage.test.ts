@@ -18,7 +18,9 @@ describe('admin tools screens', () => {
     expect(html).toContain('Strategy Hub tools');
     expect(html).toContain('Skill files');
     expect(html).toContain('Auto: decide from the list');
-    expect(html).toContain('Review and publish');
+    expect(html).toContain('Review, fix and publish');
+    expect(html).toContain('Load the proposed consulting list');
+    expect(html).toContain('Suggest tools with AI');
     expect(html).toContain('No tools yet');
   });
   it('draws the review panel loading state', () => {

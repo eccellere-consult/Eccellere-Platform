@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, CheckCircle2, AlertTriangle, XCircle } from "lucide-react";
+import { Loader2, CheckCircle2, AlertTriangle, XCircle, Sparkles, Trash2 } from "lucide-react";
 import { readJson } from "@/lib/toolkit/http";
 import { cn } from "@/lib/utils";
 import { renderDiagram } from "@/lib/strategyModels/diagrams/templates";
@@ -61,6 +61,7 @@ export default function ReviewPanel({ slug, categories, practices, onChanged, on
   const [edit, setEdit] = useState<Record<string, string>>({});
   const [dirty, setDirty] = useState(false);
   const [brief, setBrief] = useState("");
+  const [instruction, setInstruction] = useState("");
 
   const load = useCallback(async () => {
     setErr(null);
@@ -87,7 +88,10 @@ export default function ReviewPanel({ slug, categories, practices, onChanged, on
       const r = await fetch(url, { headers: { "Content-Type": "application/json" }, ...init });
       const d = await readJson(r);
       if (!r.ok) { setErr(d.error ?? "That did not work."); return false; }
-      if (Array.isArray(d.notes) && d.notes.length) setNote(d.notes.join(" "));
+      if (typeof d.applied === "boolean") {
+        setNote(`${d.applied ? `Changed by AI. Problems: ${d.before} before, ${d.after} now.` : "The AI made no change."} ${Array.isArray(d.notes) ? d.notes.join(" ") : ""}`.trim());
+        if (d.applied) setInstruction("");
+      } else if (Array.isArray(d.notes) && d.notes.length) setNote(d.notes.join(" "));
       else if (Array.isArray(d.added) && d.added.length) setNote(`Added: ${d.added.join(" and ")}.`);
       await load(); onChanged();
       return true;
@@ -96,6 +100,14 @@ export default function ReviewPanel({ slug, categories, practices, onChanged, on
   }
   const url = `/api/admin/tools/${encodeURIComponent(slug)}`;
   const post = (action: string, extra: Record<string, unknown> = {}) => call(action, url, { method: "POST", body: JSON.stringify({ action, ...extra }) });
+  async function del() {
+    setBusy("delete"); setErr(null);
+    const r = await fetch(url, { method: "DELETE" });
+    const d = await readJson(r);
+    setBusy(null);
+    if (!r.ok) return setErr(d.error ?? "Could not delete this tool.");
+    onChanged(); onClose();
+  }
   const saveEdits = () => call("save", url, {
     method: "PATCH",
     body: JSON.stringify({ edits: {
@@ -160,10 +172,13 @@ export default function ReviewPanel({ slug, categories, practices, onChanged, on
         <div className="mt-3 rounded bg-red-50 p-3 text-sm text-red-800">
           <p className="flex items-center gap-1 font-medium"><XCircle className="h-4 w-4" /> Must be fixed before this can be marked reviewed</p>
           <ul className="mt-1 list-disc pl-5">{q.errors.map((e, i) => <li key={i}>{e}</li>)}</ul>
-          {!handBuilt && !live && /Diagram:|Worked example:/.test(q.errors.join(" ")) && (
-            <button className="mt-2 bg-eccellere-ink px-3 py-1.5 text-xs text-white disabled:opacity-40" disabled={!!busy} onClick={() => post("complete")}>
-              {busy === "complete" ? <><Loader2 className="mr-1 inline h-3.5 w-3.5 animate-spin" />Asking the AI…</> : "Complete the page: add the missing diagram and worked example"}
-            </button>
+          {!handBuilt && !live && (
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <button className="inline-flex items-center gap-1 bg-eccellere-ink px-3 py-1.5 text-xs text-white disabled:opacity-40" disabled={!!busy} onClick={() => post("fix")}>
+                {busy === "fix" ? <><Loader2 className="mr-1 inline h-3.5 w-3.5 animate-spin" />Fixing with AI (up to 3 minutes)…</> : <><Sparkles className="h-3.5 w-3.5" /> Fix these problems with AI</>}
+              </button>
+              <span className="text-xs text-red-900">It adds a missing diagram or worked example and corrects the rest. If a change would make things worse it is not applied.</span>
+            </div>
           )}
         </div>
       )}
@@ -203,6 +218,18 @@ export default function ReviewPanel({ slug, categories, practices, onChanged, on
             </div>
           ) : (
             <>
+              {!live && (
+                <div className="mt-3 rounded border border-violet-200 bg-violet-50/60 p-3">
+                  <label className="text-xs font-medium text-eccellere-ink" htmlFor="modify"><Sparkles className="mr-1 inline h-3.5 w-3.5 text-violet-700" />Modify with AI</label>
+                  <p className="mt-1 text-[11px] text-ink-light">Tell the AI what to change, for example &ldquo;make the questions specific to banking&rdquo; or &ldquo;add a risk column to the options table&rdquo;. The page is re-checked and goes back to review.</p>
+                  <div className="mt-1 flex flex-wrap gap-2">
+                    <input id="modify" className={cn(field, "min-w-[220px] flex-1")} value={instruction} onChange={(e) => setInstruction(e.target.value)} placeholder="What should change?" />
+                    <button className="bg-violet-700 px-4 py-2 text-xs text-white hover:opacity-90 disabled:opacity-40" disabled={!!busy || instruction.trim().length < 5} onClick={() => post("fix", { instruction })}>
+                      {busy === "fix" && instruction ? <Loader2 className="inline h-4 w-4 animate-spin" /> : "Modify"}
+                    </button>
+                  </div>
+                </div>
+              )}
               {([
                 ["name", "Name", false], ["does", "What it does", true], ["whenToUse", "When to use it", true], ["whenNotToUse", "When not to use it", true],
                 ["next", "What to do next", true], ["analysisGuide", "How the analysis reads the result", true],
@@ -293,6 +320,9 @@ export default function ReviewPanel({ slug, categories, practices, onChanged, on
                 </button>
               </div>
             )}
+            {!live && <button className="inline-flex items-center gap-1 border border-red-300 px-4 py-2 text-xs text-red-700 hover:bg-red-50 disabled:opacity-40" disabled={!!busy} onClick={() => confirm("Delete this tool for good? If people have saved work in it, it cannot be deleted and you should archive it instead.") && del()}>
+              {busy === "delete" ? <Loader2 className="inline h-4 w-4 animate-spin" /> : <><Trash2 className="h-3.5 w-3.5" /> Delete</>}
+            </button>}
             {!live && <button className="border border-red-300 px-4 py-2 text-xs text-red-700 hover:bg-red-50 disabled:opacity-40" disabled={!!busy} onClick={() => confirm("Archive this tool? It disappears from the library and the marketplace. Saved work by people is kept.") && post("archive")}>Archive</button>}
           </>
         )}

@@ -129,7 +129,7 @@ export const EXAMPLE_TOOL: DeclarativeTool = {
   },
 };
 
-const SCHEMA_NOTES = `
+export const SCHEMA_NOTES = `
 SHAPE (JSON object; every key shown is allowed, nothing else):
 { "schema": 1, "slug", "name", "category", "does", "whenToUse", "whenNotToUse", "next",
   "reference": { "originator": "", "year": "", "summary", "caption", "howToRead": [2 to 4 short lines] },
