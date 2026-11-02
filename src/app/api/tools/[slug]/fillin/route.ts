@@ -3,7 +3,6 @@ import { prismaRepo } from "@/lib/tools/prismaRepo";
 import { VersionConflict, getFillin, saveFillin } from "@/lib/tools/service";
 import { toolsGuard, userTool } from "@/lib/tools/server";
 import { canonicaliseClientFields, cleanClientFields } from "@/lib/strategyHubAi";
-import { structureOf } from "@/lib/tools/ai";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +29,7 @@ export const PUT = toolsGuard(async (req: NextRequest, ctx: Ctx) => {
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Invalid request." }, { status: 400 }); }
   const expected = Number.isInteger(body.expectedVersion) ? (body.expectedVersion as number) : null;
   if (expected === null) return NextResponse.json({ error: "Reload the page and try again." }, { status: 400 });
-  const fields = canonicaliseClientFields(structureOf(u.def), cleanClientFields(body.fields)).map((f) => ({ label: f.label, value: f.value, source: f.source || "Manual" }));
+  const fields = canonicaliseClientFields(u.ai.def, cleanClientFields(body.fields)).map((f) => ({ label: f.label, value: f.value, source: f.source || "Manual" }));
   try {
     const record = await saveFillin(prismaRepo, u.userId, slug, { fields }, { expectedVersion: expected });
     return NextResponse.json({ record });

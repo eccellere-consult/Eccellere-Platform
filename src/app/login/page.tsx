@@ -34,7 +34,7 @@ export default function LoginPage() {
       const role = (session?.user as { role?: string })?.role;
       // Coming from a tool page: go back to it (only to a /tools/ path on this site, never to an outside address).
       const next = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("next") : null;
-      if (next && /^\/tools(\/[a-z0-9-]+)?$/.test(next)) {
+      if (next && /^\/(tools|consulting\/library)(\/[a-z0-9-]+)?$/.test(next)) {
         router.push(next);
       } else if (role === "ADMIN" || role === "SUPER_ADMIN" || role === "CONTENT_ADMIN") {
         router.push("/admin");

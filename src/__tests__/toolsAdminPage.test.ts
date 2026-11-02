@@ -11,13 +11,18 @@ describe('admin tools screens', () => {
     expect(html).toContain('Tools marketplace');
     expect(html).toContain('Paste or upload a list');
     expect(html).toContain('Write one tool');
-    expect(html).toContain('Upload a file');
+    expect(html).toContain('Upload a list');
+    expect(html).toContain('.pdf, .docx, .pptx');
+    expect(html).toContain('Upload a document as source');
+    expect(html).toContain('Consulting practice');
+    expect(html).toContain('Strategy Hub tools');
+    expect(html).toContain('Skill files');
     expect(html).toContain('Auto: decide from the list');
     expect(html).toContain('Review and publish');
     expect(html).toContain('No tools yet');
   });
   it('draws the review panel loading state', () => {
-    const html = renderToString(createElement(ReviewPanel, { slug: 'x', categories: ['Strategy'], onChanged: () => {}, onClose: () => {} }));
+    const html = renderToString(createElement(ReviewPanel, { slug: 'x', categories: ['Strategy'], practices: ['Strategy'], onChanged: () => {}, onClose: () => {} }));
     expect(html).toContain('Loading');
   });
 });

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { EXAMPLE_TOOL } from '@/lib/tools/draft';
-import { aiAnalyse, aiFill, buildAnalyseMessages, buildFillMessages, structureOf, type GenerateFn } from '@/lib/tools/ai';
+import { aiAnalyse, aiFill, aiQuestions, buildAnalyseMessages, buildFillMessages, fromDeclarative, type GenerateFn } from '@/lib/tools/ai';
+
+const TOOL = fromDeclarative(EXAMPLE_TOOL);
 
 const reply = (o: unknown, finishReason = 'stop') => ({ text: JSON.stringify(o), provider: 'groq' as const, model: 'm', finishReason });
 const down = () => 'No AI provider is switched on with a key.';
@@ -18,14 +20,14 @@ const fillReply = {
 
 describe('drafting answers', () => {
   it('asks for a situation first when there is nothing to base a draft on', async () => {
-    const r = await aiFill({ generate: async () => reply(fillReply), explainDown: down }, { tool: EXAMPLE_TOOL, current: [], brief: '  ' });
+    const r = await aiFill({ generate: async () => reply(fillReply), explainDown: down }, { tool: TOOL, current: [], brief: '  ' });
     expect(r).toMatchObject({ ok: false, code: 'NOTHING_TO_DO' });
   });
 
   it('drafts only what is blank, labels it AI, and never touches the person\'s own answer', async () => {
     let seen: Parameters<GenerateFn>[0] | undefined;
     const generate: GenerateFn = async (a) => { seen = a; return reply(fillReply); };
-    const r = await aiFill({ generate, explainDown: down }, { tool: EXAMPLE_TOOL, current: [mine('What limits the choice?', 'Two analysts, no budget.')], brief: 'We are a small finance team with late invoices.' });
+    const r = await aiFill({ generate, explainDown: down }, { tool: TOOL, current: [mine('What limits the choice?', 'Two analysts, no budget.')], brief: 'We are a small finance team with late invoices.' });
     if (!r.ok) throw new Error(r.reason);
     const by = new Map(r.fields.map((f) => [f.label, f]));
     expect(by.get('What limits the choice?')).toMatchObject({ value: 'Two analysts, no budget.', source: 'Manual' });
@@ -47,12 +49,12 @@ describe('drafting answers', () => {
       mine('Options', JSON.stringify([{ option: 'x', impact: '3', effort: '2' }])), mine('What did you decide, and why?', 'd'),
       mine('Actions for the next 90 days', JSON.stringify([{ action: 'x', owner: 'Finance Manager', measure: 'm', horizon: '30 days' }])),
     ];
-    const r = await aiFill({ generate: async () => reply(fillReply), explainDown: down }, { tool: EXAMPLE_TOOL, current: all, brief: 'x' });
+    const r = await aiFill({ generate: async () => reply(fillReply), explainDown: down }, { tool: TOOL, current: all, brief: 'x' });
     expect(r).toMatchObject({ ok: false, code: 'NOTHING_TO_DO' });
   });
 
   it('saves nothing and says why when the AI is down, cut off, or unreadable', async () => {
-    const args = { tool: EXAMPLE_TOOL, current: [], brief: 'We are a small team.' };
+    const args = { tool: TOOL, current: [], brief: 'We are a small team.' };
     expect(await aiFill({ generate: async (a) => { a.diag?.push('Groq: HTTP 401'); return null; }, explainDown: (d) => `down: ${d}` }, args)).toEqual({ ok: false, code: 'AI_DOWN', reason: 'down: Groq: HTTP 401' });
     expect(await aiFill({ generate: async () => reply(fillReply, 'length'), explainDown: down }, args)).toMatchObject({ ok: false, code: 'CUT_OFF' });
     expect(await aiFill({ generate: async () => ({ text: 'not json', provider: 'groq', model: 'm' }), explainDown: down }, args)).toMatchObject({ ok: false, code: 'UNUSABLE' });
@@ -60,8 +62,7 @@ describe('drafting answers', () => {
   });
 
   it('builds a prompt from the tool\'s own structure', () => {
-    const s = structureOf(EXAMPLE_TOOL);
-    const m = buildFillMessages({ tool: EXAMPLE_TOOL, structure: s, fillable: ['Options'], current: [], brief: '' });
+    const m = buildFillMessages({ tool: TOOL, structure: TOOL.def, fillable: ['Options'], current: [], brief: '' });
     expect(m.system).toContain('"Options"');
     expect(m.system).toContain('"tables"');
     expect(m.system).toContain(EXAMPLE_TOOL.does);
@@ -85,13 +86,13 @@ const filled = [
 
 describe('the analysis', () => {
   it('will not analyse an empty worksheet', async () => {
-    const r = await aiAnalyse({ generate: async () => reply(analysisReply), explainDown: down }, { tool: EXAMPLE_TOOL, fields: [mine('What are we choosing between?', 'x')] });
+    const r = await aiAnalyse({ generate: async () => reply(analysisReply), explainDown: down }, { tool: TOOL, fields: [mine('What are we choosing between?', 'x')] });
     expect(r).toMatchObject({ ok: false, code: 'NOTHING_TO_DO' });
   });
 
   it('writes the analysis and keeps the system prompt honest about blanks, hypotheses and the tool\'s own reading guide', async () => {
     let seen: Parameters<GenerateFn>[0] | undefined;
-    const r = await aiAnalyse({ generate: async (a) => { seen = a; return reply(analysisReply); }, explainDown: down }, { tool: EXAMPLE_TOOL, fields: filled });
+    const r = await aiAnalyse({ generate: async (a) => { seen = a; return reply(analysisReply); }, explainDown: down }, { tool: TOOL, fields: filled });
     if (!r.ok) throw new Error(r.reason);
     expect(r.analysis.verdict?.label).toBe('Start with reminders');
     expect(r.actionables[0]).toMatchObject({ owner: 'Finance Manager', timeframe: 'Next 30 days' });
@@ -105,21 +106,21 @@ describe('the analysis', () => {
 
   it('lists every number the inputs do not support, with its unit', async () => {
     const bad = { ...analysisReply, analysis: { ...analysisReply.analysis, summary: 'Reminders will cut late payments by 37 percent and save Rs 4,50,000.' } };
-    const r = await aiAnalyse({ generate: async () => reply(bad), explainDown: down }, { tool: EXAMPLE_TOOL, fields: filled });
+    const r = await aiAnalyse({ generate: async () => reply(bad), explainDown: down }, { tool: TOOL, fields: filled });
     if (!r.ok) throw new Error(r.reason);
     expect(r.analysis.figuresToCheck?.join(' ')).toMatch(/37/);
     expect(r.analysis.figuresToCheck?.join(' ')).toMatch(/4,50,000|450000/);
   });
 
   it('saves nothing when the AI is down, cut off or unreadable', async () => {
-    const args = { tool: EXAMPLE_TOOL, fields: filled };
+    const args = { tool: TOOL, fields: filled };
     expect(await aiAnalyse({ generate: async () => null, explainDown: down }, args)).toMatchObject({ ok: false, code: 'AI_DOWN' });
     expect(await aiAnalyse({ generate: async () => reply(analysisReply, 'length'), explainDown: down }, args)).toMatchObject({ ok: false, code: 'CUT_OFF' });
     expect(await aiAnalyse({ generate: async () => ({ text: '{}', provider: 'groq', model: 'm' }), explainDown: down }, args)).toMatchObject({ ok: false, code: 'UNUSABLE' });
   });
 
   it('builds the prompt with the tool name in it', () => {
-    const m = buildAnalyseMessages({ tool: EXAMPLE_TOOL, structure: structureOf(EXAMPLE_TOOL), fields: filled });
+    const m = buildAnalyseMessages({ tool: TOOL, structure: TOOL.def, fields: filled });
     expect(m.system).toContain('Impact-Effort Matrix');
     expect(m.system).toContain('Next 30 days');
   });

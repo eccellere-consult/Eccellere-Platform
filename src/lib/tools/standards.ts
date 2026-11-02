@@ -5,7 +5,8 @@
  *
  * The score is out of 100. L2 ("Focused tool", section 2.3) needs 75 or more AND an action plan. Below 60 is "major rework" (an error).
  */
-import type { DeclTable, DeclarativeTool } from '@/lib/strategyModels/declarative';
+import { qualityGate, type DeclTable, type DeclarativeTool } from '@/lib/strategyModels/declarative';
+import type { QualityResult } from './repo';
 
 export interface StandardsItem { id: string; label: string; points: number; earned: number; hint: string }
 export interface StandardsResult { score: number; level: 'L0' | 'L1' | 'L2'; band: 'Publish-ready' | 'Near-ready' | 'Needs work' | 'Major rework' | 'Not ready'; items: StandardsItem[] }
@@ -70,4 +71,29 @@ export function standardsCheck(t: DeclarativeTool): StandardsResult {
 /** Plain-language lines for the review screen: only what fell short. */
 export function standardsGaps(r: StandardsResult): string[] {
   return r.items.filter((i) => i.earned < i.points).map((i) => `${i.label} (${i.earned}/${i.points}). ${i.hint}`);
+}
+
+/**
+ * The full check of a tool page, shown on the review screen and decided on before anything can be marked reviewed.
+ * Errors block "Looks right": a failed quality gate, a score under the floor, and (because every page must teach the method and show it
+ * in use) a missing diagram or worked example. Warnings are things to look at.
+ */
+export function assess(tool: DeclarativeTool, extraWarnings: string[] = []): QualityResult {
+  const gate = qualityGate(tool);
+  const s = standardsCheck(tool);
+  const errors = [...gate.blockers];
+  if (!tool.diagram) errors.push('Diagram: every tool needs a diagram of the method. Use "Complete the page" to have the AI add one.');
+  if (!tool.sample) errors.push('Worked example: every tool needs a short fictional worked example. Use "Complete the page" to have the AI add one.');
+  if (s.score < MIN_SCORE_TO_REVIEW) errors.push(`Standards: scored ${s.score}/100 (${s.band}); the Eccellere standard needs at least ${MIN_SCORE_TO_REVIEW} before review.`);
+  // the gate's own "no diagram / no example / no originator" warnings are replaced by the errors above and the originator note below
+  const gateWarnings = gate.warnings.filter((w) => !/^(diagram|sample|reference\.originator):/.test(w));
+  const originator = !tool.reference.originator?.trim()
+    ? ['Originator not confirmed: check a source and enter who is credited with the method and the year, or leave it as "Originator not stated" on the page.']
+    : [];
+  const gaps = standardsGaps(s).filter((g) => !/^(A diagram of the method|A worked example)/.test(g));
+  return {
+    errors,
+    warnings: [...gateWarnings, ...originator, ...extraWarnings, ...gaps.map((g) => `Standards: ${g}`)],
+    standards: { score: s.score, level: s.level, band: s.band },
+  };
 }

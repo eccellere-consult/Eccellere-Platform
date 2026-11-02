@@ -802,6 +802,7 @@ model WsTool {
   name         String
   category     String
   groupName    String? // sub-group inside the category, for example "Root cause"
+  practice     String? // consulting practice area used by the Consulting library: Strategy, Process, Digital, Organisation, Technology, ...
   status       String    @default("DRAFT") // DRAFT | NEEDS_REVIEW | REVIEWED | PUBLISHED | ARCHIVED
   source       String    @default("ai") // ai | hand | strategy-hub
   does         String?   @db.Text
@@ -864,6 +865,8 @@ model WsImportItem {
   name      String
   category  String
   groupName String?
+  practice  String?
+  brief     String?     @db.Text
   slug      String
   status    String      @default("QUEUED") // QUEUED | DRAFTING | DRAFT | NEEDS_REVIEW | FAILED | REVIEWED | PUBLISHED
   attempts  Int         @default(0)

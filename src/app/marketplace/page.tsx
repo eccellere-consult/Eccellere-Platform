@@ -126,6 +126,18 @@ export default function MarketplacePage() {
           </div>
         </section>
 
+        {/* Link to the Tools section (working worksheets, separate from the kits below) */}
+        <section className="border-b border-eccellere-ink/10 bg-eccellere-cream">
+          <div className="mx-auto flex max-w-[1280px] flex-wrap items-center gap-3 px-6 py-4">
+            <p className="text-sm text-eccellere-ink">
+              <strong>New: Tools.</strong> Strategy, problem-solving and decision worksheets with AI help. Free when you sign in.
+            </p>
+            <Link href="/tools" className="ml-auto border border-eccellere-ink px-4 py-1.5 text-xs text-eccellere-ink hover:bg-eccellere-ink hover:text-white">
+              Browse the tools
+            </Link>
+          </div>
+        </section>
+
         {/* Filters + Grid */}
         <section className="mx-auto max-w-[1280px] px-6 py-12">
           {/* Category tabs */}

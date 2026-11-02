@@ -15,7 +15,7 @@ type ItemDb = Awaited<ReturnType<typeof prisma.wsImportItem.findFirstOrThrow>>;
 type JobDb = Awaited<ReturnType<typeof prisma.wsImportJob.findFirstOrThrow>>;
 
 const toTool = (r: ToolRow): ToolRecord => ({
-  id: r.id, slug: r.slug, name: r.name, category: r.category, groupName: r.groupName,
+  id: r.id, slug: r.slug, name: r.name, category: r.category, groupName: r.groupName, practice: r.practice,
   status: r.status as ToolRecord['status'], source: r.source as ToolRecord['source'],
   does: r.does, whenToUse: r.whenToUse, whenNotToUse: r.whenNotToUse,
   definition: r.definition, quality: (r.quality as QualityResult | null) ?? null,
@@ -37,7 +37,7 @@ const toFillin = (r: FillinDb): FillinRow => ({
 });
 
 const toItem = (r: ItemDb): ItemRecord => ({
-  id: r.id, jobId: r.jobId, name: r.name, category: r.category, groupName: r.groupName, slug: r.slug,
+  id: r.id, jobId: r.jobId, name: r.name, category: r.category, groupName: r.groupName, practice: r.practice, brief: r.brief, slug: r.slug,
   status: r.status as ItemRecord['status'], attempts: r.attempts, claimedAt: r.claimedAt, error: r.error, toolId: r.toolId,
 });
 const toJob = (r: JobDb): JobRecord => ({
@@ -70,7 +70,7 @@ export const prismaRepo: ToolsRepo = {
   },
   async saveTool(input) {
     const content = {
-      name: input.name, category: input.category, groupName: input.groupName ?? undefined, definition: json(input.definition),
+      name: input.name, category: input.category, groupName: input.groupName ?? undefined, practice: input.practice ?? undefined, definition: json(input.definition),
       does: input.does ?? undefined, whenToUse: input.whenToUse ?? undefined, whenNotToUse: input.whenNotToUse ?? undefined,
       quality: jsonOrNull(input.quality), provenance: jsonOrNull(input.provenance),
       ...(input.status ? { status: input.status } : {}), ...(input.source ? { source: input.source } : {}),
@@ -125,7 +125,7 @@ export const prismaRepo: ToolsRepo = {
 
   async createJob(createdById, label, list) {
     const job = await prisma.wsImportJob.create({ data: { createdById, label } });
-    await prisma.wsImportItem.createMany({ data: list.map((e) => ({ jobId: job.id, name: e.name, category: e.category, groupName: e.groupName, slug: e.slug })) });
+    await prisma.wsImportItem.createMany({ data: list.map((e) => ({ jobId: job.id, name: e.name, category: e.category, groupName: e.groupName, practice: e.practice, brief: e.brief ?? null, slug: e.slug })) });
     const items = await prisma.wsImportItem.findMany({ where: { jobId: job.id }, orderBy: { createdAt: 'asc' } });
     return { job: toJob(job), items: items.map(toItem) };
   },
