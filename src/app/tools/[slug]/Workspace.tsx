@@ -405,7 +405,7 @@ function WorkspaceInner({ slug, def, toolName, sample }: { slug: string; def: Mo
         <div className="flex flex-wrap items-center gap-x-8 gap-y-4">
           <div className="min-w-[260px] flex-1">
             <p className={LABEL}>{sample ? "Worked example & template" : "Template"}</p>
-            <h2 className="m-0 mt-1 font-display text-[clamp(18px,2.2vw,22px)] font-light text-eccellere-ink">{sample ? "See it worked 2014 or fill it in offline" : "Fill it in offline"}</h2>
+            <h2 className="m-0 mt-1 font-display text-[clamp(18px,2.2vw,22px)] font-light text-eccellere-ink">{sample ? "See it worked — or fill it in offline" : "Fill it in offline"}</h2>
             <p className="mt-2 text-sm text-ink-light">{sample ? "A fictional company's completed example, a blank Excel template that mirrors the form below, and an upload that reads a filled one back. No AI is needed." : "A blank Excel template that mirrors the form below, and an upload that reads a filled one back. No AI is needed."}</p>
           </div>
           <div className="flex flex-wrap gap-3">
