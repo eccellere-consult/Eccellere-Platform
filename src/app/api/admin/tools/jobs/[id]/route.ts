@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prismaRepo } from "@/lib/tools/prismaRepo";
-import { draftNext, resumeJob, retryFailed } from "@/lib/tools/service";
+import { draftNext, removeRun, removeRunItem, resumeJob, retryFailed } from "@/lib/tools/service";
 import { readAuth, realDrafter, toolsGuard, writeAuth } from "@/lib/tools/server";
 
 export const dynamic = "force-dynamic";
@@ -45,4 +45,15 @@ export const POST = toolsGuard(async (req: NextRequest, ctx: Ctx) => {
     default:
       return NextResponse.json({ error: "Unknown action." }, { status: 400 });
   }
+});
+
+/** DELETE /api/admin/tools/jobs/:id  removes the whole run; DELETE /api/admin/tools/jobs/:id?item=<id> removes one name from it. Tools already drafted stay. */
+export const DELETE = toolsGuard(async (req: NextRequest, ctx: Ctx) => {
+  const auth = await writeAuth();
+  if (auth.error) return auth.error;
+  const { id } = await ctx.params;
+  const item = new URL(req.url).searchParams.get("item");
+  if (item) await removeRunItem(prismaRepo, id, item);
+  else await removeRun(prismaRepo, id);
+  return NextResponse.json({ ok: true });
 });

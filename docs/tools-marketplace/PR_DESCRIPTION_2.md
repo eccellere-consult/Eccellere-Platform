@@ -21,3 +21,9 @@ Not run in a real browser, against the live database, or with a live AI key. PDF
 
 ## Not in this PR
 AI-generated pictures, a chart of the person's own numbers, deck-to-many-tools import, per-field Not-known toggle, syncing actions into the Game Plan app.
+
+## Also in this PR: clean-up and "with AI" at every stage
+- **Fix with AI** (per tool, on a selection, or all tools with problems) and **Modify with AI** (by instruction). A correction that would make a page worse is refused and explained; name, section, originator and review state are never taken from the AI.
+- **Suggest tools with AI** at the add stage; a one-click **Load the proposed consulting list** (231 tools, plain `Name | Group` text in `TOOL_LIST_v2_consulting.txt`).
+- **Delete** tools (not while live, not once anyone has saved work: archive instead), names inside a run, or a whole run; **bulk** mark reviewed, expose, withdraw, archive, delete.
+- Tests: 1,138 screen/engine tests, 153 platform tests; tsc and eslint clean.

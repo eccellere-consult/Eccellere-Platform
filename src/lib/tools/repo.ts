@@ -84,6 +84,10 @@ export interface ToolsRepo {
   /** Creates the tool, or replaces its content if the slug exists. Never touches review/publish fields on replace. */
   saveTool(input: ToolInput): Promise<ToolRecord>;
   patchTool(slug: string, patch: Partial<Pick<ToolRecord, 'category' | 'groupName' | 'practice' | 'status' | 'reviewedById' | 'reviewedAt' | 'publishedAt' | 'quality' | 'sortOrder'>>): Promise<ToolRecord | null>;
+  /** Permanently removes a tool row. People's saved work in it is not touched (the service refuses when any exists). */
+  deleteTool(slug: string): Promise<boolean>;
+  /** How many people have saved work in this tool. */
+  countFillinsFor(toolSlug: string): Promise<number>;
   // people's work
   getFillinRow(userId: string, toolSlug: string, caseId: number): Promise<FillinRow | null>;
   listFillinRows(userId: string): Promise<FillinRow[]>;
@@ -95,5 +99,9 @@ export interface ToolsRepo {
   setJob(jobId: string, patch: { status?: JobStatus; pauseReason?: string | null }): Promise<void>;
   /** Atomically move ONE queued item (or one whose drafting started before `staleBefore`) to DRAFTING. Null when nothing is available. */
   claimNextItem(jobId: string, staleBefore: Date): Promise<ItemRecord | null>;
+  /** Remove one name from a run (and nothing else). */
+  deleteItem(itemId: string): Promise<void>;
+  /** Remove a whole run and the names in it. Tools already drafted from it are kept. */
+  deleteJob(jobId: string): Promise<void>;
   patchItem(itemId: string, patch: Partial<Pick<ItemRecord, 'status' | 'error' | 'toolId' | 'attempts'>>): Promise<void>;
 }

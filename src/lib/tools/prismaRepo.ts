@@ -79,6 +79,13 @@ export const prismaRepo: ToolsRepo = {
     const r = await prisma.wsTool.upsert({ where: { slug: input.slug }, create: { slug: input.slug, ...content }, update: content });
     return toTool(r);
   },
+  async deleteTool(slug) {
+    const res = await prisma.wsTool.deleteMany({ where: { slug } });
+    return res.count > 0;
+  },
+  async countFillinsFor(toolSlug) {
+    return prisma.wsFillin.count({ where: { toolSlug } });
+  },
   async patchTool(slug, patch) {
     try {
       const r = await prisma.wsTool.update({
@@ -154,6 +161,12 @@ export const prismaRepo: ToolsRepo = {
       }
     }
     return null;
+  },
+  async deleteItem(itemId) {
+    await prisma.wsImportItem.deleteMany({ where: { id: itemId } });
+  },
+  async deleteJob(jobId) {
+    await prisma.wsImportJob.deleteMany({ where: { id: jobId } }); // the names in it go with it (cascade)
   },
   async patchItem(itemId, patch) {
     await prisma.wsImportItem.update({ where: { id: itemId }, data: patch });

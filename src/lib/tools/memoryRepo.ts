@@ -48,6 +48,8 @@ export function createMemoryRepo(): ToolsRepo & { tools: Map<string, ToolRecord>
       tools.set(rec.slug, rec);
       return rec;
     },
+    async deleteTool(slug) { return tools.delete(slug); },
+    async countFillinsFor(toolSlug) { return [...fillins.values()].filter((r) => r.toolSlug === toolSlug).length; },
     async patchTool(slug, patch) {
       const t = tools.get(slug);
       if (!t) return null;
@@ -91,6 +93,11 @@ export function createMemoryRepo(): ToolsRepo & { tools: Map<string, ToolRecord>
       const claimed = { ...next, status: 'DRAFTING' as const, claimedAt: new Date(), attempts: next.attempts + 1 };
       items.set(next.id, claimed);
       return claimed;
+    },
+    async deleteItem(itemId) { items.delete(itemId); },
+    async deleteJob(jobId) {
+      for (const [id, i] of items) if (i.jobId === jobId) items.delete(id);
+      jobs.delete(jobId);
     },
     async patchItem(itemId, patch) {
       const i = items.get(itemId);
