@@ -63,7 +63,7 @@ export default function ToolPageView(props: {
           </div>
         </section>
 
-        <section className={CARD} aria-label="Reference model">
+        <section id="stage-1" className={`${CARD} scroll-mt-24`} aria-label="Reference model">
           <p className={`${LABEL} mb-4`}>Reference model</p>
           {rt.diagramSvg
             ? <EnlargeDiagram svg={rt.diagramSvg} caption={ref.caption} />
@@ -72,13 +72,13 @@ export default function ToolPageView(props: {
           <div className="mt-8 grid gap-8 border-t border-eccellere-border pt-8 md:grid-cols-2">
             <div>
               <h2 className="m-0 font-display text-2xl font-light text-eccellere-ink">About this model</h2>
-              <p className="mt-3 text-[15px] leading-relaxed text-ink-mid">{ref.summary}</p>
+              <p className="mt-3 text-sm leading-relaxed text-ink-mid">{ref.summary}</p>
               <p className="mt-3 text-xs font-medium text-eccellere-ink">{originator || <span className="font-normal text-ink-light">Originator not stated.</span>}</p>
             </div>
             {ref.howToRead.length > 0 && (
               <div>
                 <h3 className={`${LABEL} m-0`}>How to read it</h3>
-                <ul className="mt-3 list-disc space-y-2 pl-5 text-[15px] leading-relaxed text-ink-mid">{ref.howToRead.map((l, i) => <li key={i}>{l}</li>)}</ul>
+                <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-relaxed text-ink-mid">{ref.howToRead.map((l, i) => <li key={i}>{l}</li>)}</ul>
               </div>
             )}
           </div>
@@ -94,7 +94,7 @@ export default function ToolPageView(props: {
               <span className="font-display text-lg text-eccellere-gold" aria-hidden="true">{b.n}</span>
               <div>
                 <h3 className={`${LABEL} m-0`}>{b.h}</h3>
-                <p className="mt-1.5 text-[15px] leading-relaxed text-ink-mid">{b.t}</p>
+                <p className="mt-1.5 text-sm leading-relaxed text-ink-mid">{b.t}</p>
                 {b.extra && <p className="mt-1.5 text-sm leading-relaxed text-ink-light">{b.extra}</p>}
               </div>
             </div>

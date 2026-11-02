@@ -51,8 +51,8 @@ export default function ToolsBrowser({ tools, categories }: { tools: ToolCard[];
           {shown.map((t) => (
             <li key={t.slug}>
               <Link href={`/tools/${t.slug}`} className="flex h-full flex-col border border-eccellere-ink/10 bg-white p-5 transition-shadow hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-eccellere-gold">
-                <span className="text-[10px] font-medium uppercase tracking-[0.15em] text-eccellere-gold">{t.category}{t.groupName ? ` · ${t.groupName}` : ""}</span>
-                <span className="mt-2 font-display text-xl font-medium text-eccellere-ink">{t.name}</span>
+                <span className="text-[11px] font-medium uppercase tracking-[0.15em] text-eccellere-gold">{t.category}{t.groupName ? ` · ${t.groupName}` : ""}</span>
+                <span className="mt-2 font-display text-2xl font-light text-eccellere-ink">{t.name}</span>
                 <span className="mt-2 flex-1 text-sm text-ink-mid">{t.does}</span>
                 <span className="mt-4 flex items-center justify-between text-xs text-ink-light">
                   <span>Free when you sign in</span>

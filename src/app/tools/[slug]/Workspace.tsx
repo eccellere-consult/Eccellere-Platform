@@ -41,12 +41,12 @@ function Rating({ label, scale, value, onChange }: { label: string; scale: { min
   );
 }
 
-const cellLabel = "block text-[10px] font-semibold uppercase tracking-[0.08em] text-ink-light";
+const cellLabel = "block text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-light";
 
 /** One column of a row card: its small capitals label (with the scale legend for a rating), then the control. */
 function Cell({ col, row, values, onChange, id }: { col: Column; row: Row; values: ModelValues; onChange: (v: string) => void; id: string }) {
   const v = row[col.key] ?? "";
-  const legend = col.type === "rating" && col.scale ? <span className="mt-0.5 block text-[10px] normal-case tracking-normal text-ink-light">{col.scale.min} = {col.scale.low}<br />{col.scale.max} = {col.scale.high}</span> : null;
+  const legend = col.type === "rating" && col.scale ? <span className="mt-0.5 block text-[11px] normal-case tracking-normal text-ink-light">{col.scale.min} = {col.scale.low}<br />{col.scale.max} = {col.scale.high}</span> : null;
   let control: React.ReactNode;
   if (col.type === "computed") control = <span id={id} className="block py-1.5 text-sm font-medium text-eccellere-ink">{evalColumn(col, row, values) || <span className="text-ink-light">&mdash;</span>}</span>;
   else if (col.type === "select") control = (
@@ -298,7 +298,7 @@ function WorkspaceInner({ slug, def, toolName, sample }: { slug: string; def: Mo
   const nothingYet = filled === 0;
 
   const aiBadge = (key: string) => (sources[key] === "AI" || sources[key] === "Manual + AI"
-    ? <span className="ml-2 rounded-sm bg-violet-100 px-1.5 py-0.5 text-[10px] font-medium text-violet-800">AI-suggested</span> : null);
+    ? <span className="ml-2 rounded-sm bg-violet-100 px-1.5 py-0.5 text-[11px] font-medium text-violet-800">AI-suggested</span> : null);
 
   const renderPart = (p: Part) => {
     const id = `p-${p.key}`;
@@ -308,7 +308,7 @@ function WorkspaceInner({ slug, def, toolName, sample }: { slug: string; def: Mo
       const eg = f.example ? `e.g. ${f.example}` : undefined;
       return (
         <div key={p.key} className="mt-7">
-          <label id={`${id}-label`} htmlFor={id} className="block text-[15px] font-semibold text-eccellere-ink">{f.label}{f.unit ? ` (${f.unit})` : ""}{badge}</label>
+          <label id={`${id}-label`} htmlFor={id} className="block text-sm leading-relaxed font-semibold text-eccellere-ink">{f.label}{f.unit ? ` (${f.unit})` : ""}{badge}</label>
           <p className="mt-1 text-xs text-ink-light">{f.help}</p>
           <div className="mt-2.5">
             {f.type === "rating" && f.scale ? <Rating label={f.label} scale={f.scale} value={values.fields[f.key] ?? ""} onChange={(v) => setField(f.key, v)} />
@@ -331,14 +331,14 @@ function WorkspaceInner({ slug, def, toolName, sample }: { slug: string; def: Mo
     const update = (i: number, col: string, v: string) => setRows(t, rows.map((r, j) => (j === i ? { ...r, [col]: v } : r)));
     return (
       <div key={t.key} className="mt-7">
-        <p id={`${id}-label`} className="text-[15px] font-semibold text-eccellere-ink">{t.label}{badge}</p>
+        <p id={`${id}-label`} className="text-sm leading-relaxed font-semibold text-eccellere-ink">{t.label}{badge}</p>
         <p className="mt-1 text-xs text-ink-light">{t.help}</p>
         <div className="mt-3 border border-eccellere-border">
           {rows.map((r, i) => (
             <div key={i} className={cn("p-4", i > 0 && "border-t border-eccellere-border")}>
               {t.fixedRows && (
                 <div className="mb-3">
-                  <p className="text-[15px] font-semibold text-eccellere-ink">{r[nameKey]}</p>
+                  <p className="text-sm leading-relaxed font-semibold text-eccellere-ink">{r[nameKey]}</p>
                   {t.rowHints?.[r[nameKey]] && <p className="mt-0.5 text-xs text-ink-light">{t.rowHints[r[nameKey]]}</p>}
                 </div>
               )}
@@ -405,7 +405,7 @@ function WorkspaceInner({ slug, def, toolName, sample }: { slug: string; def: Mo
         <div className="flex flex-wrap items-center gap-x-8 gap-y-4">
           <div className="min-w-[260px] flex-1">
             <p className={LABEL}>{sample ? "Worked example & template" : "Template"}</p>
-            <h2 className="m-0 mt-1 font-display text-[clamp(18px,2.2vw,22px)] font-light text-eccellere-ink">{sample ? "See it worked — or fill it in offline" : "Fill it in offline"}</h2>
+            <h2 className="m-0 mt-1 font-display text-2xl font-light text-eccellere-ink">{sample ? "See it worked — or fill it in offline" : "Fill it in offline"}</h2>
             <p className="mt-2 text-sm text-ink-light">{sample ? "A fictional company's completed example, a blank Excel template that mirrors the form below, and an upload that reads a filled one back. No AI is needed." : "A blank Excel template that mirrors the form below, and an upload that reads a filled one back. No AI is needed."}</p>
           </div>
           <div className="flex flex-wrap gap-3">
@@ -434,7 +434,7 @@ function WorkspaceInner({ slug, def, toolName, sample }: { slug: string; def: Mo
 
       {/* progress and saving */}
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1" role="status" aria-live="polite">
-        <p className={LABEL}>Guided fill-in &mdash; no length limit, be as detailed as the evidence supports</p>
+        <p id="stage-2" className={cn(LABEL, "scroll-mt-24")}>Guided fill-in &mdash; no length limit, be as detailed as the evidence supports</p>
         <p className={cn("text-xs font-medium", saveState === "error" ? "text-red-700" : "text-eccellere-teal")}>
           {saveState === "saved" && <CheckCircle2 className="mr-1 inline h-3.5 w-3.5" />}{saveText}
         </p>
@@ -457,8 +457,8 @@ function WorkspaceInner({ slug, def, toolName, sample }: { slug: string; def: Mo
         <section className={cn(CARD, "break-inside-avoid")} aria-labelledby="results">
           <h3 id="results" className={`${LABEL} m-0`}>Results at a glance</h3>
           <dl className="mt-4 grid gap-5 sm:grid-cols-2">
-            {derived.map((d) => <div key={d.key}><dt className="text-[10px] font-semibold uppercase tracking-[0.08em] text-ink-light">{d.label}</dt><dd className="mt-1 font-display text-2xl text-eccellere-ink">{d.value ?? <span className="font-sans text-sm text-ink-light">Needs more input</span>}</dd></div>)}
-            {outputs.map((o) => <div key={o.key}><dt className="text-[10px] font-semibold uppercase tracking-[0.08em] text-ink-light">{o.label}</dt><dd className="mt-1 font-display text-2xl text-eccellere-ink">{o.value || <span className="font-sans text-sm text-ink-light">Needs more input</span>}</dd></div>)}
+            {derived.map((d) => <div key={d.key}><dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-light">{d.label}</dt><dd className="mt-1 font-display text-2xl text-eccellere-ink">{d.value ?? <span className="font-sans text-sm text-ink-light">Needs more input</span>}</dd></div>)}
+            {outputs.map((o) => <div key={o.key}><dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-light">{o.label}</dt><dd className="mt-1 font-display text-2xl text-eccellere-ink">{o.value || <span className="font-sans text-sm text-ink-light">Needs more input</span>}</dd></div>)}
           </dl>
           <p className="mt-4 text-[11px] text-ink-light">Calculated by the worksheet from your numbers, not by AI.</p>
         </section>
@@ -469,7 +469,7 @@ function WorkspaceInner({ slug, def, toolName, sample }: { slug: string; def: Mo
         <button type="button" onClick={download} className={BTN_LINE}>Download</button>
       </div>
 
-      <section className={CARD} aria-labelledby="analysis">
+      <section id="stage-3" className={cn(CARD, "scroll-mt-24")} aria-labelledby="analysis">
         <p className={LABEL}>End output</p>
         <h2 id="analysis" className="m-0 mt-1 font-display text-2xl font-light text-eccellere-ink">Analysis, Recommendations &amp; Actionables</h2>
         <button type="button" disabled={!!busy || filled < 1} onClick={() => ai("analyse")} className="no-print mt-4 w-full bg-eccellere-ink px-5 py-2.5 text-sm font-medium text-white hover:opacity-90 disabled:bg-ink-light disabled:opacity-100">
@@ -479,7 +479,7 @@ function WorkspaceInner({ slug, def, toolName, sample }: { slug: string; def: Mo
         {a && (
           <div className="mt-6 space-y-6 text-sm">
             {stale && <p className="no-print border border-amber-300 bg-amber-50 p-3 text-amber-900"><AlertTriangle className="mr-1 inline h-4 w-4" />You have changed your answers since this was written. Press &ldquo;Write it again&rdquo; to bring it up to date.</p>}
-            <p className="text-[15px] leading-relaxed text-ink-mid">{a.summary}</p>
+            <p className="text-sm leading-relaxed text-ink-mid">{a.summary}</p>
             {a.verdict && <p className="border-l-4 border-eccellere-gold bg-eccellere-cream p-4 leading-relaxed"><strong>{a.verdict.label}.</strong> {a.verdict.rationale}</p>}
             {a.findings.length > 0 && (<div><h3 className={LABEL}>What the answers show</h3><ul className="mt-2 space-y-2 leading-relaxed">{a.findings.map((f, i) => <li key={i}><strong>{f.title}.</strong> {f.detail}</li>)}</ul></div>)}
             {a.watchouts.length > 0 && (<div><h3 className={LABEL}>Watch-outs</h3><ul className="mt-2 list-disc space-y-1 pl-5 leading-relaxed">{a.watchouts.map((w, i) => <li key={i}>{w}</li>)}</ul></div>)}
@@ -488,7 +488,7 @@ function WorkspaceInner({ slug, def, toolName, sample }: { slug: string; def: Mo
               <div className="overflow-x-auto">
                 <h3 className={LABEL}>Action plan</h3>
                 <table className="mt-2 w-full min-w-[520px] border-collapse text-left">
-                  <thead><tr className="text-[10px] font-semibold uppercase tracking-[0.08em] text-ink-light"><th className="border-b border-eccellere-border pb-1 pr-3">Action</th><th className="border-b border-eccellere-border pb-1 pr-3">Owner (role)</th><th className="border-b border-eccellere-border pb-1 pr-3">When</th><th className="border-b border-eccellere-border pb-1">Priority</th></tr></thead>
+                  <thead><tr className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-light"><th className="border-b border-eccellere-border pb-1 pr-3">Action</th><th className="border-b border-eccellere-border pb-1 pr-3">Owner (role)</th><th className="border-b border-eccellere-border pb-1 pr-3">When</th><th className="border-b border-eccellere-border pb-1">Priority</th></tr></thead>
                   <tbody>{saved!.actionables.map((x, i) => <tr key={i} className="border-t border-eccellere-border align-top"><td className="py-2 pr-3">{x.action}</td><td className="py-2 pr-3">{x.owner}</td><td className="py-2 pr-3">{x.timeframe}</td><td className="py-2">{x.priority}</td></tr>)}</tbody>
                 </table>
               </div>
