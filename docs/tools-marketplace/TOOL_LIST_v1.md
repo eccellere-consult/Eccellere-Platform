@@ -1,7 +1,7 @@
 # Tool list v1 (from the four course decks in `D:\Cowork\Input\Problem solving`)
 
 Extracted 2 Nov 2026 from: Creative Problem-Solving Class 1 and 2; Structured Problem-Solving Tools Class 1 and 2 (Vikram Rao).
-The decks list about 330 tile entries; after merging repeats (for example Balanced Scorecard appears three times) this is **152 distinct tools** in 14 groups.
+The decks list about 330 tile entries; after merging repeats (for example Balanced Scorecard appears three times) this is **152 distinct tools** in 12 groups.
 
 Format is the one the admin "add from a list" box will take: `Tool name | Category`. One per line.
 `*` after a name = an existing Strategy Hub tool already covers it (decision pending: reuse, or draft fresh).

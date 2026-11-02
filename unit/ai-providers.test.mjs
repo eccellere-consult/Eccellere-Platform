@@ -135,3 +135,42 @@ test("diag records a missing key and a timeout", async () => {
   assert.match(d2[0], /timed out/);
   globalThis.fetch = realFetch;
 });
+
+test("JSON mode: OpenAI-compatible providers get response_format; Anthropic gets a JSON-only instruction; default calls are unchanged", async () => {
+  let c = capture(ok({ choices: [{ message: { content: "{}" }, finish_reason: "stop" }] }));
+  await callProvider(PROVIDER_BY_ID.openai, "m", { ...args, json: true }, allKeys);
+  assert.deepEqual(c.body.response_format, { type: "json_object" });
+  assert.match(c.body.messages[0].content, /valid JSON object only/);
+  c = capture(ok({ choices: [{ message: { content: "x" } }] }));
+  await callProvider(PROVIDER_BY_ID.openai, "m", args, allKeys);
+  assert.equal(c.body.response_format, undefined);
+  assert.equal(c.body.messages[0].content, "SYS");
+  c = capture(ok({ content: [{ type: "text", text: "{}" }], stop_reason: "end_turn" }));
+  await callProvider(PROVIDER_BY_ID.anthropic, "m", { ...args, json: true }, allKeys);
+  assert.match(c.body.system, /^SYS[\s\S]*valid JSON object only/);
+  assert.equal(c.body.response_format, undefined);
+  globalThis.fetch = realFetch;
+});
+
+test("finish reason: a cut-off answer is reported as 'length' for both provider kinds, and surfaced by runProviders", async () => {
+  capture(ok({ content: [{ type: "text", text: "{\"a\":" }], stop_reason: "max_tokens" }));
+  const f1 = {};
+  await callProvider(PROVIDER_BY_ID.anthropic, "m", { ...args, finish: f1 }, allKeys);
+  assert.equal(f1.reason, "length");
+  capture(ok({ choices: [{ message: { content: "{\"a\":" }, finish_reason: "length" }] }));
+  const f2 = {};
+  await callProvider(PROVIDER_BY_ID.groq, "m", { ...args, finish: f2 }, allKeys);
+  assert.equal(f2.reason, "length");
+  capture(ok({ choices: [{ message: { content: "done" }, finish_reason: "stop" }] }));
+  const r = await runProviders(normalizeSettings({ primary: "openai" }), allKeys, args);
+  assert.equal(r.finishReason, "stop");
+  globalThis.fetch = realFetch;
+});
+
+test("error detail keeps its words: whitespace is collapsed, the letter s is not", async () => {
+  globalThis.fetch = async () => ({ ok: false, status: 429, text: async () => "rate   limit\nexceeds   issues" });
+  const d = [];
+  await callProvider(PROVIDER_BY_ID.openai, "m", { ...args, diag: d }, allKeys);
+  assert.match(d[0], /HTTP 429 - rate limit exceeds issues/);
+  globalThis.fetch = realFetch;
+});

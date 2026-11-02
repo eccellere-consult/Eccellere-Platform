@@ -792,3 +792,84 @@ model AiSetting {
   updatedBy String?
   updatedAt DateTime @updatedAt
 }
+
+// ─── Tools marketplace (strategy and problem-solving tools; additive, no change to existing tables) ───
+
+/// One tool in the catalogue. `definition` is the tool-as-data definition that drives the form, diagram and AI prompts.
+model WsTool {
+  id           String    @id @default(cuid())
+  slug         String    @unique
+  name         String
+  category     String
+  status       String    @default("DRAFT") // DRAFT | NEEDS_REVIEW | REVIEWED | PUBLISHED | ARCHIVED
+  source       String    @default("ai") // ai | hand | strategy-hub
+  does         String?   @db.Text
+  whenToUse    String?   @db.Text
+  whenNotToUse String?   @db.Text
+  definition   Json
+  quality      Json? // last quality-gate result: { errors: [], warnings: [] }
+  provenance   Json? // model used, drafted at, originator/year only if a source was opened
+  reviewedById String?
+  reviewedAt   DateTime?
+  publishedAt  DateTime?
+  sortOrder    Int       @default(0)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([status, category])
+}
+
+/// One person's work in one tool (and one case; caseId 0 = no case). `version` guards against two tabs overwriting each other.
+model WsFillin {
+  id                  String    @id @default(cuid())
+  userId              String
+  toolSlug            String
+  caseId              Int       @default(0)
+  fields              Json
+  recommendations     Json?
+  actionables         Json?
+  analysis            Json?
+  analysisFingerprint String?
+  analysisAt          DateTime?
+  previousFields      Json?
+  previousReason      String?
+  version             Int       @default(1)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@unique([userId, toolSlug, caseId])
+  @@index([userId, updatedAt])
+}
+
+/// A batch of tool names pasted by an admin, drafted one at a time.
+model WsImportJob {
+  id          String   @id @default(cuid())
+  createdById String
+  label       String
+  status      String   @default("RUNNING") // RUNNING | PAUSED | DONE
+  pauseReason String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  items WsImportItem[]
+
+  @@index([createdById, createdAt])
+}
+
+model WsImportItem {
+  id        String      @id @default(cuid())
+  jobId     String
+  job       WsImportJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  name      String
+  category  String
+  slug      String
+  status    String      @default("QUEUED") // QUEUED | DRAFTING | DRAFT | NEEDS_REVIEW | FAILED | REVIEWED | PUBLISHED
+  attempts  Int         @default(0)
+  claimedAt DateTime?
+  error     String?     @db.Text
+  toolId    String?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@index([jobId, status])
+}
