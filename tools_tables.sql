@@ -78,8 +78,6 @@ CREATE TABLE IF NOT EXISTS `WsImportItem` (
     `updatedAt` DATETIME(3) NOT NULL,
 
     INDEX `WsImportItem_jobId_status_idx`(`jobId`, `status`),
-    PRIMARY KEY (`id`)
+    PRIMARY KEY (`id`),
+    CONSTRAINT `WsImportItem_jobId_fkey` FOREIGN KEY (`jobId`) REFERENCES `WsImportJob`(`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
--- Only add the link if it is not there yet (a second run of this file would otherwise report "duplicate constraint").
-ALTER TABLE `WsImportItem` ADD CONSTRAINT `WsImportItem_jobId_fkey` FOREIGN KEY (`jobId`) REFERENCES `WsImportJob`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
