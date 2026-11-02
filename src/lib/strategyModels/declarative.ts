@@ -79,21 +79,34 @@ export interface DeclarativeTool {
 const rowsOf = (v: ModelValues, table: string): Row[] => v.tables[table] ?? [];
 const present = (r: Row) => Object.values(r).some((x) => (x ?? '').trim() !== '');
 
-function operand(o: Operand, row: Row | undefined, v: ModelValues): number | null {
+/**
+ * Computed columns by table key, then column key. A computed column's value is worked out, never stored in the saved rows, so a rule that
+ * reads such a column (a total of it, the top row by it) must work it out again row by row. (Added when the Tools marketplace found that a
+ * 'top' output over a computed column never produced a result.)
+ */
+export type ComputedMap = Record<string, Record<string, Rule>>;
+
+/** The text of a column in a row, working it out when it is a computed column. Computed columns do not nest here (no map is passed down). */
+function colText(r: Row, table: string, col: string, v: ModelValues, cm?: ComputedMap): string {
+  const rule = cm?.[table]?.[col];
+  return rule ? ruleFn(rule)(r, v) ?? '' : r[col] ?? '';
+}
+
+function operand(o: Operand, row: Row | undefined, v: ModelValues, cm?: ComputedMap): number | null {
   if (typeof o === 'number') return o;
   if ('field' in o) return toNum(v.fields[o.field]);
   if ('cell' in o) return row ? toNum(row[o.cell]) : null;
   const rows = rowsOf(v, o.table);
   // count: the rows that have anything in them, or (with `col`) the rows where that column is filled in, whether it holds a number or words.
-  if (o.agg === 'count') return o.col ? rows.filter((r) => (r[o.col!] ?? '').trim() !== '').length : rows.filter(present).length;
-  const ns = o.col ? rows.map((r) => toNum(r[o.col!])).filter((n): n is number => n !== null) : [];
+  if (o.agg === 'count') return o.col ? rows.filter((r) => colText(r, o.table, o.col!, v, cm).trim() !== '').length : rows.filter(present).length;
+  const ns = o.col ? rows.map((r) => toNum(colText(r, o.table, o.col!, v, cm))).filter((n): n is number => n !== null) : [];
   if (!ns.length) return null;
   return o.agg === 'sum' ? ns.reduce((a, b) => a + b, 0) : o.agg === 'avg' ? ns.reduce((a, b) => a + b, 0) / ns.length : o.agg === 'min' ? Math.min(...ns) : Math.max(...ns);
 }
 
-function evalExpr(e: Expr, row: Row | undefined, v: ModelValues): number | null {
-  if (typeof e === 'number' || 'field' in e || 'cell' in e || 'agg' in e) return operand(e as Operand, row, v);
-  const all = (xs: Expr[]) => { const ns = xs.map((x) => evalExpr(x, row, v)); return ns.some((n) => n === null) ? null : (ns as number[]); };
+function evalExpr(e: Expr, row: Row | undefined, v: ModelValues, cm?: ComputedMap): number | null {
+  if (typeof e === 'number' || 'field' in e || 'cell' in e || 'agg' in e) return operand(e as Operand, row, v, cm);
+  const all = (xs: Expr[]) => { const ns = xs.map((x) => evalExpr(x, row, v, cm)); return ns.some((n) => n === null) ? null : (ns as number[]); };
   if ('add' in e) { const ns = all(e.add); return ns ? ns.reduce((a, b) => a + b, 0) : null; }
   if ('mul' in e) { const ns = all(e.mul); return ns ? ns.reduce((a, b) => a * b, 1) : null; }
   if ('sub' in e) { const ns = all(e.sub); return ns ? ns[0] - ns[1] : null; }
@@ -105,22 +118,22 @@ const show = (n: number, f: 'int' | 'dp1' | 'dp2' | 'pct' | undefined): string =
   f === 'int' ? String(Math.round(n)) : f === 'dp2' ? fmtNum(n, 2) : f === 'pct' ? `${fmtNum(n, 1)}%` : fmtNum(n, 1);
 
 /** A rule as a function of the current row (computed columns) and the answers. Null until there is enough input. */
-export function ruleFn(rule: Rule): (row: Row | undefined, v: ModelValues) => string | null {
+export function ruleFn(rule: Rule, cm?: ComputedMap): (row: Row | undefined, v: ModelValues) => string | null {
   return (row, v) => {
     try {
       switch (rule.op) {
-        case 'calc': { const n = evalExpr(rule.expr, row, v); return n === null || !Number.isFinite(n) ? null : `${show(n, rule.format)}${rule.suffix ?? ''}`; }
+        case 'calc': { const n = evalExpr(rule.expr, row, v, cm); return n === null || !Number.isFinite(n) ? null : `${show(n, rule.format)}${rule.suffix ?? ''}`; }
         case 'weighted': {
-          const rs = rowsOf(v, rule.table).map((r) => ({ a: toNum(r[rule.value]), w: toNum(r[rule.weight]) })).filter((x): x is { a: number; w: number } => x.a !== null && x.w !== null);
+          const rs = rowsOf(v, rule.table).map((r) => ({ a: toNum(colText(r, rule.table, rule.value, v, cm)), w: toNum(colText(r, rule.table, rule.weight, v, cm)) })).filter((x): x is { a: number; w: number } => x.a !== null && x.w !== null);
           const w = rs.reduce((s, x) => s + x.w, 0);
           return rs.length && w !== 0 ? show(rs.reduce((s, x) => s + x.a * x.w, 0) / w, rule.format ?? 'dp1') : null;
         }
         case 'top': {
-          const rs = rowsOf(v, rule.table).map((r) => ({ n: toNum(r[rule.by]), l: (r[rule.label] ?? '').trim() })).filter((x): x is { n: number; l: string } => x.n !== null && x.l !== '');
+          const rs = rowsOf(v, rule.table).map((r) => ({ n: toNum(colText(r, rule.table, rule.by, v, cm)), l: colText(r, rule.table, rule.label, v, cm).trim() })).filter((x): x is { n: number; l: string } => x.n !== null && x.l !== '');
           return rs.length ? rs.reduce((best, x) => (x.n > best.n ? x : best)).l : null;
         }
         case 'quadrant': {
-          const x = evalExpr(rule.x, row, v), y = evalExpr(rule.y, row, v);
+          const x = evalExpr(rule.x, row, v, cm), y = evalExpr(rule.y, row, v, cm);
           return x === null || y === null ? null : rule.names[(x > rule.midX ? 1 : 0) + (y > rule.midY ? 2 : 0)];
         }
         case 'template': {
@@ -129,7 +142,7 @@ export function ruleFn(rule: Rule): (row: Row | undefined, v: ModelValues) => st
           return blank ? null : out;
         }
         case 'when': {
-          const n = evalExpr(rule.expr, row, v);
+          const n = evalExpr(rule.expr, row, v, cm);
           if (n === null) return null;
           return (rule.gt === undefined || n > rule.gt) && (rule.lt === undefined || n < rule.lt) ? rule.then : rule.else;
         }
@@ -138,16 +151,16 @@ export function ruleFn(rule: Rule): (row: Row | undefined, v: ModelValues) => st
   };
 }
 
-const toneFn = (rule: Rule): Derived['tone'] =>
+const toneFn = (rule: Rule, cm?: ComputedMap): Derived['tone'] =>
   rule.op === 'when' && rule.tones ? (v) => {
-    const n = evalExpr(rule.expr, undefined, v);
+    const n = evalExpr(rule.expr, undefined, v, cm);
     if (n === null) return undefined;
     return (rule.gt === undefined || n > rule.gt) && (rule.lt === undefined || n < rule.lt) ? rule.tones?.then : rule.tones?.else;
   } : undefined;
 
 // ── From data to an ordinary ModelDefinition ────────────────────────────────────────────────────────────────────────
 
-function partOf(p: DeclPart): Part {
+function partOf(p: DeclPart, cm?: ComputedMap): Part {
   if (p.kind === 'field') {
     const ex = p.example ?? '';
     switch (p.type) {
@@ -165,7 +178,7 @@ function partOf(p: DeclPart): Part {
       case 'number': return col.num(c.key, c.header, c.help, c.unit ?? '', { half: c.half });
       case 'select': return col.select(c.key, c.header, c.help, c.options ?? []);
       case 'rating': return col.rating(c.key, c.header, c.help, c.scale ?? {});
-      case 'computed': { const f = ruleFn(c.rule ?? { op: 'template', text: '' }); return col.computed(c.key, c.header, c.help, (row, v) => f(row, v) ?? ''); }
+      case 'computed': { const f = ruleFn(c.rule ?? { op: 'template', text: '' }, cm); return col.computed(c.key, c.header, c.help, (row, v) => f(row, v) ?? ''); }
       default: return col.text(c.key, c.header, c.help, { half: c.half });
     }
   });
@@ -173,10 +186,20 @@ function partOf(p: DeclPart): Part {
 }
 
 /** The ModelDefinition the engine runs. Everything downstream (form, kit, AI, outputs) treats it like a hand-coded one. */
+function computedMapOf(tool: DeclarativeTool): ComputedMap {
+  const cm: ComputedMap = {};
+  for (const s of tool.sections) for (const p of s.parts) {
+    if (p.kind !== 'table' || p.board) continue;
+    for (const c of p.columns) if (c.type === 'computed' && c.rule) (cm[p.key] ??= {})[c.key] = c.rule;
+  }
+  return cm;
+}
+
 export function interpret(tool: DeclarativeTool): ModelDefinition {
-  const sections: Section[] = tool.sections.map((s) => section(s.key, s.title, s.summary, ...s.parts.map(partOf)));
-  const derived: Derived[] = (tool.derived ?? []).map((d) => { const f = ruleFn(d.rule); return { key: d.key, label: d.label, help: d.help, compute: (v) => f(undefined, v), tone: toneFn(d.rule) }; });
-  const outputs: Output[] = (tool.outputs ?? []).map((o) => { const f = ruleFn(o.rule); return { key: o.key, label: o.label, compute: (v) => f(undefined, v), conditional: o.conditional }; });
+  const cm = computedMapOf(tool);
+  const sections: Section[] = tool.sections.map((s) => section(s.key, s.title, s.summary, ...s.parts.map((p) => partOf(p, cm))));
+  const derived: Derived[] = (tool.derived ?? []).map((d) => { const f = ruleFn(d.rule, cm); return { key: d.key, label: d.label, help: d.help, compute: (v) => f(undefined, v), tone: toneFn(d.rule, cm) }; });
+  const outputs: Output[] = (tool.outputs ?? []).map((o) => { const f = ruleFn(o.rule, cm); return { key: o.key, label: o.label, compute: (v) => f(undefined, v), conditional: o.conditional }; });
   return { toolId: tool.slug, reference: tool.reference, sections, derived, outputs, analysisGuide: tool.analysisGuide };
 }
 

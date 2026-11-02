@@ -32,7 +32,11 @@ export default function LoginPage() {
     } else {
       const session = await getSession();
       const role = (session?.user as { role?: string })?.role;
-      if (role === "ADMIN" || role === "SUPER_ADMIN" || role === "CONTENT_ADMIN") {
+      // Coming from a tool page: go back to it (only to a /tools/ path on this site, never to an outside address).
+      const next = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("next") : null;
+      if (next && /^\/tools(\/[a-z0-9-]+)?$/.test(next)) {
+        router.push(next);
+      } else if (role === "ADMIN" || role === "SUPER_ADMIN" || role === "CONTENT_ADMIN") {
         router.push("/admin");
       } else if (role === "SPECIALIST") {
         router.push("/specialist");
