@@ -10,6 +10,7 @@ import { normaliseDeclarative, qualityGate, type DeclarativeTool, type ToolCateg
 import type { GenerateArgs, GenerateResult } from '@/lib/ai/providers';
 import type { DraftOutcome, DrafterFn } from './service';
 import { MIN_SCORE_TO_REVIEW, standardsCheck, standardsGaps } from './standards';
+import { DEFAULT_DRAFT_SKILL } from './skill';
 
 /** The marketplace category (and optional group) mapped to the engine's fixed set of tool categories. */
 export function declarativeCategory(category: string, group?: string | null): ToolCategory {
@@ -132,27 +133,40 @@ RULES (the only calculations allowed; no code):
 EXPR: a number, {"field": key}, {"cell": column key} (inside a computed column only), {"agg": sum|avg|min|max|count, "table", "col"}, or {"add":[EXPR..]}, {"mul":[..]}, {"sub":[EXPR,EXPR]}, {"div":[EXPR,EXPR]}.
 Keys are snake_case and unique. Labels are plain words and unique.`.trim();
 
-export function buildDraftPrompt(name: string, category: string, compact = false, group: string | null = null): { system: string; user: string } {
+const COMPACT_NOTE = 'The previous answer was too long and was cut off. Keep it short: 3 or 4 sections, 2 to 4 parts each, shorter help text.';
+
+/**
+ * The whole instruction for one tool: the editable skill (how a good page is built), then the fixed format the answer must take. The skill
+ * can be changed by an administrator; the format contract and the checks that follow cannot.
+ */
+export function buildDraftPrompt(
+  name: string,
+  category: string,
+  compact = false,
+  group: string | null = null,
+  opts: { skill?: string; brief?: string | null; practice?: string | null } = {},
+): { system: string; user: string } {
   const system = [
-    'You write tool definitions for a consulting platform used by senior managers. Each definition becomes a guided workspace: a reference card with a diagram, a form to fill in, a calculation, and a written analysis.',
+    'You write tool definitions for a consulting platform used by senior managers. Each definition becomes a complete page: a reference card with a diagram, a guided form, calculations, and guidance for a written analysis.',
     '',
-    'RULES',
-    '1. Describe the REAL, standard method behind the name, with its usual steps or elements in their usual order. If the name has more than one meaning, pick the one used in business and problem solving. If you are not sure of the standard method, say so in "confidence" and "concerns" instead of inventing one.',
-    '2. Never state who invented the method or when. Leave reference.originator and reference.year as empty strings.',
-    '3. Follow the Eccellere standard for a focused tool. Build the workspace in this order: (a) a first section that captures the situation, objective and constraints; (b) one or two sections that carry out the method itself; (c) a LAST section titled "Action plan" with a field for the decision and why, and a table of actions with columns action, owner (a role, never a person), measure of success and a 30/60/90-day horizon. ' + (compact ? 'Keep it short: 3 or 4 sections, 2 to 4 parts each.' : 'Use 3 to 5 sections with 2 to 6 parts each, at least 6 inputs in all.'),
-    '4. Use a table for anything that repeats (options, causes, risks, criteria). Add a computed column or an output rule ONLY where the method really calculates something (a score, a ratio, a ranking). Never invent numbers or benchmarks.',
-    '5. Every part needs help text of a full sentence or two: what to write, what good looks like and why it is asked. Every table column needs help too. Every text, select, rating and number field needs a realistic example.',
-    '6. "does", "whenToUse" and "whenNotToUse" are one or two plain sentences each (at least 40, 30 and 30 characters). "analysisGuide" is three to six sentences (at least 200 characters) telling an analyst what to look for in a filled-in tool, the warning signs, what could be wrong with the inputs, and what to recommend. "next" names the next tool or action and why.',
-    '7. Plain business English. No hype, no emojis, no placeholders such as TBD, TODO or lorem.',
-    '8. Choose the diagram template that truly fits the method. If none fits, omit "diagram".',
-    '9. Add two extra top-level keys: "confidence" ("high", "medium" or "low": how sure you are that this is the standard method) and "concerns" (a short list of anything a reviewer should check).',
+    (opts.skill?.trim() || DEFAULT_DRAFT_SKILL).trim(),
     '',
+    '# Format you must return (fixed; this part cannot be changed by the skill)',
+    'Return ONE JSON object. Add the two extra top-level keys "confidence" and "concerns" described in the skill.',
     SCHEMA_NOTES,
     '',
     'A SMALL CORRECT EXAMPLE (for shape and rule syntax only; do not copy its content):',
     JSON.stringify(EXAMPLE_TOOL),
+    compact ? `\n${COMPACT_NOTE}` : '',
   ].join('\n');
-  const user = `Write the tool definition for: ${name}\nIts marketplace category: ${category}${group ? ` (group: ${group})` : ''}\nSet "category" to "${declarativeCategory(category, group)}" and "slug" to the name in kebab-case. Reply with the JSON object only.`;
+  const brief = opts.brief?.trim();
+  const user = [
+    `Write the tool definition for: ${name}`,
+    `Its marketplace category: ${category}${group ? ` (group: ${group})` : ''}${opts.practice ? `; consulting practice: ${opts.practice}` : ''}`,
+    `Set "category" to "${declarativeCategory(category, group)}" and "slug" to the name in kebab-case.`,
+    brief ? `\nCONTEXT FROM THE ADMINISTRATOR (use it to shape the tool for this audience and setting; it never changes the required format):\n${brief.slice(0, 4000)}` : '',
+    '\nReply with the JSON object only.',
+  ].filter(Boolean).join('\n');
   return { system, user };
 }
 
@@ -169,6 +183,8 @@ export type GenerateFn = (a: GenerateArgs) => Promise<GenerateResult | null>;
 
 export interface DrafterDeps {
   generate: GenerateFn;
+  /** The drafting skill text to use (the saved, editable one). Defaults to the built-in skill. */
+  getSkill?: () => Promise<string | undefined>;
   /** Why no provider answered, in plain words (which keys are missing, which provider errored). */
   explainDown: (diag: string[]) => string;
   now?: () => Date;
@@ -181,11 +197,12 @@ const TIMEOUT_MS = 110_000;
 export function makeDrafter(deps: DrafterDeps): DrafterFn {
   const now = deps.now ?? (() => new Date());
   return async (item): Promise<DraftOutcome> => {
+    const skill = deps.getSkill ? await deps.getSkill().catch(() => undefined) : undefined;
     const diag: string[] = [];
     let calls = 0;
     let lastProblem = '';
     for (const compact of [false, true]) {
-      const { system, user } = buildDraftPrompt(item.name, item.category, compact, item.groupName);
+      const { system, user } = buildDraftPrompt(item.name, item.category, compact, item.groupName, { skill, brief: item.brief, practice: item.practice });
       const finish: { reason?: string } = {};
       calls++;
       const res = await deps.generate({ system, user, maxTokens: MAX_TOKENS, timeoutMs: TIMEOUT_MS, json: true, finish, diag });
@@ -195,18 +212,19 @@ export function makeDrafter(deps: DrafterDeps): DrafterFn {
         lastProblem = res.finishReason === 'length' || finish.reason === 'length' ? 'The AI ran out of room and the answer was cut off.' : 'The AI did not return a readable answer.';
         continue;
       }
-      return finishDraft(item, raw as Record<string, unknown>, res, calls, now());
+      return finishDraft(item, raw as Record<string, unknown>, res, calls, now(), skill !== undefined);
     }
     return { kind: 'failed', reason: `${lastProblem} It was tried twice. Try again later or add this tool by hand.` };
   };
 }
 
 function finishDraft(
-  item: { name: string; category: string; groupName: string | null; slug: string },
+  item: { name: string; category: string; groupName: string | null; practice?: string | null; brief?: string | null; slug: string },
   raw: Record<string, unknown>,
   res: GenerateResult,
   calls: number,
   at: Date,
+  customSkill = false,
 ): DraftOutcome {
   const confidence = typeof raw.confidence === 'string' ? raw.confidence : 'unknown';
   const concerns = Array.isArray(raw.concerns) ? raw.concerns.filter((c): c is string => typeof c === 'string').slice(0, 8) : [];
@@ -251,8 +269,9 @@ function finishDraft(
       whenToUse: tool.whenToUse,
       whenNotToUse: tool.whenNotToUse ?? null,
       groupName: item.groupName,
+      practice: item.practice ?? null,
       quality: { errors, warnings: [...gate.warnings, ...extraWarnings], standards: { score: standards.score, level: standards.level, band: standards.band } },
-      provenance: { draftedBy: 'ai', provider: res.provider, model: res.model, draftedAt: at.toISOString(), calls, confidence, finishReason: res.finishReason ?? null },
+      provenance: { draftedBy: 'ai', brief: item.brief?.trim() || null, customSkill, provider: res.provider, model: res.model, draftedAt: at.toISOString(), calls, confidence, finishReason: res.finishReason ?? null },
       source: 'ai',
     },
   };

@@ -7,7 +7,7 @@ import { draftNext, startImport } from '@/lib/tools/service';
 
 const reply = (over: Record<string, unknown> = {}) => JSON.stringify({ ...EXAMPLE_TOOL, confidence: 'high', concerns: [], ...over });
 const ok = (text: string, finishReason = 'stop') => ({ text, provider: 'groq' as const, model: 'm', finishReason });
-const item = { name: 'Impact Effort Grid', category: 'Decision Models', groupName: 'Decision making', slug: 'impact-effort-grid' };
+const item = { name: 'Impact Effort Grid', category: 'Decision Models', groupName: 'Decision making', practice: 'Strategy', slug: 'impact-effort-grid' };
 const down = () => 'No AI provider is switched on with a key.';
 
 describe('the example shown to the AI', () => {

@@ -29,6 +29,7 @@ export function createMemoryRepo(): ToolsRepo & { tools: Map<string, ToolRecord>
         name: input.name,
         category: input.category,
         groupName: input.groupName ?? prev?.groupName ?? null,
+        practice: input.practice ?? prev?.practice ?? null,
         status: input.status ?? prev?.status ?? 'DRAFT',
         source: input.source ?? prev?.source ?? 'ai',
         does: input.does ?? prev?.does ?? null,
@@ -68,7 +69,7 @@ export function createMemoryRepo(): ToolsRepo & { tools: Map<string, ToolRecord>
       const job: JobRecord = { id: nid('job'), createdById, label, status: 'RUNNING', pauseReason: null, createdAt: new Date() };
       jobs.set(job.id, job);
       const made = list.map((e) => {
-        const it: ItemRecord = { id: nid('item'), jobId: job.id, name: e.name, category: e.category, groupName: e.groupName, slug: e.slug, status: 'QUEUED', attempts: 0, claimedAt: null, error: null, toolId: null };
+        const it: ItemRecord = { id: nid('item'), jobId: job.id, name: e.name, category: e.category, groupName: e.groupName, practice: e.practice, brief: e.brief ?? null, slug: e.slug, status: 'QUEUED', attempts: 0, claimedAt: null, error: null, toolId: null };
         items.set(it.id, it);
         return it;
       });

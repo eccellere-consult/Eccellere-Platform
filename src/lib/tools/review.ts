@@ -59,7 +59,7 @@ export async function editTool(repo: ToolsRepo, slug: string, edits: ToolEdits):
   def.source = { ...(def.source ?? { draftedBy: 'ai' as const }) };
   const quality = assess(def);
   await repo.saveTool({
-    slug, name: def.name, category: tool.category, groupName: tool.groupName, definition: def,
+    slug, name: def.name, category: tool.category, groupName: tool.groupName, practice: tool.practice, definition: def,
     does: def.does, whenToUse: def.whenToUse, whenNotToUse: def.whenNotToUse ?? null, quality,
     status: quality.errors.length ? 'NEEDS_REVIEW' : 'DRAFT',
   });
@@ -68,11 +68,11 @@ export async function editTool(repo: ToolsRepo, slug: string, edits: ToolEdits):
 }
 
 /** Draft this tool again from its name. Replaces the content; the previous draft is not kept. */
-export async function redraftTool(repo: ToolsRepo, slug: string, drafter: DrafterFn): Promise<{ tool?: ToolRecord; paused?: string; failed?: string }> {
+export async function redraftTool(repo: ToolsRepo, slug: string, drafter: DrafterFn, brief?: string): Promise<{ tool?: ToolRecord; paused?: string; failed?: string }> {
   const tool = await repo.getToolBySlug(slug);
   if (!tool) throw new ToolsError('NOT_FOUND', 'That tool was not found.');
   if (tool.status === 'PUBLISHED') throw new ToolsError('WRONG_STATE', 'This tool is live. Take it off the marketplace before drafting it again.');
-  const out = await drafter({ name: tool.name, category: tool.category, groupName: tool.groupName, slug });
+  const out = await drafter({ name: tool.name, category: tool.category, groupName: tool.groupName, practice: tool.practice, brief: brief?.trim() || (typeof tool.provenance?.brief === 'string' ? tool.provenance.brief : null), slug });
   if (out.kind === 'ai_down') return { paused: out.reason };
   if (out.kind === 'failed') return { failed: out.reason };
   const status = (out.tool.quality?.errors.length ?? 0) > 0 ? 'NEEDS_REVIEW' : 'DRAFT';

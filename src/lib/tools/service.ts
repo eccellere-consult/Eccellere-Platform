@@ -6,6 +6,7 @@
 import { EMPTY_RECORD, fingerprintFields, type FieldChangeReason, type FillinRecord, type StrategyAnalysis } from '@/lib/strategyFillinTypes';
 import type { FrameworkField } from '@/lib/strategyFrameworks';
 import type { FillinRow, ItemRecord, ToolInput, ToolRecord, ToolsRepo } from './repo';
+import { PRACTICES, asPractice, suggestPractice, type Practice } from './practice';
 
 /** A drafting request that has not finished within this long is treated as dead and its name is offered again. */
 export const STALE_DRAFT_MS = 3 * 60 * 1000;
@@ -38,16 +39,16 @@ export const asMarketCategory = (x: string): MarketCategory | null =>
 export function suggestCategory(group: string): MarketCategory {
   const g = group.toLowerCase();
   if (!g) return 'Others';
-  if (/change|adoption|stakeholder/.test(g)) return 'Change Management';
+  if (/(change|adoption|stakeholder|organi[sz]ation|people|operating model|capabilit|culture|talent)/.test(g)) return 'Change Management';
   if (/decision/.test(g)) return 'Decision Models';
   if (/strateg|alignment/.test(g)) return 'Strategy';
   if (/project|performance/.test(g)) return 'Project Management';
   if (/(root cause|creative|problem|process improvement)/.test(g)) return 'Problem solving';
-  if (/(risk|quality|monitor|financ|analy)/.test(g)) return 'Business analysis';
+  if (/(risk|quality|monitor|financ|analy|digital|technolog|architect|data|automation|integration)/.test(g)) return 'Business analysis';
   return 'Others';
 }
 
-export interface ListEntry { name: string; category: MarketCategory; groupName: string | null; slug: string }
+export interface ListEntry { name: string; category: MarketCategory; groupName: string | null; practice: Practice; slug: string }
 export interface ParsedList {
   entries: ListEntry[];
   /** lines that were not a tool (too long, or empty after cleaning), shown back so nothing vanishes silently */
@@ -61,7 +62,7 @@ export interface ParsedList {
  * pasted as it is. The marketplace category is the one chosen in the drop-down, or, for 'Auto', worked out from the group; a line that ends
  * `| Strategy` (any marketplace category) overrides both. Bullets and trailing `*` / `~` marks are ignored. Prose lines are skipped and reported.
  */
-export function parseToolList(text: string, chosen: MarketCategory | 'Auto' = 'Auto'): ParsedList {
+export function parseToolList(text: string, chosen: MarketCategory | 'Auto' = 'Auto', chosenPractice: Practice | 'Auto' = 'Auto'): ParsedList {
   const entries: ListEntry[] = [];
   const skipped: ParsedList['skipped'] = [];
   const duplicates: string[] = [];
@@ -80,9 +81,11 @@ export function parseToolList(text: string, chosen: MarketCategory | 'Auto' = 'A
     const [namePart, ...rest] = line.split('|');
     const name = namePart.replace(/[*~]+\s*$/, '').trim();
     const tag = rest.join('|').trim();
-    // A tag after | that names a marketplace category wins; any other tag is a sub-group.
+    // A tag after | that names a marketplace category or a consulting practice wins; any other tag is a sub-group.
     const tagCategory = tag ? asMarketCategory(tag) : null;
-    const groupName = (tagCategory ? current : tag || current) || null;
+    const tagPractice = tag ? asPractice(tag) : null;
+    const groupName = (tagCategory || tagPractice ? current : tag || current) || null;
+    const practice: Practice = tagPractice ?? (chosenPractice === 'Auto' ? suggestPractice(current || groupName || '') : chosenPractice);
     const category: MarketCategory = tagCategory ?? (chosen === 'Auto' ? suggestCategory(current || groupName || '') : chosen);
     if (!name) { skipped.push({ line: raw.trim(), reason: 'No name on this line.' }); continue; }
     if (/[`]|[.;,]$/.test(name)) { skipped.push({ line: raw.trim().slice(0, 120), reason: 'Looks like a sentence or a note, not a tool name.' }); continue; }
@@ -91,7 +94,7 @@ export function parseToolList(text: string, chosen: MarketCategory | 'Auto' = 'A
     if (!slug) { skipped.push({ line: raw.trim(), reason: 'The name has no letters or numbers.' }); continue; }
     if (seen.has(slug)) { duplicates.push(name); continue; }
     seen.add(slug);
-    entries.push({ name, category, groupName, slug });
+    entries.push({ name, category, groupName, practice, slug });
   }
   if (entries.length > MAX_LIST_ITEMS) {
     for (const e of entries.splice(MAX_LIST_ITEMS)) skipped.push({ line: e.name, reason: `Over the limit of ${MAX_LIST_ITEMS} per run. Paste the rest in a second run.` });
@@ -127,9 +130,17 @@ export function asChoice(x: unknown): MarketCategory | 'Auto' {
   return c;
 }
 
+/** The value of the practice drop-down: one of the practice areas, or "Auto" to work it out from the list's headings. */
+export function asPracticeChoice(x: unknown): Practice | 'Auto' {
+  if (typeof x !== 'string' || x.trim().toLowerCase() === 'auto' || !x.trim()) return 'Auto';
+  const p = asPractice(x);
+  if (!p) throw new ToolsError('BAD_PRACTICE', `"${x}" is not one of the practice areas: ${PRACTICES.join(', ')}.`);
+  return p;
+}
+
 /** What a pasted or uploaded list would do, without writing anything: shown to the admin before drafting starts. */
-export async function previewImport(repo: ToolsRepo, text: string, choice: MarketCategory | 'Auto') {
-  const parsed = parseToolList(text, choice);
+export async function previewImport(repo: ToolsRepo, text: string, choice: MarketCategory | 'Auto', practiceChoice: Practice | 'Auto' = 'Auto') {
+  const parsed = parseToolList(text, choice, practiceChoice);
   const alreadyInCatalogue: string[] = [];
   const fresh: ListEntry[] = [];
   for (const e of parsed.entries) {
@@ -138,11 +149,13 @@ export async function previewImport(repo: ToolsRepo, text: string, choice: Marke
   }
   const byCategory: Record<string, number> = {};
   for (const e of fresh) byCategory[e.category] = (byCategory[e.category] ?? 0) + 1;
-  return { entries: fresh, alreadyInCatalogue, skipped: parsed.skipped, duplicates: parsed.duplicates, byCategory, estimate: estimateRun(fresh.length) };
+  const byPractice: Record<string, number> = {};
+  for (const e of fresh) byPractice[e.practice] = (byPractice[e.practice] ?? 0) + 1;
+  return { entries: fresh, alreadyInCatalogue, skipped: parsed.skipped, duplicates: parsed.duplicates, byCategory, byPractice, estimate: estimateRun(fresh.length) };
 }
 
-export async function startImport(repo: ToolsRepo, adminId: string, text: string, choice: MarketCategory | 'Auto' = 'Auto', label?: string): Promise<StartedImport> {
-  const parsed = parseToolList(text, choice);
+export async function startImport(repo: ToolsRepo, adminId: string, text: string, choice: MarketCategory | 'Auto' = 'Auto', label?: string, practiceChoice: Practice | 'Auto' = 'Auto'): Promise<StartedImport> {
+  const parsed = parseToolList(text, choice, practiceChoice);
   const alreadyInCatalogue: string[] = [];
   const fresh: ListEntry[] = [];
   for (const e of parsed.entries) {
@@ -160,7 +173,8 @@ export type DraftOutcome =
   | { kind: 'ai_down'; reason: string } // no provider answered: stop the whole run, nothing is the tool's fault
   | { kind: 'failed'; reason: string }; // this one name could not be drafted
 
-export type DrafterFn = (item: Pick<ItemRecord, 'name' | 'category' | 'groupName' | 'slug'>) => Promise<DraftOutcome>;
+export type DrafterItem = Pick<ItemRecord, 'name' | 'category' | 'groupName' | 'practice' | 'slug'> & { brief?: string | null };
+export type DrafterFn = (item: DrafterItem) => Promise<DraftOutcome>;
 
 export type DraftStep =
   | { kind: 'idle'; reason: 'no_more_items' | 'job_paused' }
@@ -184,7 +198,7 @@ export async function draftNext(repo: ToolsRepo, jobId: string, draft: DrafterFn
   }
   let outcome: DraftOutcome;
   try {
-    outcome = await draft({ name: item.name, category: item.category, groupName: item.groupName, slug: item.slug });
+    outcome = await draft({ name: item.name, category: item.category, groupName: item.groupName, practice: item.practice, brief: item.brief, slug: item.slug });
   } catch (e) {
     outcome = { kind: 'failed', reason: e instanceof Error ? e.message.slice(0, 300) : 'Unexpected error while drafting.' };
   }
@@ -255,16 +269,48 @@ export async function publishTool(repo: ToolsRepo, slug: string, now: () => Date
   return (await repo.patchTool(slug, { status: 'PUBLISHED', publishedAt: now() }))!;
 }
 
+/** Take a tool back from clients. It stays in the Consulting library (reviewed), so the Eccellere team can still use it. */
 export async function unpublishTool(repo: ToolsRepo, slug: string): Promise<ToolRecord> {
   const tool = await repo.getToolBySlug(slug);
   if (!tool) throw new ToolsError('NOT_FOUND', 'That tool was not found.');
+  if (tool.status !== 'PUBLISHED') throw new ToolsError('WRONG_STATE', 'This tool is not live for clients.');
+  return (await repo.patchTool(slug, { status: 'REVIEWED', publishedAt: null }))!;
+}
+
+/** Retire a tool everywhere: hidden from clients and from the Consulting library. Saved work by people is kept. */
+export async function archiveTool(repo: ToolsRepo, slug: string): Promise<ToolRecord> {
+  const tool = await repo.getToolBySlug(slug);
+  if (!tool) throw new ToolsError('NOT_FOUND', 'That tool was not found.');
   return (await repo.patchTool(slug, { status: 'ARCHIVED' }))!;
+}
+
+/** Put a retired tool back in the Consulting library (it has to be exposed to clients again on purpose). */
+export async function restoreTool(repo: ToolsRepo, slug: string): Promise<ToolRecord> {
+  const tool = await repo.getToolBySlug(slug);
+  if (!tool) throw new ToolsError('NOT_FOUND', 'That tool was not found.');
+  if (tool.status !== 'ARCHIVED') throw new ToolsError('WRONG_STATE', 'This tool is not archived.');
+  return (await repo.patchTool(slug, { status: tool.reviewedById ? 'REVIEWED' : 'DRAFT' }))!;
 }
 
 /** What a signed-in visitor may open. Only published tools; a draft is "not found", never a hint that it exists. */
 export async function getPublishedTool(repo: ToolsRepo, slug: string): Promise<ToolRecord | null> {
   const tool = await repo.getToolBySlug(slug);
   return tool && tool.status === 'PUBLISHED' ? tool : null;
+}
+
+/** What the Eccellere team may open in the Consulting library: every tool a person has reviewed, whether or not clients can see it. */
+export async function getLibraryTool(repo: ToolsRepo, slug: string): Promise<ToolRecord | null> {
+  const tool = await repo.getToolBySlug(slug);
+  return tool && (tool.status === 'REVIEWED' || tool.status === 'PUBLISHED') ? tool : null;
+}
+
+/** Move a tool to another consulting practice (the library drop-down). */
+export async function setToolPractice(repo: ToolsRepo, slug: string, practice: string): Promise<ToolRecord> {
+  const p = asPractice(practice);
+  if (!p) throw new ToolsError('BAD_PRACTICE', `"${practice}" is not one of the practice areas: ${PRACTICES.join(', ')}.`);
+  const updated = await repo.patchTool(slug, { practice: p });
+  if (!updated) throw new ToolsError('NOT_FOUND', 'That tool was not found.');
+  return updated;
 }
 
 // ── A person's work in a tool ────────────────────────────────────────────────────────────────────────────────────
