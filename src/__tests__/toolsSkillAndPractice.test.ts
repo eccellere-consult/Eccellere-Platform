@@ -10,7 +10,7 @@ import {
 } from '@/lib/tools/service';
 import { redraftTool } from '@/lib/tools/review';
 
-const good = JSON.stringify({ ...EXAMPLE_TOOL, confidence: 'high', concerns: [] });
+const good = JSON.stringify({ ...EXAMPLE_TOOL, confidence: 'high', concerns: [], originatorSuggestion: { name: 'A. Suggested Person', year: '1998', confidence: 'medium' } });
 const ok = (text: string) => ({ text, provider: 'groq' as const, model: 'm', finishReason: 'stop' });
 const down = () => 'down';
 
@@ -19,7 +19,9 @@ describe('skill files', () => {
     expect(checkSkillText(DEFAULT_DRAFT_SKILL)).toBeNull();
     expect(checkSkillText(DEFAULT_ASSIST_SKILL)).toBeNull();
     expect(defaultSkill('draft')).toBe(DEFAULT_DRAFT_SKILL);
-    expect(DEFAULT_DRAFT_SKILL).toContain('Never state who invented the method');
+    expect(DEFAULT_DRAFT_SKILL).toContain('originatorSuggestion');
+    expect(DEFAULT_DRAFT_SKILL).toMatch(/always include a diagram/i);
+    expect(DEFAULT_DRAFT_SKILL).toMatch(/worked example/i);
     expect(DEFAULT_DRAFT_SKILL).toContain('Action plan');
   });
   it('refuses a skill file that is empty, tiny, huge or not text', () => {
@@ -41,7 +43,7 @@ describe('the drafting prompt', () => {
     const custom = 'CUSTOM-SKILL-MARKER '.repeat(20);
     const { system } = buildDraftPrompt('Kano Model', 'Decision Models', false, null, { skill: custom });
     expect(system).toContain('CUSTOM-SKILL-MARKER');
-    expect(system).not.toContain('Never state who invented the method'); // the default text is replaced, not appended
+    expect(system).not.toContain('Eccellere drafting skill'); // the default text is replaced, not appended
     expect(system).toContain('Format you must return (fixed');
     expect(system).toContain('"template": "matrix2x2"');
     expect(system).toContain('impact-effort-matrix'); // the worked example
@@ -67,7 +69,7 @@ describe('the drafting prompt', () => {
     let system = '';
     const drafter = makeDrafter({ generate: async (a) => { system = a.system; return ok(good); }, explainDown: down, getSkill: async () => { throw new Error('db down'); } });
     await drafter({ name: 'X Tool', category: 'Others', groupName: null, practice: null, slug: 'x-tool' });
-    expect(system).toContain('Never state who invented the method');
+    expect(system).toContain('Eccellere drafting skill');
   });
 });
 

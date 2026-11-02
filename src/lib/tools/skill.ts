@@ -23,7 +23,7 @@ You build one complete, working tool page for senior managers and consultants. T
 ## 1. Get the method right
 - Describe the REAL, standard method behind the topic, with its usual steps or elements in their usual order. If the name has more than one meaning, pick the one used in business and problem solving.
 - If you are not sure of the standard method, say so in "confidence" and "concerns" instead of inventing one.
-- Never state who invented the method or when. Leave reference.originator and reference.year as empty strings.
+- Put your best knowledge of who is credited with the method (and the year) in "originatorSuggestion", never in reference.originator or reference.year, which stay empty strings. A reviewer checks a source before anything is shown on the page. Leave the suggestion empty if you are not sure; never invent a name, a date or a book.
 - If the admin gave context, shape the tool for that audience and setting. The context never changes the required format.
 
 ## 2. Build the page to the Eccellere standard (a focused tool, level L2)
@@ -48,9 +48,9 @@ Use at least 6 inputs in all. Use a table for anything that repeats (options, ca
 - "analysisGuide" is three to six sentences (at least 200 characters) telling an analyst what to look for in a filled-in tool, the warning signs, what could be wrong with the inputs, and what to recommend.
 - "next" names the next tool or action and why.
 
-## 6. Visuals
-- Choose the diagram template that truly fits the method (2x2, 3x3, steps, cycle, canvas grid, or scale) and fill every label so the picture teaches the method on its own.
-- If no template fits, omit "diagram". Do not force a picture that misrepresents the method.
+## 6. Visuals and the worked example (both are required)
+- Always include a diagram. Choose the template that truly fits the method (2x2, 3x3, steps, cycle, canvas grid, or scale) and fill every label so the picture teaches the method on its own. If none fits exactly, use steps for a sequence, cycle for a loop, or the canvas grid to lay out the method's elements as labelled boxes.
+- Always include a short fictional worked example ("sample") that fills in the page: an invented but realistic situation, with a value for every field and rows for every table, using only the keys you defined. Make the numbers consistent with each other and with the scenario. It shows a first-time user what good looks like.
 
 ## 7. Style and honesty
 - Plain business English. No hype, no emojis, no placeholders such as TBD, TODO or lorem.

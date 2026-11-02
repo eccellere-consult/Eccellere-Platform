@@ -5,7 +5,7 @@ import { standardsCheck, standardsGaps, actionPlanTable } from '@/lib/tools/stan
 import { createMemoryRepo } from '@/lib/tools/memoryRepo';
 import { draftNext, startImport } from '@/lib/tools/service';
 
-const reply = (over: Record<string, unknown> = {}) => JSON.stringify({ ...EXAMPLE_TOOL, confidence: 'high', concerns: [], ...over });
+const reply = (over: Record<string, unknown> = {}) => JSON.stringify({ ...EXAMPLE_TOOL, confidence: 'high', concerns: [], originatorSuggestion: { name: 'A. Suggested Person', year: '1998', confidence: 'medium' }, ...over });
 const ok = (text: string, finishReason = 'stop') => ({ text, provider: 'groq' as const, model: 'm', finishReason });
 const item = { name: 'Impact Effort Grid', category: 'Decision Models', groupName: 'Decision making', practice: 'Strategy', slug: 'impact-effort-grid' };
 const down = () => 'No AI provider is switched on with a key.';
@@ -19,7 +19,7 @@ describe('the example shown to the AI', () => {
   });
   it('appears in the prompt with the rules, and the prompt carries the name and mapped category', () => {
     const { system, user } = buildDraftPrompt('Kano Model', 'Decision Models', false, 'Decision making');
-    expect(system).toContain('Never state who invented the method');
+    expect(system).toContain('originatorSuggestion');
     expect(system).toContain('impact-effort-matrix');
     expect(user).toContain('Kano Model');
     expect(user).toContain('"decision-matrix"');
@@ -44,8 +44,8 @@ describe('declarativeCategory', () => {
 describe('Eccellere standards check', () => {
   it('scores the example tool as an L2, publish-ready', () => {
     const r = standardsCheck(EXAMPLE_TOOL);
-    expect(r.items.filter((i) => i.earned < i.points).map((i) => i.id)).toEqual(['example']); // only the optional worked example is missing
-    expect(r.score).toBeGreaterThanOrEqual(90);
+    expect(r.items.filter((i) => i.earned < i.points).map((i) => i.id)).toEqual([]); // the example has every part, including a diagram and a worked example
+    expect(r.score).toBe(100);
     expect(r.level).toBe('L2');
     expect(r.band).toBe('Publish-ready');
     expect(actionPlanTable(EXAMPLE_TOOL)?.key).toBe('actions');
@@ -108,6 +108,11 @@ describe('makeDrafter', () => {
     expect(out.tool.category).toBe('Decision Models');
     expect(out.tool.groupName).toBe('Decision making');
     expect(out.tool.provenance).toMatchObject({ provider: 'groq', calls: 1, confidence: 'high' });
+    // the AI's guess about who is credited is kept for the reviewer; it is not on the page until a person confirms it
+    expect(out.tool.provenance).toMatchObject({ originatorSuggestion: { name: 'A. Suggested Person', year: '1998', status: 'unverified' } });
+    expect(out.tool.quality!.warnings.join(' ')).toMatch(/AI suggests the originator is A\. Suggested Person \(1998\)/);
+    expect(def.sample).toBeTruthy();
+    expect(def.diagram).toBeTruthy();
   });
 
   it('keeps a draft with gate errors (so a person can see and fix it) and lists the errors', async () => {
@@ -119,13 +124,60 @@ describe('makeDrafter', () => {
     expect(out.tool.quality!.errors.join(' ')).toMatch(/does needs at least/);
   });
 
-  it('drops a worked example that has errors rather than failing the tool', async () => {
-    const gen: GenerateFn = async () => ok(reply({ sample: { scenario: 'x', values: { nonsense_field: 'TBD' }, tables: {} } }));
-    const out = await makeDrafter({ generate: gen, explainDown: down })(item);
+  it('replaces a worked example that has errors by asking once for just that, and keeps the rest of the tool', async () => {
+    const prompts: string[] = [];
+    const generate: GenerateFn = async (a) => {
+      prompts.push(a.system);
+      if (a.system.includes('completing a finished tool page')) return ok(JSON.stringify({ sample: EXAMPLE_TOOL.sample }));
+      return ok(reply({ sample: { scenario: 'x', values: { nonsense_field: 'TBD' }, tables: {} } }));
+    };
+    const out = await makeDrafter({ generate, explainDown: down })(item);
     if (out.kind !== 'ok') throw new Error('expected ok');
+    expect(prompts).toHaveLength(2);
     expect(out.tool.quality!.errors).toEqual([]);
-    expect(out.tool.quality!.warnings.join(' ')).toMatch(/worked example had errors and was removed/);
-    expect((out.tool.definition as { sample?: unknown }).sample).toBeUndefined();
+    expect((out.tool.definition as { sample?: { scenario: string } }).sample?.scenario).toMatch(/regional distributor/);
+    expect(out.tool.quality!.warnings.join(' ')).toMatch(/worked example had errors and was replaced/);
+    expect(out.tool.provenance).toMatchObject({ calls: 2 });
+  });
+
+  it('fills in a missing diagram, worked example and originator with one focused call, using the page\'s own keys', async () => {
+    let completion = '';
+    let completionUser = '';
+    const generate: GenerateFn = async (a) => {
+      if (a.system.includes('completing a finished tool page')) {
+        completion = a.system; completionUser = a.user;
+        return ok(JSON.stringify({ diagram: EXAMPLE_TOOL.diagram, sample: EXAMPLE_TOOL.sample, originatorSuggestion: { name: 'Someone Credited', year: '1975', confidence: 'low' } }));
+      }
+      const { diagram, sample, ...rest } = EXAMPLE_TOOL; void diagram; void sample;
+      return ok(JSON.stringify({ ...rest, confidence: 'high', concerns: [] }));
+    };
+    const out = await makeDrafter({ generate, explainDown: down })(item);
+    if (out.kind !== 'ok') throw new Error('expected ok');
+    const def = out.tool.definition as typeof EXAMPLE_TOOL;
+    expect(def.diagram?.template).toBe('matrix2x2');
+    expect(def.sample).toBeTruthy();
+    expect(out.tool.quality!.errors).toEqual([]);
+    expect(out.tool.provenance).toMatchObject({ originatorSuggestion: { name: 'Someone Credited', confidence: 'low', status: 'unverified' } });
+    expect(def.reference.originator).toBe('');
+    expect(completion).toContain('"diagram"');
+    expect(completion).toContain('"sample"');
+    expect(completion).toContain('"originatorSuggestion"');
+    expect(completionUser).toContain('table "options"');
+    expect(completionUser).toContain('field "objective"');
+  });
+
+  it('sends a page to review with plain errors when the AI cannot supply the diagram or example even on the second try', async () => {
+    const generate: GenerateFn = async (a) => {
+      if (a.system.includes('completing a finished tool page')) return ok(JSON.stringify({ diagram: { template: 'steps', title: 'x', steps: [] }, sample: { scenario: 'short', values: { nope: 'x' }, tables: {} } }));
+      const { diagram, sample, ...rest } = EXAMPLE_TOOL; void diagram; void sample;
+      return ok(JSON.stringify({ ...rest, confidence: 'high', concerns: [], originatorSuggestion: { name: 'X', year: '', confidence: 'low' } }));
+    };
+    const out = await makeDrafter({ generate, explainDown: down })(item);
+    if (out.kind !== 'ok') throw new Error('expected ok');
+    const errs = out.tool.quality!.errors.join(' ');
+    expect(errs).toMatch(/Diagram: every tool needs a diagram/);
+    expect(errs).toMatch(/Worked example: every tool needs/);
+    expect(out.tool.quality!.warnings.join(' ')).toMatch(/was not used/);
   });
 
   it('passes the AI\'s own doubts to the reviewer', async () => {

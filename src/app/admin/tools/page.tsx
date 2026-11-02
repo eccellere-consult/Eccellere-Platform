@@ -5,24 +5,26 @@ import Link from "next/link";
 import { ChevronLeft, Loader2, Upload, Play, Pause, RotateCcw } from "lucide-react";
 import { readJson } from "@/lib/toolkit/http";
 import { cn } from "@/lib/utils";
-import { LIST_FILE_TYPES, fileToListText } from "@/lib/tools/listFile";
+import { fileToListText, isDocument, LIST_FILE_TYPES } from "@/lib/tools/listFile";
 import ReviewPanel, { StatusChip, statusLabel } from "./ReviewPanel";
+import SkillEditor from "./SkillEditor";
 
 const CONCURRENCY = 3;
 const RUN_KEY = "tools.currentRun";
 const field = "w-full border border-eccellere-ink/20 bg-white px-3 py-2 text-sm focus:border-eccellere-gold focus:outline-none";
 
 interface Preview {
-  entries: { name: string; category: string; groupName: string | null }[];
+  entries: { name: string; category: string; practice: string; groupName: string | null }[];
   alreadyInCatalogue: string[]; skipped: { line: string; reason: string }[]; duplicates: string[];
-  byCategory: Record<string, number>; estimate: { count: number; callsMin: number; callsMax: number; minutes: number };
+  byCategory: Record<string, number>; byPractice: Record<string, number>; briefChars: number; briefLimit: number; briefWillBeShortened: boolean; estimate: { count: number; callsMin: number; callsMax: number; minutes: number };
 }
 interface RunItem { id: string; name: string; category: string; slug: string; status: string; error: string | null }
 interface RunState { job: { id: string; label: string; status: string; pauseReason: string | null }; items: RunItem[] }
-interface Row { slug: string; name: string; category: string; groupName: string | null; status: string; errors: number; warnings: number; standards: { score: number; level: string } | null }
+interface Row { slug: string; name: string; category: string; practice: string | null; source: string; groupName: string | null; status: string; errors: number; warnings: number; standards: { score: number; level: string } | null }
 
 export default function AdminToolsPage() {
   const [categories, setCategories] = useState<string[]>([]);
+  const [practices, setPractices] = useState<string[]>([]);
   const [aiReady, setAiReady] = useState(true);
   const [rows, setRows] = useState<Row[]>([]);
   const [loadErr, setLoadErr] = useState<string | null>(null);
@@ -30,6 +32,11 @@ export default function AdminToolsPage() {
   // add
   const [mode, setMode] = useState<"list" | "one">("list");
   const [category, setCategory] = useState("Auto");
+  const [practice, setPractice] = useState("Auto");
+  const [brief, setBrief] = useState("");
+  const [extracting, setExtracting] = useState<"list" | "source" | null>(null);
+  const [hubMsg, setHubMsg] = useState<string | null>(null);
+  const [hubBusy, setHubBusy] = useState(false);
   const [text, setText] = useState("");
   const [oneName, setOneName] = useState("");
   const [oneGroup, setOneGroup] = useState("");
@@ -54,7 +61,7 @@ export default function AdminToolsPage() {
     if (r.status === 401 || r.status === 403) return setLoadErr("You do not have permission to manage tools.");
     const d = await readJson(r);
     if (!r.ok) return setLoadErr(d.error ?? "Could not load the tools.");
-    setLoadErr(null); setCategories(d.categories); setAiReady(d.aiReady); setRows(d.tools);
+    setLoadErr(null); setCategories(d.categories); setPractices(d.practices ?? []); setAiReady(d.aiReady); setRows(d.tools);
   }, []);
 
   const loadRun = useCallback(async (id: string) => {
@@ -71,19 +78,58 @@ export default function AdminToolsPage() {
     try { const id = localStorage.getItem(RUN_KEY); if (id) loadRun(id).catch(() => {}); } catch { /* storage unavailable */ }
   }, [loadCatalogue, loadRun]);
 
+  /** Reads a PDF, Word or PowerPoint file on the server and returns its text. */
+  async function extract(f: File): Promise<string> {
+    const form = new FormData();
+    form.append("file", f);
+    const r = await fetch("/api/admin/tools/extract", { method: "POST", body: form });
+    const d = await readJson(r);
+    if (!r.ok) throw new Error(d.error ?? "Could not read that file.");
+    return `${d.text}${d.truncated ? "\n\n[Only the first part of the document was kept.]" : ""}`;
+  }
+
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     e.target.value = "";
     if (!f) return;
-    try { setText(await fileToListText(f)); setPreview(null); setAddErr(null); }
-    catch (x) { setAddErr(x instanceof Error ? x.message : "Could not read that file."); }
+    setAddErr(null);
+    try {
+      if (isDocument(f.name)) { setExtracting("list"); setText(await extract(f)); }
+      else setText(await fileToListText(f));
+      setPreview(null);
+    } catch (x) { setAddErr(x instanceof Error ? x.message : "Could not read that file."); }
+    finally { setExtracting(null); }
+  }
+
+  /** A document as the content the AI builds the tool from: its text goes into the context box, where it can be read and edited. */
+  async function onSourceFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    e.target.value = "";
+    if (!f) return;
+    setAddErr(null); setExtracting("source");
+    try {
+      const t = await extract(f);
+      setBrief((b) => `${b.trim() ? `${b.trim()}\n\n` : ""}[From ${f.name}]\n${t}`);
+      setPreview(null);
+    } catch (x) { setAddErr(x instanceof Error ? x.message : "Could not read that file."); }
+    finally { setExtracting(null); }
+  }
+
+  async function seedHub() {
+    setHubBusy(true); setHubMsg(null);
+    const r = await fetch("/api/admin/tools/seed-hub", { method: "POST" });
+    const d = await readJson(r);
+    setHubBusy(false);
+    if (!r.ok) return setHubMsg(d.error ?? "Could not add them.");
+    setHubMsg(`${d.added.length} added, ${d.skipped.length} were already there.${d.missing.length ? ` Missing: ${d.missing.join(", ")}.` : ""}`);
+    loadCatalogue().catch(() => {});
   }
 
   const listText = () => (mode === "one" ? `${oneName.trim()}${oneGroup.trim() ? ` | ${oneGroup.trim()}` : ""}` : text);
 
   async function check() {
     setChecking(true); setAddErr(null); setPreview(null);
-    const r = await fetch("/api/admin/tools/import", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: listText(), category, dryRun: true }) });
+    const r = await fetch("/api/admin/tools/import", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: listText(), category, practice, brief, dryRun: true }) });
     const d = await readJson(r);
     setChecking(false);
     if (!r.ok) return setAddErr(d.error ?? "Could not check that list.");
@@ -92,12 +138,12 @@ export default function AdminToolsPage() {
 
   async function startDrafting() {
     setStarting(true); setAddErr(null);
-    const r = await fetch("/api/admin/tools/import", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: listText(), category }) });
+    const r = await fetch("/api/admin/tools/import", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: listText(), category, practice, brief }) });
     const d = await readJson(r);
     setStarting(false);
     if (!r.ok) return setAddErr(d.error ?? "Could not start.");
     try { localStorage.setItem(RUN_KEY, d.jobId); } catch { /* ignore */ }
-    setPreview(null); setText(""); setOneName(""); setOneGroup("");
+    setPreview(null); setText(""); setOneName(""); setOneGroup(""); setBrief("");
     const s = await loadRun(d.jobId);
     if (s) drive(d.jobId);
   }
@@ -148,8 +194,9 @@ export default function AdminToolsPage() {
       <p className="mt-2 max-w-3xl text-sm text-ink-mid">
         Add tools by name, one at a time or from a list or file. The AI drafts each one to the Eccellere standard (a route, a guided workspace, a calculation,
         guidance on reading the result, and a 30/60/90 action plan). You review every draft, then publish it into the section you choose.
-        Nothing reaches a client until you mark it reviewed.
+        Reviewed tools join the Eccellere consulting library; nothing reaches a client until you expose it.
       </p>
+      <p className="mt-2 text-sm"><Link className="text-eccellere-gold underline" href="/consulting/library">Open the consulting library</Link></p>
       {!aiReady && <p className="mt-4 rounded bg-red-50 p-3 text-sm text-red-800">No AI provider is switched on with a key, so drafting cannot start. Set one up under <Link className="underline" href="/admin/ai-settings">AI providers</Link>.</p>}
 
       {/* 1. add */}
@@ -163,7 +210,13 @@ export default function AdminToolsPage() {
               </button>
             ))}
           </div>
-          <label className="ml-auto text-xs text-ink-mid">Marketplace section
+          <label className="ml-auto text-xs text-ink-mid">Consulting practice
+            <select className={cn(field, "mt-1 w-56")} value={practice} onChange={(e) => { setPractice(e.target.value); setPreview(null); }}>
+              <option value="Auto">Auto: decide from the list&apos;s headings</option>
+              {practices.map((c) => <option key={c}>{c}</option>)}
+            </select>
+          </label>
+          <label className="text-xs text-ink-mid">Marketplace section
             <select className={cn(field, "mt-1 w-64")} value={category} onChange={(e) => { setCategory(e.target.value); setPreview(null); }}>
               <option value="Auto">Auto: decide from the list&apos;s headings</option>
               {categories.map((c) => <option key={c}>{c}</option>)}
@@ -176,10 +229,10 @@ export default function AdminToolsPage() {
             <textarea className={cn(field, "min-h-[150px] font-mono")} value={text} onChange={(e) => { setText(e.target.value); setPreview(null); }}
               placeholder={"One tool per line.\n5 Why Analysis\nFishbone Diagram | Root cause\n\nA line starting with # sets the group for the lines under it:\n# Decision making\nPugh Matrix\nKano Model"} aria-label="List of tool names" />
             <label className="mt-2 inline-flex cursor-pointer items-center gap-2 border border-eccellere-ink/20 px-3 py-2 text-xs hover:bg-eccellere-cream">
-              <Upload className="h-4 w-4" /> Upload a file (.txt, .csv, .xlsx)
+              {extracting === "list" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />} Upload a list (.txt, .csv, .xlsx, .pdf, .docx, .pptx)
               <input type="file" accept={LIST_FILE_TYPES} className="sr-only" onChange={onFile} />
             </label>
-            <span className="ml-3 text-[11px] text-ink-light">Spreadsheets: column A is the tool name, column B (optional) the group.</span>
+            <span className="ml-3 text-[11px] text-ink-light">Spreadsheets: column A is the tool name, column B (optional) the group. From a PDF, Word or PowerPoint file the text is read and put in the box; delete anything that is not a tool name.</span>
           </div>
         ) : (
           <div className="mt-4 grid gap-3 sm:grid-cols-[2fr_1fr]">
@@ -187,6 +240,17 @@ export default function AdminToolsPage() {
             <label className="text-xs text-ink-mid">Group (optional)<input className={cn(field, "mt-1")} value={oneGroup} onChange={(e) => { setOneGroup(e.target.value); setPreview(null); }} placeholder="for example: Root cause" /></label>
           </div>
         )}
+
+        <div className="mt-4 rounded border border-eccellere-ink/10 bg-eccellere-cream/50 p-3">
+          <label className="text-xs font-medium text-eccellere-ink" htmlFor="brief">Content or context for the AI to build from (optional)</label>
+          <p className="mt-1 text-[11px] text-ink-light">Describe the audience and setting, or upload the source: a course deck, a PDF, a Word document or a slide deck. The AI builds the tool from it where it applies. You can read and edit the text before using it. Uploaded files are read, not stored.</p>
+          <textarea id="brief" className={cn(field, "mt-2 min-h-[90px]")} value={brief} onChange={(e) => { setBrief(e.target.value); setPreview(null); }} placeholder="For example: for the finance team of a mid-sized distributor, who already use Excel for cash forecasts…" />
+          <label className="mt-2 inline-flex cursor-pointer items-center gap-2 border border-eccellere-ink/20 bg-white px-3 py-2 text-xs hover:bg-eccellere-cream">
+            {extracting === "source" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />} Upload a document as source (PDF, Word, PowerPoint)
+            <input type="file" accept=".pdf,.docx,.pptx,.xlsx,.txt,.md" className="sr-only" onChange={onSourceFile} />
+          </label>
+          {brief.trim() && <span className="ml-3 text-[11px] text-ink-light">{brief.trim().length.toLocaleString("en-GB")} characters</span>}
+        </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <button className="bg-eccellere-ink px-4 py-2 text-xs text-white hover:opacity-90 disabled:opacity-40" disabled={!canCheck} onClick={check}>
@@ -200,15 +264,20 @@ export default function AdminToolsPage() {
             <p className="font-medium text-eccellere-ink">{preview.estimate.count} new tool{preview.estimate.count === 1 ? "" : "s"} ready to draft</p>
             {preview.estimate.count > 0 && (
               <>
-                <p className="mt-1 text-xs text-ink-mid">
-                  {Object.entries(preview.byCategory).map(([c, n]) => `${c}: ${n}`).join(" · ")}
-                </p>
+                <p className="mt-1 text-xs text-ink-mid">Sections: {Object.entries(preview.byCategory).map(([c, n]) => `${c}: ${n}`).join(" · ")}</p>
+                <p className="mt-1 text-xs text-ink-mid">Practices: {Object.entries(preview.byPractice).map(([c, n]) => `${c}: ${n}`).join(" · ")}</p>
+                {preview.briefChars > 0 && (
+                  <p className={cn("mt-1 text-xs", preview.briefWillBeShortened ? "text-amber-800" : "text-ink-mid")}>
+                    Your context ({preview.briefChars.toLocaleString("en-GB")} characters) is sent with every tool in this run.
+                    {preview.briefWillBeShortened ? ` It will be cut to the first ${preview.briefLimit.toLocaleString("en-GB")} characters because the run has many tools. For a long document, add one tool at a time.` : ""}
+                  </p>
+                )}
                 <p className="mt-1 text-xs text-ink-mid">
                   About {preview.estimate.callsMin} to {preview.estimate.callsMax} AI calls and roughly {preview.estimate.minutes} minute{preview.estimate.minutes === 1 ? "" : "s"} with three running at a time.
                   The tool names and categories (nothing else) are sent to your AI provider. Keep this page open while it runs; if you close it, press Continue later.
                 </p>
                 <ul className="mt-2 max-h-40 overflow-auto text-xs text-ink-mid">
-                  {preview.entries.slice(0, 200).map((e) => <li key={e.name}>{e.name} <span className="text-ink-light">→ {e.category}{e.groupName ? ` · ${e.groupName}` : ""}</span></li>)}
+                  {preview.entries.slice(0, 200).map((e) => <li key={e.name}>{e.name} <span className="text-ink-light">→ {e.category} · {e.practice}{e.groupName ? ` · ${e.groupName}` : ""}</span></li>)}
                 </ul>
               </>
             )}
@@ -226,6 +295,21 @@ export default function AdminToolsPage() {
             )}
           </div>
         )}
+      </section>
+
+      {/* Strategy Hub tools */}
+      <section className="mt-6 rounded bg-white p-5 shadow-sm">
+        <h2 className="font-medium text-eccellere-ink">Strategy Hub tools</h2>
+        <p className="mt-1 text-sm text-ink-mid">
+          The 36 hand-built Strategy Hub tools (PESTEL, Porter, Business Model Canvas, OKRs and more), with their hand-drawn diagrams and worked examples.
+          Adding them puts them in the consulting library, placed by practice, layer and lifecycle stage. They are not shown to clients until you expose them.
+        </p>
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <button className="bg-eccellere-ink px-4 py-2 text-xs text-white hover:opacity-90 disabled:opacity-40" disabled={hubBusy} onClick={seedHub}>
+            {hubBusy ? <Loader2 className="inline h-4 w-4 animate-spin" /> : `Add the Strategy Hub tools to the library (${rows.filter((r) => r.source === "strategy-hub").length} of 36 added)`}
+          </button>
+          {hubMsg && <span className="text-sm text-ink-mid">{hubMsg}</span>}
+        </div>
       </section>
 
       {/* 2. run */}
@@ -276,12 +360,13 @@ export default function AdminToolsPage() {
         ) : (
           <div className="mt-3 overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="text-[11px] uppercase tracking-wider text-ink-light"><tr><th className="py-2 pr-3">Tool</th><th className="pr-3">Section</th><th className="pr-3">Status</th><th className="pr-3">Standard</th><th className="pr-3">Checks</th><th /></tr></thead>
+              <thead className="text-[11px] uppercase tracking-wider text-ink-light"><tr><th className="py-2 pr-3">Tool</th><th className="pr-3">Section</th><th className="pr-3">Practice</th><th className="pr-3">Status</th><th className="pr-3">Standard</th><th className="pr-3">Checks</th><th /></tr></thead>
               <tbody>
                 {shown.map((r) => (
                   <tr key={r.slug} className={cn("border-t border-eccellere-ink/5", open === r.slug && "bg-eccellere-cream")}>
                     <td className="py-2 pr-3 font-medium text-eccellere-ink">{r.name}{r.groupName && <span className="block text-[11px] font-normal text-ink-light">{r.groupName}</span>}</td>
                     <td className="pr-3 text-xs text-ink-mid">{r.category}</td>
+                    <td className="pr-3 text-xs text-ink-mid">{r.practice ?? "-"}</td>
                     <td className="pr-3"><StatusChip s={r.status} /></td>
                     <td className="pr-3 text-xs">{r.standards ? `${r.standards.score}/100 · ${r.standards.level}` : "-"}</td>
                     <td className="pr-3 text-xs">{r.errors > 0 ? <span className="text-red-700">{r.errors} to fix</span> : <span className="text-emerald-700">clear</span>}{r.warnings > 0 && <span className="text-ink-light"> · {r.warnings} notes</span>}</td>
@@ -294,7 +379,13 @@ export default function AdminToolsPage() {
         )}
       </section>
 
-      {open && <ReviewPanel key={open} slug={open} categories={categories} onChanged={() => loadCatalogue().catch(() => {})} onClose={() => setOpen(null)} />}
+      <section className="mt-6 rounded bg-white p-5 shadow-sm">
+        <h2 className="font-medium text-eccellere-ink">Skill files</h2>
+        <p className="mt-1 text-sm text-ink-mid">The instructions the AI follows to build a tool page from a topic, and to help a person using one. Edit them to change the standard; download them as .md to share.</p>
+        <details className="mt-3"><summary className="cursor-pointer text-sm text-eccellere-gold">Open and edit the skill files</summary><div className="mt-4"><SkillEditor /></div></details>
+      </section>
+
+      {open && <ReviewPanel key={open} slug={open} categories={categories} practices={practices} onChanged={() => loadCatalogue().catch(() => {})} onClose={() => setOpen(null)} />}
     </div>
   );
 }

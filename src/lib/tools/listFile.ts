@@ -1,8 +1,12 @@
 /**
  * Turning an uploaded file into the `Name | Group` text the list box understands. Runs in the browser; the pure parts are tested.
- * Supported: .txt .md .csv .tsv .xlsx .xls (first sheet). Column A is the tool name, column B (optional) the group or category.
+ * Supported here: .txt .md .csv .tsv .xlsx .xls (first sheet). Column A is the tool name, column B (optional) the group or category.
+ * PDF, Word and PowerPoint go through the server (see isDocument and /api/admin/tools/extract).
  */
-export const LIST_FILE_TYPES = '.txt,.md,.csv,.tsv,.xlsx,.xls';
+export const LIST_FILE_TYPES = '.txt,.md,.csv,.tsv,.xlsx,.xls,.pdf,.docx,.pptx';
+
+/** PDF, Word and PowerPoint are read on the server (their text is sent back); everything else is read in the browser. */
+export const isDocument = (fileName: string): boolean => /\.(pdf|docx|pptx)$/i.test(fileName);
 export const MAX_FILE_BYTES = 2 * 1024 * 1024;
 
 /** Splits one CSV/TSV line, honouring double quotes. */

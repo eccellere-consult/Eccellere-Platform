@@ -116,11 +116,18 @@ export function estimateRun(count: number) {
 
 export interface StartedImport {
   jobId: string;
+  /** true when the context/source text was shortened because it is shared by many tools */
+  briefClipped: boolean;
   queued: number;
   alreadyInCatalogue: string[];
   skipped: ParsedList['skipped'];
   duplicates: string[];
 }
+
+/** Context or source text is sent with every tool in a run, so a long document is only kept whole for a small run. */
+export const BRIEF_LIMIT_SMALL_RUN = 16_000;
+export const BRIEF_LIMIT_LARGE_RUN = 4_000;
+export const briefLimitFor = (toolCount: number) => (toolCount <= 3 ? BRIEF_LIMIT_SMALL_RUN : BRIEF_LIMIT_LARGE_RUN);
 
 /** The value of the category drop-down: one of the seven, or "Auto" to let the list's own headings decide. */
 export function asChoice(x: unknown): MarketCategory | 'Auto' {
@@ -139,7 +146,7 @@ export function asPracticeChoice(x: unknown): Practice | 'Auto' {
 }
 
 /** What a pasted or uploaded list would do, without writing anything: shown to the admin before drafting starts. */
-export async function previewImport(repo: ToolsRepo, text: string, choice: MarketCategory | 'Auto', practiceChoice: Practice | 'Auto' = 'Auto') {
+export async function previewImport(repo: ToolsRepo, text: string, choice: MarketCategory | 'Auto', practiceChoice: Practice | 'Auto' = 'Auto', briefChars = 0) {
   const parsed = parseToolList(text, choice, practiceChoice);
   const alreadyInCatalogue: string[] = [];
   const fresh: ListEntry[] = [];
@@ -151,10 +158,10 @@ export async function previewImport(repo: ToolsRepo, text: string, choice: Marke
   for (const e of fresh) byCategory[e.category] = (byCategory[e.category] ?? 0) + 1;
   const byPractice: Record<string, number> = {};
   for (const e of fresh) byPractice[e.practice] = (byPractice[e.practice] ?? 0) + 1;
-  return { entries: fresh, alreadyInCatalogue, skipped: parsed.skipped, duplicates: parsed.duplicates, byCategory, byPractice, estimate: estimateRun(fresh.length) };
+  return { entries: fresh, alreadyInCatalogue, skipped: parsed.skipped, duplicates: parsed.duplicates, byCategory, byPractice, estimate: estimateRun(fresh.length), briefChars, briefLimit: briefLimitFor(fresh.length), briefWillBeShortened: briefChars > briefLimitFor(fresh.length) };
 }
 
-export async function startImport(repo: ToolsRepo, adminId: string, text: string, choice: MarketCategory | 'Auto' = 'Auto', label?: string, practiceChoice: Practice | 'Auto' = 'Auto'): Promise<StartedImport> {
+export async function startImport(repo: ToolsRepo, adminId: string, text: string, choice: MarketCategory | 'Auto' = 'Auto', label?: string, practiceChoice: Practice | 'Auto' = 'Auto', brief = ''): Promise<StartedImport> {
   const parsed = parseToolList(text, choice, practiceChoice);
   const alreadyInCatalogue: string[] = [];
   const fresh: ListEntry[] = [];
@@ -163,8 +170,11 @@ export async function startImport(repo: ToolsRepo, adminId: string, text: string
     else fresh.push(e);
   }
   if (fresh.length === 0) throw new ToolsError('NOTHING_TO_DRAFT', 'There is no new tool name in that list. Check the lines below, or the names may already be in the catalogue.');
-  const { job, items } = await repo.createJob(adminId, label?.trim() || `Run of ${fresh.length} tools`, fresh);
-  return { jobId: job.id, queued: items.length, alreadyInCatalogue, skipped: parsed.skipped, duplicates: parsed.duplicates };
+  const limit = briefLimitFor(fresh.length);
+  const cleaned = brief.trim();
+  const kept = cleaned.slice(0, limit) || null;
+  const { job, items } = await repo.createJob(adminId, label?.trim() || `Run of ${fresh.length} tools`, fresh.map((e) => ({ ...e, brief: kept })));
+  return { jobId: job.id, briefClipped: cleaned.length > limit, queued: items.length, alreadyInCatalogue, skipped: parsed.skipped, duplicates: parsed.duplicates };
 }
 
 /** What the AI step reports back for one name. */

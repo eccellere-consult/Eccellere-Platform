@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prismaRepo } from "@/lib/tools/prismaRepo";
 import { MARKET_CATEGORIES } from "@/lib/tools/service";
+import { PRACTICES } from "@/lib/tools/practice";
 import { aiReady, readAuth, toolsGuard } from "@/lib/tools/server";
 
 export const dynamic = "force-dynamic";
@@ -12,12 +13,15 @@ export const GET = toolsGuard(async () => {
   const tools = await prismaRepo.listTools();
   return NextResponse.json({
     categories: MARKET_CATEGORIES,
+    practices: PRACTICES,
     aiReady: await aiReady(),
     tools: tools.map((t) => ({
       slug: t.slug,
       name: t.name,
       category: t.category,
       groupName: t.groupName,
+      practice: t.practice,
+      source: t.source,
       status: t.status,
       errors: t.quality?.errors.length ?? 0,
       warnings: t.quality?.warnings.length ?? 0,
