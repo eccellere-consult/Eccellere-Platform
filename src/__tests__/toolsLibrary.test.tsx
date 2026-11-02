@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+﻿// @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import LibraryBrowser, { type LibraryCard } from '@/app/consulting/library/LibraryBrowser';
@@ -102,7 +102,7 @@ describe('the worksheet for library tools', () => {
 
   const open = async (props: Partial<React.ComponentProps<typeof Workspace>> = {}) => {
     render(<Workspace slug="impact-effort-matrix" toolName="Impact-Effort Matrix" definition={EXAMPLE_TOOL} sample={EXAMPLE_TOOL.sample!} {...props} />);
-    await screen.findByText(/parts started/);
+    await screen.findByText(/parts answered/);
   };
 
   it('shows the fictional worked example on request, labelled, and leaves the worksheet untouched', async () => {
@@ -140,8 +140,9 @@ describe('the worksheet for library tools', () => {
 
   it('opens a hand-built Strategy Hub tool from its id, with its own sections', async () => {
     render(<Workspace slug="bmc" toolName="Business Model Canvas" toolId="bmc" sample={null} />);
-    expect(await screen.findByText(/parts started/, undefined, { timeout: 4000 })).toBeTruthy();
+    expect(await screen.findByText(/parts answered/, undefined, { timeout: 4000 })).toBeTruthy();
     expect(screen.getAllByText(/Customer Segments/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Value Propositions/).length).toBeGreaterThan(0);
   });
 });
+

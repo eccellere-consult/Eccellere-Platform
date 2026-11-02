@@ -38,6 +38,11 @@ export interface ToolRuntime {
   analysisGuide: string;
   next: string;
   code: CodeDefinition | null;
+  /** The golden thread: what this tool builds on and what it feeds, by name. */
+  buildsOn: string[];
+  feeds: string[];
+  /** The section's own axis (a problem-solving stage, say), shown as a chip under the title. */
+  stage: string;
 }
 
 export function toRuntime(tool: ToolRecord): ToolRuntime | null {
@@ -46,13 +51,13 @@ export function toRuntime(tool: ToolRecord): ToolRuntime | null {
     const def = getModelDefinition(code.toolId);
     if (!def) return null;
     const sm = getModelSample(code.toolId);
-    return { def, sample: sm ? { scenario: sm.scenario, values: sm.values, tables: sm.tables } : null, reference: def.reference, diagramSvg: getModelDiagramSvg(code.toolId) ?? '', analysisGuide: def.analysisGuide ?? '', next: code.next ?? '', code };
+    return { def, sample: sm ? { scenario: sm.scenario, values: sm.values, tables: sm.tables } : null, reference: def.reference, diagramSvg: getModelDiagramSvg(code.toolId) ?? '', analysisGuide: def.analysisGuide ?? '', next: code.next ?? '', code, buildsOn: code.upstream ?? [], feeds: code.downstream ?? [], stage: '' };
   }
   const d = tool.definition as DeclarativeTool;
   if (!d || !Array.isArray(d.sections)) return null;
   let svg = '';
   try { svg = d.diagram ? renderDiagram(d.diagram) : ''; } catch { svg = ''; }
-  return { def: interpret(d), sample: d.sample ? { scenario: d.sample.scenario, values: d.sample.values, tables: d.sample.tables } : null, reference: d.reference, diagramSvg: svg, analysisGuide: d.analysisGuide, next: d.next ?? '', code: null };
+  return { def: interpret(d), sample: d.sample ? { scenario: d.sample.scenario, values: d.sample.values, tables: d.sample.tables } : null, reference: d.reference, diagramSvg: svg, analysisGuide: d.analysisGuide, next: d.next ?? '', code: null, buildsOn: d.links?.buildsOn ?? [], feeds: d.links?.feeds ?? [], stage: d.stage ?? '' };
 }
 
 export function toAiTool(tool: ToolRecord): AiTool | null {

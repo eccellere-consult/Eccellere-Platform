@@ -13,7 +13,7 @@ export interface Need { diagram: boolean; sample: boolean; originator: boolean }
 export interface OriginatorSuggestion { name: string; year: string; confidence: 'high' | 'medium' | 'low'; status: 'unverified' }
 
 const DIAGRAM_FORMS = `"diagram" is ONE of:
-  { "template": "matrix2x2", "title", "xAxis": {"label","low","high"}, "yAxis": {...}, "quadrants": [4 x {"name","hint","tone": good|warn|bad|neutral}] (top-left, top-right, bottom-left, bottom-right) }
+  { "template": "matrix2x2", "title", "xAxis": {"label","low","high"}, "yAxis": {...}, "quadrants": [4 x {"name","hint","tag","tone": good|warn|bad|neutral}] (top-left, top-right, bottom-left, bottom-right; "tag" is two or three words such as "Lowest risk") }
   { "template": "matrix3x3", "title", "xAxis", "yAxis", "cells": [9 strings, top row first] }
   { "template": "steps" | "cycle", "title", "steps": [3 to 8 x {"name","hint"}] }
   { "template": "canvasGrid", "title", "cols", "rows", "boxes": [{"name","hint","col","row","colSpan","rowSpan"}] }

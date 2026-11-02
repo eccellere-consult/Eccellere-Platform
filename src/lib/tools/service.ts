@@ -10,8 +10,8 @@ import { PRACTICES, asPractice, suggestPractice, type Practice } from './practic
 
 /** A drafting request that has not finished within this long is treated as dead and its name is offered again. */
 export const STALE_DRAFT_MS = 3 * 60 * 1000;
-export const MAX_NAME_LENGTH = 80;
-export const MAX_LIST_ITEMS = 300;
+export const MAX_NAME_LENGTH = 200;
+export const MAX_LIST_ITEMS = 1000;
 /** Rough time for one AI draft; used only for the estimate shown before a run. */
 export const SECONDS_PER_DRAFT = 40;
 export const CONCURRENCY = 3;
@@ -23,7 +23,7 @@ export function slugify(name: string): string {
     .toLowerCase()
     .replace(/&/g, ' and ')
     .replace(/\([^)]*\)/g, (m) => ` ${m.slice(1, -1)} `)
-    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/[^\p{L}\p{N}]+/gu, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 80);
 }
@@ -79,7 +79,10 @@ export function parseToolList(text: string, chosen: MarketCategory | 'Auto' = 'A
     }
     line = line.replace(/^[-•·]\s+/, '').replace(/^\d+[.)]\s+/, '');
     const [namePart, ...rest] = line.split('|');
-    const name = namePart.replace(/[*~]+\s*$/, '').trim();
+    const words = namePart.trim().split(/\s+/).length;
+    const sentence = words > 30 || (words > 12 && /[.;:,]/.test(namePart)) || (words > 6 && /[.;:]\s*$/.test(namePart));
+    const name = namePart.replace(/`/g, '').replace(/[*~.;,:]+\s*$/, '').trim();
+    if (sentence) { skipped.push({ line: raw.trim().slice(0, 120), reason: 'Looks like a sentence or a note, not a tool name.' }); continue; }
     const tag = rest.join('|').trim();
     // A tag after | that names a marketplace category or a consulting practice wins; any other tag is a sub-group.
     const tagCategory = tag ? asMarketCategory(tag) : null;
@@ -88,7 +91,6 @@ export function parseToolList(text: string, chosen: MarketCategory | 'Auto' = 'A
     const practice: Practice = tagPractice ?? (chosenPractice === 'Auto' ? suggestPractice(current || groupName || '') : chosenPractice);
     const category: MarketCategory = tagCategory ?? (chosen === 'Auto' ? suggestCategory(current || groupName || '') : chosen);
     if (!name) { skipped.push({ line: raw.trim(), reason: 'No name on this line.' }); continue; }
-    if (/[`]|[.;,]$/.test(name)) { skipped.push({ line: raw.trim().slice(0, 120), reason: 'Looks like a sentence or a note, not a tool name.' }); continue; }
     if (name.length > MAX_NAME_LENGTH) { skipped.push({ line: raw.trim().slice(0, 120), reason: `Longer than ${MAX_NAME_LENGTH} characters, so it looks like a sentence, not a tool name.` }); continue; }
     const slug = slugify(name);
     if (!slug) { skipped.push({ line: raw.trim(), reason: 'The name has no letters or numbers.' }); continue; }
@@ -469,7 +471,7 @@ export interface BulkResult { slug: string; ok: boolean; message?: string }
 /** The same single-tool rules applied to many tools; one failure never stops the rest, and each says why it failed in plain words. */
 export async function bulkAction(repo: ToolsRepo, action: BulkAction, slugs: string[], reviewerId: string): Promise<BulkResult[]> {
   const out: BulkResult[] = [];
-  for (const slug of [...new Set(slugs)].slice(0, 300)) {
+  for (const slug of [...new Set(slugs)].slice(0, 1000)) {
     try {
       if (action === 'delete') await deleteTool(repo, slug);
       else if (action === 'archive') await archiveTool(repo, slug);
