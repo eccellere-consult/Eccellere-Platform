@@ -1,13 +1,14 @@
 /**
  * What the Advisor may draw on today: Eccellere's own published content (tools, services, marketplace resources). No author names, no
  * client names and nothing private is ever included. Retrieval is keyword scoring with a heavier weight on titles; the passages are
- * handed to the model as untrusted data. The Google Drive library and vector search are on the roadmap (docs/advisor/PLAN.md).
+ * handed to the model as untrusted data. The approved Google Drive library (anonymised, approved pieces only) is added by the server; vector search is on the roadmap (docs/advisor/PLAN.md).
  */
 import { servicesData } from "@/lib/services-data";
 import { assets } from "@/lib/marketplace-data";
 
-export type SourceKind = "tool" | "service" | "resource";
-export interface Passage { id: string; kind: SourceKind; title: string; href: string; text: string }
+export type SourceKind = "tool" | "service" | "resource" | "knowledge";
+/** `href` is empty for library documents: clients are never given a link to a Drive file. `ref` is a safe position such as "part 3". */
+export interface Passage { id: string; kind: SourceKind; title: string; href: string; text: string; ref?: string }
 
 const STOP = new Set("a an and are as at be but by can do does for from how i if in into is it its me my of on or our so than that the their then there these they this to us was we what when where which who why will with would you your should could about over under more most".split(" "));
 
@@ -22,8 +23,11 @@ export const stripInstructions = (s: string): string => s.split(/\n+/).filter((l
 
 export interface ToolLite { slug: string; name: string; category: string; does?: string | null; whenToUse?: string | null }
 
-export function buildCorpus(tools: readonly ToolLite[]): Passage[] {
+export interface LibraryChunk { id: string; title: string; seq: number; text: string }
+
+export function buildCorpus(tools: readonly ToolLite[], library: readonly LibraryChunk[] = []): Passage[] {
   const out: Passage[] = [];
+  for (const c of library) out.push({ id: `knowledge:${c.id}`, kind: "knowledge", title: c.title, href: "", ref: `part ${c.seq + 1}`, text: c.text });
   for (const t of tools) {
     out.push({ id: `tool:${t.slug}`, kind: "tool", title: t.name, href: `/tools/${t.slug}`, text: [t.category, t.does, t.whenToUse && `Use it when: ${t.whenToUse}`].filter(Boolean).join(". ") });
   }
@@ -58,9 +62,12 @@ export function search(corpus: readonly Passage[], query: string, limit = 5): Pa
     }
     return { p, score: score * (0.5 + hit / q.length), hit };
   });
+  const seen = new Set<string>();
   return scored
     .filter((s) => s.hit >= Math.min(2, q.length) && s.score > 0)
     .sort((a, b) => b.score - a.score)
+    // one piece per document, so every [S#] number names a different source
+    .filter((s) => { const k = `${s.p.kind}|${s.p.title}`; if (seen.has(k)) return false; seen.add(k); return true; })
     .slice(0, limit)
     .map((s) => ({ ...s.p, text: clip(stripInstructions(s.p.text), 700) }));
 }

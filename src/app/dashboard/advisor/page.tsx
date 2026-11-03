@@ -6,7 +6,7 @@ import { Send, RotateCcw, BrainCircuit, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-interface Source { n: number; title: string; href: string; kind: string }
+interface Source { n: number; title: string; href: string; kind: string; ref?: string }
 interface Message {
   role: "user" | "assistant";
   text: string;
@@ -30,7 +30,7 @@ const greeting = (name?: string): Message => ({
   ts: now(),
 });
 
-const KIND: Record<string, string> = { tool: "Tool", service: "Service", resource: "Resource" };
+const KIND: Record<string, string> = { tool: "Tool", service: "Service", resource: "Resource", knowledge: "Eccellere knowledge" };
 
 export default function AdvisorPage() {
   const [messages, setMessages] = useState<Message[]>([greeting()]);
@@ -141,7 +141,7 @@ export default function AdvisorPage() {
                     <ul className="m-0 mt-1 list-none space-y-1 p-0 text-xs text-ink-mid">
                       {m.sources.map((s) => (
                         <li key={s.n}>
-                          [S{s.n}] <Link href={s.href} className="text-eccellere-ink underline hover:text-eccellere-gold-deep">{s.title}</Link> · {KIND[s.kind] ?? s.kind}
+                          [S{s.n}] {s.href ? <Link href={s.href} className="text-eccellere-ink underline hover:text-eccellere-gold-deep">{s.title}</Link> : <span className="text-eccellere-ink">{s.title}</span>} · {KIND[s.kind] ?? s.kind}{s.ref ? `, ${s.ref}` : ""}
                         </li>
                       ))}
                     </ul>
