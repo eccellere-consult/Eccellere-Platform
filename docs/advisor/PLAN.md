@@ -22,11 +22,23 @@ The Advisor in the client dashboard (`/dashboard/advisor`) is now a real AI advi
 | 15 Cost control | Per-user rate limit (20 questions per 5 minutes), token and time limit per mode, 2,000-character questions |
 | 16 Tests | `src/__tests__/advisor.test.ts`: identity refusal, redaction, citations, injection, kill switch, no-AI fallback, modes |
 
+## 2b. Built: Google Drive library (update 3 Nov 2026)
+
+Set-up guide: `DRIVE_SETUP.md`. Admin screen: **Admin → Eccellere Advisor**. Database: run `advisor_tables.sql` once.
+
+- **Connection:** a read-only service account ("robot login") that sees only folders you share with it; no extra packages. Key goes in the Hostinger variable `GOOGLE_SERVICE_ACCOUNT_JSON`.
+- **Reads:** Google Docs, Sheets, Slides, Word, Excel, PowerPoint, text, Markdown, CSV (up to 15 MB). PDFs and scans are listed as not readable yet.
+- **Anonymise before storing:** e-mails, numbers, outside links, "Pvt Ltd" style companies, your protected names, and people named after "Prepared by / Dear Mr / Contact" are removed. File names that name someone become "Eccellere knowledge document N".
+- **Approval gate:** every document waits for an administrator (with a preview of exactly what the Advisor would learn). Automatic publishing of clean documents is an option, off by default. A changed file is re-screened and goes back to waiting.
+- **Revocation:** a file deleted, moved out or un-shared disappears on the next sync and its text is deleted. Withdraw is one click.
+- **Clients never get a Drive link.** Sources show "Eccellere knowledge, part N".
+- **Bounded:** 12 files per sync click; failures are recorded without the file name.
+
 ## 3. Next Lite steps (needs your input)
 
-1. **Google Drive library.** Needs a Google service account (or OAuth) and the folders you approve. Then: ingestion with identity anonymisation, a quarantine list for uncertain files, incremental sync, revocation. Without credentials this cannot be built or tested.
+1. **Google Drive library:** built (section 2b); waiting for you to create the Google key and share folders. Still to add: PDF and scan reading, automatic scheduled sync, Drive change notifications.
 2. **Vector search and reranking** (the hybrid retrieval of Lite section 6). Needs a place to store embeddings (a new table or a vector service) and an embeddings provider.
-3. **Admin screen** for the kill switch, protected names, retrieval gaps and cost.
+3. **Admin screen:** kill switch, protected names and Drive are done; retrieval gaps and cost reports are still to add.
 4. **Saved conversations** with review and delete by the client.
 5. **Tool use:** spreadsheet analysis, calculation, assessment recommendation, launching a platform tool.
 6. **Release tests 8, 11, 12, 13** from the skill that need Drive and multiple tenants.

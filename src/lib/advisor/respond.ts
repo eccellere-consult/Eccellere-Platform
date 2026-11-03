@@ -9,7 +9,7 @@ import { search, type Passage } from "./knowledge";
 export type Mode = "quick" | "standard" | "deep";
 export interface Turn { role: "user" | "assistant"; text: string }
 export interface AdviceRequest { message: string; history?: Turn[]; context?: { industry?: string; role?: string; page?: string } }
-export interface SourceRef { n: number; title: string; href: string; kind: string }
+export interface SourceRef { n: number; title: string; href: string; kind: string; ref?: string }
 export interface Advice { reply: string; mode: Mode; sources: SourceRef[]; protectedIdentity?: boolean; unavailable?: "disabled" | "no-ai" }
 export interface Deps {
   enabled: boolean;
@@ -57,7 +57,7 @@ const clean = (s: string, n: number) => s.replace(/\u0000/g, "").trim().slice(0,
 
 export function buildPrompt(req: AdviceRequest, mode: Mode, found: readonly Passage[]): { system: string; user: string } {
   const sources = found.length
-    ? found.map((p, i) => `<source id="S${i + 1}" type="${p.kind}" title="${p.title.replace(/"/g, "'")}">\n${p.text}\n</source>`).join("\n")
+    ? found.map((p, i) => `<source id="S${i + 1}" type="${p.kind}" title="${p.title.replace(/"/g, "'")}"${p.ref ? ` position="${p.ref}"` : ""}>\n${p.text}\n</source>`).join("\n")
     : "(No Eccellere content matched this question.)";
   const history = (req.history ?? []).slice(-LIMITS.turns).map((t) => `${t.role === "user" ? "Client" : "Advisor"}: ${clean(t.text, LIMITS.turn)}`).join("\n");
   const ctx = [req.context?.industry && `Business type: ${clean(req.context.industry, 80)}`, req.context?.page && `Page: ${clean(req.context.page, 80)}`].filter(Boolean).join("; ");
@@ -86,7 +86,7 @@ export async function advise(req: AdviceRequest, deps: Deps): Promise<Advice> {
   if (asksForIdentity(message)) return { reply: IDENTITY_REFUSAL, mode, sources: [], protectedIdentity: true };
 
   const found = GREETING.test(message) ? [] : search(deps.corpus, `${message} ${(req.history ?? []).slice(-2).map((t) => (t.role === "user" ? t.text : "")).join(" ")}`, LIMITS.sources);
-  const refs = (): SourceRef[] => found.map((p, i) => ({ n: i + 1, title: p.title, href: p.href, kind: p.kind }));
+  const refs = (): SourceRef[] => found.map((p, i) => ({ n: i + 1, title: p.title, href: p.href, kind: p.kind, ref: p.ref }));
   const { system, user } = buildPrompt({ ...req, message }, mode, found);
   const out = await deps.generate({ system, user, maxTokens: TOKENS[mode], timeoutMs: mode === "deep" ? 60_000 : 30_000 });
   const raw = out?.text?.trim();

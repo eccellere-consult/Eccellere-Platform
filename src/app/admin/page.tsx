@@ -140,6 +140,14 @@ const adminModules = [
     badge: null,
   },
   {
+    label: "Eccellere Advisor",
+    href: "/admin/advisor",
+    description: "Advisor on/off switch, protected names and the approved Google Drive library",
+    icon: Shield,
+    stat: "new",
+    badge: null,
+  },
+  {
     label: "AI Providers",
     href: "/admin/ai-settings",
     description: "Switch AI providers on or off, choose the primary and fallback order",

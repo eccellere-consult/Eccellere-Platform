@@ -878,3 +878,36 @@ model WsImportItem {
 
   @@index([jobId, status])
 }
+
+// ─── Eccellere Advisor: approved Google Drive library (additive; see advisor_tables.sql) ───
+
+/// One Drive file the Advisor has read. The file name is kept only for administrators; clients see `title`.
+model AdvFile {
+  id         String   @id @default(cuid())
+  driveId    String   @unique
+  name       String   @db.Text
+  mime       String
+  version    String
+  title      String
+  status     String   @default("QUARANTINED") // PUBLISHED | QUARANTINED | EXCLUDED | FAILED | REMOVED
+  reason     String?  @db.Text
+  redactions Int      @default(0)
+  syncedAt   DateTime @default(now())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  chunks AdvChunk[]
+
+  @@index([status])
+}
+
+/// An anonymised piece of a file. Only chunks of PUBLISHED files can be searched.
+model AdvChunk {
+  id     String  @id @default(cuid())
+  fileId String
+  file   AdvFile @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  seq    Int
+  text   String  @db.LongText
+
+  @@index([fileId, seq])
+}

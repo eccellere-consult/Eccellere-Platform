@@ -54,3 +54,19 @@ export function redactIdentities(input: string, protectedNames: readonly string[
   t = t.replace(PHONE, (m) => (m.replace(/\D/g, "").length >= 8 && !m.replace(/\D/g, "").endsWith("9964694566") ? (n++, "[number removed]") : m));
   return { text: t, redactions: n };
 }
+
+/** Cues that a person is named next to them: "Prepared by Asha Rao", "Dear Mr Shah", "Contact: Ravi". Matched without regard to case; the name itself must start with a capital. */
+const PERSON_CUE = /\b(prepared by|authored by|author|written by|interviewee|interviewed|contact(?: person)?|attn|attention|signed|regards|dear|mr|mrs|ms|dr|prof|sri|shri|smt)\b\.?[:\s,-]+(\p{L}[\p{L}'-]*(?:\s+\p{L}[\p{L}'-]*){0,3})/giu;
+const CAPITAL = /^\p{Lu}/u;
+
+/** How many places in a document seem to name a person. Used at ingestion: a document with any is held for review. */
+export function personCues(text: string): number {
+  return [...text.matchAll(PERSON_CUE)].filter((m) => CAPITAL.test(m[2])).length;
+}
+
+/** Replaces the name after each person cue with "an individual". Used at ingestion only, never on answers. */
+export function redactPersonCues(text: string): ScanResult {
+  let n = 0;
+  const t = text.replace(PERSON_CUE, (m, cue: string, name: string) => (CAPITAL.test(name) ? (n++, `${cue} an individual`) : m));
+  return { text: t, redactions: n };
+}
