@@ -1,52 +1,39 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import Link from "next/link";
 import { Send, RotateCcw, BrainCircuit, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+interface Source { n: number; title: string; href: string; kind: string }
 interface Message {
   role: "user" | "assistant";
   text: string;
   ts: string;
+  sources?: Source[];
+  mode?: string;
 }
 
 const SUGGESTIONS = [
+  "Our manufacturing rejection rate is rising. How do I find the cause?",
   "How can I improve my working capital cycle?",
-  "What AI tools are right for my manufacturing MSME?",
+  "Should we invest in automation or fix our process first?",
   "How do I build a 12-month growth plan?",
-  "What's the best way to reduce supply chain costs?",
-  "How do I prepare for investor due diligence?",
+  "Which Eccellere tool helps me prioritise projects?",
 ];
 
-const INITIAL: Message[] = [
-  {
-    role: "assistant",
-    text: "Hello Rahul! I'm your Eccellere AI Advisor — trained on MSME strategy, operations, finance, and digital transformation insights.\n\nAsk me anything about growing your business, improving processes, or understanding our marketplace assets. How can I help you today?",
-    ts: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-  },
-];
+const now = () => new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+const greeting = (name?: string): Message => ({
+  role: "assistant",
+  text: `Hello${name ? ` ${name.split(" ")[0]}` : ""}! I'm your Eccellere Advisor.\n\nTell me about a business problem and I will structure it, look at what Eccellere's tools, services and resources say, and recommend practical next steps. Add as much context as you can: your business type, size and what you have already tried.`,
+  ts: now(),
+});
 
-const MOCK_RESPONSES: Record<string, string> = {
-  default:
-    "That's a great question. Based on best practices for Indian MSMEs, I'd recommend starting with a structured assessment of your current processes before making any investment decisions. Our Specialist network can also provide a tailored engagement — would you like me to summarise the relevant marketplace assets on this topic?",
-  working:
-    "Working capital optimisation typically focuses on three levers: **receivables (debtor days)**, **payables (creditor days)**, and **inventory days**. The goal is to reduce your Cash Conversion Cycle.\n\nFor a manufacturing MSME, 30-day receivables and 60-day payables is a common target. Our *Working Capital Optimisation Framework* by Meera Iyer covers this with a ready-to-use Excel model — you already own that asset in your library!",
-  ai: "For manufacturing MSMEs at your readiness level (72%), I'd recommend starting with **process automation** before jumping to machine learning.\n\nQuick wins:\n• AP/AR automation using tools like Zoho Books or Tally integrations\n• Demand forecasting using our Excel-based model (you own the *Demand Forecasting Model* in your library)\n• Chatbot for customer FAQs\n\nShall I explain how to build a 6-month AI adoption roadmap?",
-  growth:
-    "A solid 12-month growth plan for an MSME covers five pillars: Market, Operations, Finance, People, and Digital. I'd suggest:\n\n1. **Month 1–2:** Diagnose — our MSME Growth Strategy Playbook (in your library) has a structured template\n2. **Month 3–4:** Prioritise 2–3 high-impact initiatives\n3. **Month 5–10:** Execute with quarterly reviews\n4. **Month 11–12:** Measure outcomes and plan the next cycle\n\nWould you like a recommendation for a Strategy specialist engagement?",
-};
-
-function getResponse(text: string): string {
-  const t = text.toLowerCase();
-  if (t.includes("working capital") || t.includes("cash flow") || t.includes("receivable")) return MOCK_RESPONSES.working;
-  if (t.includes("ai") || t.includes("automation") || t.includes("digital")) return MOCK_RESPONSES.ai;
-  if (t.includes("growth") || t.includes("12-month") || t.includes("plan")) return MOCK_RESPONSES.growth;
-  return MOCK_RESPONSES.default;
-}
+const KIND: Record<string, string> = { tool: "Tool", service: "Service", resource: "Resource" };
 
 export default function AdvisorPage() {
-  const [messages, setMessages] = useState<Message[]>(INITIAL);
+  const [messages, setMessages] = useState<Message[]>([greeting()]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -55,26 +42,34 @@ export default function AdvisorPage() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
-  function send(text?: string) {
+  useEffect(() => {
+    fetch("/api/dashboard/profile")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d?.user?.name) setMessages((m) => (m.length === 1 ? [greeting(d.user.name)] : m)); })
+      .catch(() => {});
+  }, []);
+
+  async function send(text?: string) {
     const msg = (text ?? input).trim();
     if (!msg || loading) return;
     setInput("");
-    const ts = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    setMessages((prev) => [...prev, { role: "user", text: msg, ts }]);
+    const history = messages.slice(1).map((m) => ({ role: m.role, text: m.text }));
+    setMessages((prev) => [...prev, { role: "user", text: msg, ts: now() }]);
     setLoading(true);
-    setTimeout(() => {
-      const replyTs = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", text: getResponse(msg), ts: replyTs },
-      ]);
+    try {
+      const res = await fetch("/api/dashboard/advisor", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: msg, history }) });
+      const data = await res.json().catch(() => ({}));
+      const reply = res.ok ? data.reply : data.error || "Something went wrong. Please try again.";
+      setMessages((prev) => [...prev, { role: "assistant", text: reply, ts: now(), sources: res.ok ? data.sources : undefined, mode: res.ok ? data.mode : undefined }]);
+    } catch {
+      setMessages((prev) => [...prev, { role: "assistant", text: "I could not reach the Advisor. Please check your connection and try again.", ts: now() }]);
+    } finally {
       setLoading(false);
-    }, 900);
+    }
   }
 
   function reset() {
-    const ts = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    setMessages([{ ...INITIAL[0], ts }]);
+    setMessages((m) => [{ ...m[0], ts: now() }]);
     setInput("");
   }
 
@@ -83,10 +78,10 @@ export default function AdvisorPage() {
       {/* Header */}
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-eccellere-gold">
+          <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-eccellere-gold-deep">
             Client Dashboard
           </p>
-          <h1 className="mt-0.5 font-display text-3xl font-light text-eccellere-ink">AI Advisor</h1>
+          <h1 className="mt-0.5 font-display text-3xl font-light text-eccellere-ink">Eccellere AI Advisor</h1>
         </div>
         <Button variant="outline" size="sm" onClick={reset} className="flex items-center gap-1.5 text-xs">
           <RotateCcw className="h-3.5 w-3.5" />
@@ -97,7 +92,7 @@ export default function AdvisorPage() {
       {/* Chat window */}
       <div className="flex flex-1 flex-col overflow-hidden rounded-lg bg-white shadow-sm">
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-5">
+        <div className="flex-1 overflow-y-auto p-6 space-y-5" aria-live="polite">
           {messages.map((m, i) => (
             <div
               key={i}
@@ -109,7 +104,7 @@ export default function AdvisorPage() {
                   "flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full",
                   m.role === "assistant"
                     ? "bg-eccellere-ink text-eccellere-gold"
-                    : "bg-eccellere-gold text-white"
+                    : "bg-eccellere-gold-deep text-white"
                 )}
               >
                 {m.role === "assistant" ? (
@@ -140,7 +135,19 @@ export default function AdvisorPage() {
                     </p>
                   ))}
                 </div>
-                <p className="mt-1 text-[10px] text-ink-light">{m.ts}</p>
+                {m.sources && m.sources.length > 0 && (
+                  <div className="mt-2 border border-eccellere-border bg-white px-3 py-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-eccellere-gold-deep">From Eccellere</p>
+                    <ul className="m-0 mt-1 list-none space-y-1 p-0 text-xs text-ink-mid">
+                      {m.sources.map((s) => (
+                        <li key={s.n}>
+                          [S{s.n}] <Link href={s.href} className="text-eccellere-ink underline hover:text-eccellere-gold-deep">{s.title}</Link> · {KIND[s.kind] ?? s.kind}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                <p className="mt-1 text-[11px] text-ink-light">{m.ts}{m.mode ? ` · ${m.mode === "deep" ? "Deep analysis" : m.mode === "quick" ? "Quick answer" : "Advisory answer"}` : ""}</p>
               </div>
             </div>
           ))}
@@ -194,7 +201,9 @@ export default function AdvisorPage() {
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask anything about your business..."
+              maxLength={2000}
+              aria-label="Ask the Advisor"
+              placeholder="Describe your business problem or ask a question..."
               className="flex-1 rounded border border-eccellere-ink/15 bg-eccellere-cream px-4 py-2.5 text-sm text-eccellere-ink placeholder:text-ink-light/60 focus:border-eccellere-gold focus:outline-none focus:ring-1 focus:ring-eccellere-gold"
             />
             <Button type="submit" disabled={!input.trim() || loading} className="flex items-center gap-1.5">
@@ -202,8 +211,8 @@ export default function AdvisorPage() {
               <span className="hidden sm:inline">Send</span>
             </Button>
           </form>
-          <p className="mt-2 text-center text-[10px] text-ink-light">
-            AI Advisor responses are for guidance only. Consult a specialist for binding advice.
+          <p className="mt-2 text-center text-[11px] text-ink-light">
+            AI-drafted guidance from Eccellere content and general knowledge. It never names companies or individuals. Consult a specialist for binding advice.
           </p>
         </div>
       </div>
