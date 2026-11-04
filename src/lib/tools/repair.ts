@@ -13,6 +13,7 @@ import { normaliseDeclarative, type DeclarativeTool } from '@/lib/strategyModels
 import type { GenerateArgs, GenerateResult } from '@/lib/ai/providers';
 import { SCHEMA_NOTES, extractJson } from './draft';
 import { DEFAULT_DRAFT_SKILL } from './skill';
+import { diagramIssues, type DiagramSpec } from '@/lib/strategyModels/diagrams/templates';
 import { assess } from './standards';
 import { completePage } from './complete';
 import { isCodeDefinition } from './runtime';
@@ -77,6 +78,91 @@ export function dropBrokenResults(def: DeclarativeTool): string[] {
   return dropped;
 }
 
+type GridBox = { name?: string; hint?: string; col?: number; row?: number; colSpan?: number; rowSpan?: number };
+
+/**
+ * Structural faults the AI makes again and again, repaired without asking the AI anything:
+ *  - a "canvasGrid" diagram with unnamed boxes or boxes that fall outside the grid (the grid is widened within its limits, boxes are
+ *    trimmed to fit, unnamed ones are removed; with fewer than 2 boxes left the diagram is taken out so it can be re-made);
+ *  - a calculated column whose rule the engine cannot run (it becomes a plain number column people fill in, so the table keeps working).
+ * Returns plain-words notes of what was changed.
+ */
+export function repairStructure(def: DeclarativeTool): string[] {
+  const notes: string[] = [];
+  const d = def.diagram as unknown as ({ template?: string; title?: string; cols?: number; rows?: number; boxes?: GridBox[] } | undefined);
+  if (d && d.template === 'canvasGrid' && diagramIssues(def.diagram as DiagramSpec).length > 0) {
+    const whole = (n: unknown, dflt: number) => (Number.isFinite(Number(n)) ? Math.max(0, Math.floor(Number(n))) : dflt);
+    const named = (Array.isArray(d.boxes) ? d.boxes : []).filter((b): b is GridBox => !!b && typeof b.name === 'string' && b.name.trim().length > 0 && whole(b.col, 0) <= 5 && whole(b.row, 0) <= 4);
+    if (named.length < 2) {
+      delete (def as { diagram?: unknown }).diagram;
+      notes.push('Removed a diagram whose boxes were unnamed or outside its grid. Use "Complete the page" to have a new one drawn.');
+    } else {
+      for (const b of named) {
+        b.col = whole(b.col, 0); b.row = whole(b.row, 0);
+        b.colSpan = Math.max(1, whole(b.colSpan ?? 1, 1)); b.rowSpan = Math.max(1, whole(b.rowSpan ?? 1, 1));
+      }
+      d.cols = Math.min(6, Math.max(1, whole(d.cols, 3), ...named.map((b) => (b.col ?? 0) + 1)));
+      d.rows = Math.min(5, Math.max(1, whole(d.rows, 3), ...named.map((b) => (b.row ?? 0) + 1)));
+      for (const b of named) {
+        b.colSpan = Math.min(b.colSpan ?? 1, d.cols - (b.col ?? 0));
+        b.rowSpan = Math.min(b.rowSpan ?? 1, d.rows - (b.row ?? 0));
+      }
+      d.boxes = named;
+      if (!d.title?.trim()) d.title = def.name;
+      notes.push('Fixed the diagram: every box now has a name and sits inside the grid.');
+    }
+  }
+  for (let round = 0; round < 6; round++) {
+    const hits = assess(def).errors
+      .map((e) => /^sections\[(\d+)\]\.parts\[(\d+)\]\.columns\[(\d+)\]\.rule/.exec(e))
+      .filter((m): m is RegExpExecArray => !!m);
+    if (!hits.length) break;
+    let changed = false;
+    for (const m of hits) {
+      const part = def.sections[Number(m[1])]?.parts[Number(m[2])];
+      const col = part && part.kind === 'table' && !part.board ? part.columns[Number(m[3])] : undefined;
+      if (col && col.type === 'computed') {
+        col.type = 'number';
+        delete (col as { rule?: unknown }).rule;
+        notes.push(`The column “${col.header || col.key}” had a calculation the tool cannot run, so people now enter it themselves.`);
+        changed = true;
+      }
+    }
+    if (!changed) break;
+  }
+  return notes;
+}
+
+/**
+ * The automatic clean-up, with no AI: removes results and columns that cannot run and repairs a broken diagram grid, then re-checks.
+ * Saves only when something changed and the page is no worse; the tool goes back to review. `remaining` lists what is still wrong.
+ */
+export async function tidyTool(repo: ToolsRepo, slug: string): Promise<FixOutcome & { remaining: string[] }> {
+  const tool = await repo.getToolBySlug(slug);
+  if (!tool) throw new ToolsError('NOT_FOUND', 'That tool was not found.');
+  if (tool.status === 'PUBLISHED') throw new ToolsError('WRONG_STATE', 'This tool is live for clients. Withdraw it from clients before changing it.');
+  if (isCodeDefinition(tool.definition)) throw new ToolsError('WRONG_STATE', 'This is a hand-built Strategy Hub tool. It is not changed automatically.');
+  const def = JSON.parse(JSON.stringify(tool.definition)) as DeclarativeTool;
+  const before = assess(def);
+  const notes: string[] = [];
+  const removed = dropBrokenResults(def);
+  if (removed.length) notes.push(`Removed ${removed.length} result${removed.length === 1 ? '' : 's'} that could not run: ${removed.map((r) => `“${r}”`).join(', ')}.`);
+  notes.push(...repairStructure(def));
+  const quality: QualityResult = assess(def);
+  const changed = notes.length > 0;
+  if (!changed || quality.errors.length > before.errors.length) {
+    return { tool, applied: false, before: before.errors.length, after: before.errors.length, notes, remaining: before.errors };
+  }
+  const status = quality.errors.length ? 'NEEDS_REVIEW' : 'DRAFT';
+  await repo.saveTool({
+    slug, name: def.name, category: tool.category, groupName: tool.groupName, practice: tool.practice, definition: def,
+    does: def.does, whenToUse: def.whenToUse, whenNotToUse: def.whenNotToUse ?? null, quality,
+    provenance: { ...(tool.provenance ?? {}), lastTidyAt: new Date().toISOString() } as Record<string, unknown>, status,
+  });
+  const updated = await repo.patchTool(slug, { reviewedById: null, reviewedAt: null, status, quality });
+  return { tool: updated!, applied: true, before: before.errors.length, after: quality.errors.length, notes, remaining: quality.errors };
+}
+
 /** Fix the problems on a page, and/or change it as instructed, using AI. */
 export async function fixTool(
   repo: ToolsRepo,
@@ -94,6 +180,8 @@ export async function fixTool(
   const notes: string[] = [];
   const removed = dropBrokenResults(def);
   if (removed.length) notes.push(`Removed ${removed.length} result${removed.length === 1 ? '' : 's'} the AI had written with a rule this tool cannot run: ${removed.map((r) => `“${r}”`).join(', ')}. Ask "Modify with AI" to add a result back if you need it.`);
+  const structural = repairStructure(def);
+  notes.push(...structural);
 
   // 1. missing diagram / worked example: their own focused call
   const need = { diagram: !def.diagram, sample: !def.sample, originator: false };
@@ -106,7 +194,7 @@ export async function fixTool(
 
   // 2. whatever is still wrong (or the administrator's instruction): one correction call
   let current = assess(def);
-  let applied = (removed.length > 0 || !!(need.diagram || need.sample)) && current.errors.length < before.errors.length;
+  let applied = (removed.length > 0 || structural.length > 0 || !!(need.diagram || need.sample)) &&current.errors.length < before.errors.length;
   if (current.errors.length > 0 || instruction) {
     const issues = current.errors;
     const { system, user } = buildRepairMessages(def, issues, instruction, opts.skill);
