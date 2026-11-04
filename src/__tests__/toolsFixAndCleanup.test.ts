@@ -139,6 +139,17 @@ describe('Fix with AI and Modify with AI', () => {
     }
   });
 
+  it('automatic clean-up replaces a sole unrunnable result with a simple summary so the tool still has an output', async () => {
+    const t = clone(EXAMPLE_TOOL) as unknown as DeclarativeTool;
+    t.outputs = [{ key: 'bogus', label: 'Invented total', rule: { op: 'sum_everything' } as never }];
+    t.derived = [];
+    const repo = await repoWith(t);
+    const r = await tidyTool(repo, t.slug);
+    expect(r.applied).toBe(true);
+    expect(r.remaining.join(' ')).not.toMatch(/unknown rule|at least one output/);
+    expect(((r.tool.definition as DeclarativeTool).outputs ?? []).length).toBe(1);
+  });
+
   it('automatic clean-up leaves a sound tool alone', async () => {
     const t = clone(EXAMPLE_TOOL) as unknown as DeclarativeTool;
     const repo = await repoWith(t, 'DRAFT');
