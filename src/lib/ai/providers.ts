@@ -188,7 +188,7 @@ export async function callProvider(
         signal: ctrl.signal,
         headers: { "Content-Type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
         body: JSON.stringify({
-          model, max_tokens: a.maxTokens, temperature: 0.3, system: a.json ? a.system + JSON_ONLY : a.system,
+          model, max_tokens: a.maxTokens, system: a.json ? a.system + JSON_ONLY : a.system,
           messages: [{ role: "user", content: a.images?.length
             ? [...a.images.map((i) => ({ type: "image", source: { type: "base64", media_type: i.mediaType, data: i.data } })), { type: "text", text: a.user }]
             : a.user }],
@@ -211,7 +211,8 @@ export async function callProvider(
       signal: ctrl.signal,
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
       body: JSON.stringify({
-        model, temperature: 0.3, max_tokens: a.maxTokens,
+        // newer OpenAI models reject a temperature setting, so it is only sent to the other OpenAI-style providers
+        model, ...(p.id === "openai" ? {} : { temperature: 0.3 }), max_tokens: a.maxTokens,
         messages: [{ role: "system", content: a.json ? a.system + JSON_ONLY : a.system }, { role: "user", content: a.images?.length
           ? [...a.images.map((i) => ({ type: "image_url", image_url: { url: `data:${i.mediaType};base64,${i.data}` } })), { type: "text", text: a.user }]
           : a.user }],
