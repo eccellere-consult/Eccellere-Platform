@@ -87,6 +87,37 @@ export default function Catalogue({ rows, categories, open, setOpen, reload, aiR
     reload();
   }
 
+  /** Automatic clean-up, no AI and no cost: removes results and columns that cannot run and repairs broken diagram grids. Four at once. */
+  async function tidy(slugs: string[]) {
+    const list = slugs.filter((s) => { const r = rows.find((x) => x.slug === s); return r && fixable(r); });
+    if (!list.length) return setReport({ title: "Clean up", lines: [{ slug: "", ok: false, text: "None of these tools can be cleaned up (live, archived and hand-built tools are left alone)." }] });
+    stop.current = false; setReport(null); setBusy("tidy"); setFixing({ done: 0, total: list.length });
+    const lines: { slug: string; ok: boolean; text: string }[] = [];
+    const left = new Map<string, number>();
+    let next = 0; let done = 0; let changed = 0;
+    const worker = async () => {
+      while (!stop.current && next < list.length) {
+        const slug = list[next++];
+        try {
+          const r = await fetch(`/api/admin/tools/${encodeURIComponent(slug)}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "tidy" }) });
+          const d = await readJson(r);
+          if (!r.ok) lines.push({ slug, ok: false, text: d.error ?? "Could not clean up." });
+          else {
+            if (d.applied) changed++;
+            for (const e of (d.remaining ?? []) as string[]) { const k = e.replace(/\[\d+\]/g, "[n]").replace(/\d+\/100/, "n/100").slice(0, 140); left.set(k, (left.get(k) ?? 0) + 1); }
+            if (d.applied || (d.remaining?.length ?? 0) > 0) lines.push({ slug, ok: d.applied && d.after === 0, text: d.applied ? (d.after === 0 ? "Cleaned up: no problems left" : `Cleaned up: ${d.before} problems down to ${d.after}`) : `Nothing to clean automatically (${d.after} problem${d.after === 1 ? "" : "s"} remain)` });
+          }
+        } catch { lines.push({ slug, ok: false, text: "Lost the connection." }); }
+        done++; setFixing({ done, total: list.length });
+      }
+    };
+    await Promise.all([worker(), worker(), worker(), worker()]);
+    setBusy(null); setFixing(null);
+    const common = [...left.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([k, n]) => ({ slug: "", ok: false, text: `${n} tool${n === 1 ? "" : "s"} still: ${k}` }));
+    setReport({ title: `Clean up: ${changed} of ${list.length} changed. What is still wrong, most common first:`, lines: [...common, ...lines] });
+    reload();
+  }
+
   const clearable = rows.filter((r) => r.errors > 0 && fixable(r)).length;
 
   return (
@@ -108,6 +139,9 @@ export default function Catalogue({ rows, categories, open, setOpen, reload, aiR
       {clearable > 0 && (
         <div className="mt-3 flex flex-wrap items-center gap-3 rounded bg-amber-50 p-3 text-sm text-amber-950">
           <span>{clearable} tool{clearable === 1 ? " has" : "s have"} problems to fix.</span>
+          <button className="inline-flex items-center gap-1 bg-eccellere-gold-deep px-3 py-1.5 text-xs text-white disabled:opacity-40" disabled={!!busy} onClick={() => tidy(rows.filter((r) => r.errors > 0 && fixable(r)).map((r) => r.slug))}>
+            Clean up all {clearable} automatically (no AI)
+          </button>
           <button className="inline-flex items-center gap-1 bg-eccellere-ink px-3 py-1.5 text-xs text-white disabled:opacity-40" disabled={!!busy || !aiReady} onClick={() => fixWithAi(rows.filter((r) => r.errors > 0 && fixable(r)).map((r) => r.slug))}>
             <Sparkles className="h-3.5 w-3.5" /> Fix all {clearable} with AI
           </button>

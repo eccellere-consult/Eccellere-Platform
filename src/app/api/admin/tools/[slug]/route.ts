@@ -4,7 +4,7 @@ import { prismaRepo } from "@/lib/tools/prismaRepo";
 import { completeTool, confirmOriginator, editTool, redraftTool } from "@/lib/tools/review";
 import { archiveTool, deleteTool, markReviewed, publishTool, restoreTool, setToolCategory, setToolPractice, unpublishTool } from "@/lib/tools/service";
 import { audit, loadSkillInfo, readAuth, realDrafter, toolsGuard, writeAuth } from "@/lib/tools/server";
-import { fixTool } from "@/lib/tools/repair";
+import { fixTool, tidyTool } from "@/lib/tools/repair";
 import { toRuntime } from "@/lib/tools/runtime";
 
 export const dynamic = "force-dynamic";
@@ -86,6 +86,11 @@ export const POST = toolsGuard(async (req: NextRequest, ctx: Ctx) => {
         skill: skill.isCustom ? skill.text : undefined,
       });
       return done("fixed", r.tool, { applied: r.applied, before: r.before, after: r.after, notes: r.notes });
+    }
+    case "tidy": {
+      // automatic clean-up with no AI: unrunnable results and columns, broken diagram grid
+      const r = await tidyTool(prismaRepo, slug);
+      return done("tidied", r.tool, { applied: r.applied, before: r.before, after: r.after, notes: r.notes, remaining: r.remaining });
     }
     case "redraft": {
       const r = await redraftTool(prismaRepo, slug, realDrafter(), typeof body.brief === "string" ? body.brief.slice(0, 16000) : undefined);

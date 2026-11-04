@@ -4,7 +4,7 @@ import { createMemoryRepo } from '@/lib/tools/memoryRepo';
 import {
   bulkAction, deleteTool, draftNext, markReviewed, parseToolList, publishTool, removeRun, removeRunItem, saveFillin, startImport,
 } from '@/lib/tools/service';
-import { fixTool, suggestTools } from '@/lib/tools/repair';
+import { fixTool, suggestTools, tidyTool } from '@/lib/tools/repair';
 import { assess } from '@/lib/tools/standards';
 import { PROPOSED_LIST_TEXT } from '@/lib/tools/proposedList';
 import { seedHubTools } from '@/lib/tools/hub';
@@ -108,6 +108,43 @@ describe('Fix with AI and Modify with AI', () => {
     expect(r).toMatchObject({ applied: true, after: 0 });
     expect(r.notes.join(' ')).toMatch(/Removed 1 result.*Invented total/);
     expect(((r.tool.definition as DeclarativeTool).outputs ?? []).some((o) => o.key === 'bogus')).toBe(false);
+  });
+
+  it('automatic clean-up repairs a diagram grid and a calculated column with no AI', async () => {
+    const t = clone(EXAMPLE_TOOL) as unknown as DeclarativeTool;
+    t.diagram = { template: 'canvasGrid', title: 'Grid', cols: 2, rows: 1, boxes: [
+      { name: 'A', col: 0, row: 0 }, { name: 'B', col: 3, row: 0, colSpan: 2 }, { name: '', col: 1, row: 0 },
+    ] } as never;
+    expect(assess(t).errors.join(' ')).toMatch(/Every box must be named/);
+    const repo = await repoWith(t);
+    const r = await tidyTool(repo, t.slug);
+    expect(r.applied).toBe(true);
+    expect(r.notes.join(' ')).toMatch(/Fixed the diagram/);
+    expect(r.remaining.join(' ')).not.toMatch(/Every box must be named/);
+    const d = (r.tool.definition as DeclarativeTool).diagram as unknown as { cols: number; boxes: unknown[] };
+    expect(d.boxes).toHaveLength(2);
+    expect(d.cols).toBe(4);
+
+    const u = clone(EXAMPLE_TOOL) as unknown as DeclarativeTool;
+    const table = u.sections.flatMap((s) => s.parts).find((p) => p.kind === 'table' && !p.board && p.columns.some((c) => c.type === 'computed'));
+    if (table && table.kind === 'table' && !table.board) {
+      const c = table.columns.find((x) => x.type === 'computed')!;
+      c.rule = { op: 'nonsense' } as never;
+      expect(assess(u).errors.join(' ')).toMatch(/columns\[\d+\]\.rule/);
+      const repo2 = await repoWith(u);
+      const r2 = await tidyTool(repo2, u.slug);
+      expect(r2.applied).toBe(true);
+      expect(r2.remaining.join(' ')).not.toMatch(/columns\[\d+\]\.rule/);
+      expect(r2.notes.join(' ')).toMatch(/enter it themselves/);
+    }
+  });
+
+  it('automatic clean-up leaves a sound tool alone', async () => {
+    const t = clone(EXAMPLE_TOOL) as unknown as DeclarativeTool;
+    const repo = await repoWith(t, 'DRAFT');
+    const r = await tidyTool(repo, t.slug);
+    expect(r.applied).toBe(false);
+    expect(r.notes).toEqual([]);
   });
 
   it('fixes other errors with one correction call, keeping identity, keys and the originator', async () => {
