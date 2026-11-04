@@ -150,6 +150,15 @@ describe('Fix with AI and Modify with AI', () => {
     expect(((r.tool.definition as DeclarativeTool).outputs ?? []).length).toBe(1);
   });
 
+  it('automatic clean-up gives a result even to a tool that has no plain input fields', async () => {
+    const t = clone(EXAMPLE_TOOL) as unknown as DeclarativeTool;
+    t.outputs = []; t.derived = [];
+    t.sections.forEach((sec) => { sec.parts = sec.parts.filter((p) => p.kind === 'table'); });
+    const repo = await repoWith(t);
+    const r = await tidyTool(repo, t.slug);
+    expect(r.remaining.join(' ')).not.toMatch(/at least one output/);
+  });
+
   it('automatic clean-up leaves a sound tool alone', async () => {
     const t = clone(EXAMPLE_TOOL) as unknown as DeclarativeTool;
     const repo = await repoWith(t, 'DRAFT');

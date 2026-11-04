@@ -150,10 +150,9 @@ export async function tidyTool(repo: ToolsRepo, slug: string): Promise<FixOutcom
   notes.push(...repairStructure(def));
   if (!(def.outputs ?? []).length) {
     const f = def.sections.flatMap((s) => s.parts).find((p) => p.kind === 'field');
-    if (f && f.kind === 'field') {
-      def.outputs = [{ key: 'summary', label: 'Summary of your entry', rule: { op: 'template', text: f.label + ': {' + f.key + '}' } as never }];
-      notes.push('Added a simple summary result so a later tool can build on this one. Ask "Modify with AI" for a richer one.');
-    }
+    const text = f && f.kind === 'field' ? f.label + ': {' + f.key + '}' : 'Your entries are recorded in the tables above.';
+    def.outputs = [{ key: 'summary', label: 'Summary of your entry', rule: { op: 'template', text } as never }];
+    notes.push('Added a simple summary result so a later tool can build on this one. Ask "Modify with AI" for a richer one.');
   }
   const quality: QualityResult = assess(def);
   const changed = notes.length > 0;
