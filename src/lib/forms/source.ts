@@ -343,6 +343,42 @@ export async function readSources(files: { name: string; data: Buffer }[], opts:
   return out;
 }
 
+export interface SourcePage { n: number; file: string; sheet: string | null; hidden: boolean; ids: string[] }
+
+/**
+ * The logical pages of the uploaded material, in order: every sheet of a workbook is one page (hidden sheets flagged), and every other
+ * file is one page. Several files simply continue the sequence. The AI is told to turn each page into the next page (section) of the form.
+ */
+export function sourcePages(readings: readonly SourceReading[]): SourcePage[] {
+  const pages: SourcePage[] = [];
+  for (const r of readings) {
+    const bySheet = new Map<string, SourcePage>();
+    for (const e of r.elements) {
+      const m = /^Sheet “([^”]+)”( \(hidden sheet\))?/.exec(e.where);
+      const key = m ? m[1] : '';
+      let p = bySheet.get(key);
+      if (!p) {
+        p = { n: 0, file: r.fileName, sheet: m ? m[1] : null, hidden: !!m?.[2], ids: [] };
+        bySheet.set(key, p);
+        pages.push(p);
+      }
+      p.ids.push(e.id);
+    }
+  }
+  pages.forEach((p, i) => { p.n = i + 1; });
+  return pages;
+}
+
+/** The page plan as text for the AI prompt. Empty when there is only one page (nothing to split). */
+export function pagePlanText(pages: readonly SourcePage[]): string {
+  if (pages.length < 2) return '';
+  const span = (p: SourcePage) => (p.ids.length > 1 ? `${p.ids[0]} to ${p.ids[p.ids.length - 1]}` : p.ids[0]);
+  return [
+    `SOURCE PAGES (${pages.length}, in order). Turn each source page into the NEXT logical page of the form, one "sections" entry per source page, in this order, named after the sheet or document (tidy the name). Do not merge two source pages into one section and do not drop one. A page that only holds lists, lookups or settings becomes a short section (or the options of a select) and says so in "sourceMap". Within a section, split a very long page into sub-parts but keep it in that section.`,
+    ...pages.map((p) => `${p.n}. ${p.file}${p.sheet ? ` / sheet “${p.sheet}”${p.hidden ? ' (hidden sheet: include only if it belongs)' : ''}` : ''} (${span(p)}, ${p.ids.length} items)`),
+  ].join("\n");
+}
+
 export const SUBSTANTIVE: readonly ElementKind[] = ['question', 'option', 'tablehead', 'row', 'formula', 'instruction'];
 
 /**
