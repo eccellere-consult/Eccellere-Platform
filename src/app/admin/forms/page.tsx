@@ -152,7 +152,7 @@ export default function FormBuilderPage() {
 
         {path === "upload" && (
           <div className="mt-4">
-            <p className="block text-sm text-eccellere-ink" id="fb-files-label">Files or screenshots (up to 3; documents 10 MB, pictures 5 MB)</p>
+            <p className="block text-sm text-eccellere-ink" id="fb-files-label">Files or screenshots (up to 3; no size or length limit for documents; pictures up to 5 MB each)</p>
             <div
               role="group" aria-labelledby="fb-files-label"
               onDragOver={(e) => { e.preventDefault(); setDragging(true); }}

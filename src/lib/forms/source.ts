@@ -9,7 +9,7 @@
  * Safety: nothing in a file is executed. Excel formulas are read as text. The text of a file is data for the AI, never instructions.
  * Server code only.
  */
-import { docKindOf, extractDocumentText, legacyOfficeHint, ExtractError, MAX_UPLOAD_BYTES, type DocKind } from '@/lib/tools/extract';
+import { docKindOf, extractDocumentText, legacyOfficeHint, ExtractError, type DocKind } from '@/lib/tools/extract';
 import { IMAGE_NAME, MAX_IMAGE_BYTES, sniffImage, type ImageReader } from './image';
 import { loadXlsx } from '@/lib/spendAnalysis/xlsxLoader';
 
@@ -36,9 +36,8 @@ export interface SourceReading {
   truncated: boolean;
 }
 
-export const MAX_ELEMENTS = 700;
-export const MAX_ELEMENT_CHARS = 400;
-const MAX_ROWS_PER_SHEET = 600;
+/** The Form Builder puts no limit on how much of a document is read: every item is listed. A single cell or paragraph is kept to this length for display. */
+export const MAX_ELEMENT_CHARS = 5000;
 
 const GLYPH = /^\s*(?:[☐☑☒□■○◯●◻]|\[\s?[xX ]?\s?\]|\(\s?\))\s*/;
 const BULLET = /^\s*(?:[-–•*·]|[a-hA-H][.)]|\(?[a-h]\))\s+/;
@@ -88,7 +87,6 @@ class Collector {
   add(kind: ElementKind, text: string, where: string): boolean {
     const t = clip(clean(text));
     if (!t) return true;
-    if (this.elements.length >= MAX_ELEMENTS) { this.truncated = true; return false; }
     this.counter += 1;
     this.elements.push({ id: `E${this.counter}`, file: this.file, kind, text: t, where });
     return true;
@@ -213,7 +211,7 @@ async function fromXlsx(c: Collector, buffer: Buffer): Promise<void> {
     if ((ws['!cols'] ?? []).some((col) => col?.hidden)) c.warn(`The sheet “${name}” has hidden columns. They were read; check they belong.`);
     const range = XLSX.utils.decode_range(ws['!ref']);
     let lastWasRow = false;
-    for (let r = range.s.r; r <= Math.min(range.e.r, range.s.r + MAX_ROWS_PER_SHEET); r++) {
+    for (let r = range.s.r; r <= range.e.r; r++) {
       const cells: { addr: string; text: string; f?: string }[] = [];
       for (let col = range.s.c; col <= range.e.c; col++) {
         const addr = XLSX.utils.encode_cell({ r, c: col });
@@ -243,7 +241,6 @@ async function fromXlsx(c: Collector, buffer: Buffer): Promise<void> {
         }
       }
     }
-    if (range.e.r - range.s.r > MAX_ROWS_PER_SHEET) c.warn(`The sheet “${name}” has more than ${MAX_ROWS_PER_SHEET} rows. Only the first ${MAX_ROWS_PER_SHEET} were read.`);
   });
   for (const l of lists) {
     let values = l.formula;
@@ -295,11 +292,10 @@ async function readPicture(fileName: string, buffer: Buffer, startAt: number, re
   if (/^NOT_A_FORM(?![A-Za-z_])/.test(text.trim())) throw new ExtractError('UNREADABLE', 'That picture does not look like a form, questionnaire, checklist or table.');
   const safeName = fileName.replace(/[^\w.\- ]+/g, '_').slice(0, 120);
   const c = new Collector(safeName, startAt);
-  fromLines(c, text.slice(0, 40_000));
+  fromLines(c, text);
   if (c.elements.length < 2) throw new ExtractError('UNREADABLE', 'No readable questions or fields were found in that picture. Try a sharper or larger screenshot.');
   c.warn('Read from a picture by AI, not copied from a file. Check every item against the original before relying on it.');
   if (c.elements.some((e) => /\[unreadable\]/i.test(e.text))) c.warn('Some text in the picture was unreadable and is marked [unreadable].');
-  if (c.truncated) c.warn(`The picture has more than ${MAX_ELEMENTS} items. Only the first ${MAX_ELEMENTS} are listed.`);
   return { fileName: safeName, kind: 'image' as DocKind, elements: c.elements, warnings: c.warnings, truncated: c.truncated };
 }
 
@@ -310,7 +306,6 @@ export async function readSource(fileName: string, buffer: Buffer, startAt = 0, 
   if (legacy) throw new ExtractError('UNSUPPORTED', legacy);
   const kind = docKindOf(fileName);
   if (!kind) throw new ExtractError('UNSUPPORTED', 'Supported files: Excel (.xlsx), Word (.docx), PDF, PowerPoint (.pptx), CSV, TXT and Markdown.');
-  if (buffer.length > MAX_UPLOAD_BYTES) throw new ExtractError('TOO_LARGE', 'That file is larger than 10 MB. Use a smaller file, or split it.');
   const safeName = fileName.replace(/[^\w.\- ]+/g, '_').slice(0, 120);
   const c = new Collector(safeName, startAt);
   const ext = fileName.toLowerCase().split('.').pop() ?? '';
@@ -321,7 +316,7 @@ export async function readSource(fileName: string, buffer: Buffer, startAt = 0, 
     else if (ext === 'csv' || ext === 'tsv') fromDelimited(c, buffer.toString('utf8'), ext === 'tsv' ? '\t' : ',');
     else if (kind === 'text') fromLines(c, buffer.toString('utf8'));
     else {
-      const got = await extractDocumentText(fileName, buffer);
+      const got = await extractDocumentText(fileName, buffer, undefined, { noLimit: true });
       fromLines(c, got.text);
       if (got.truncated) { c.truncated = true; c.warn('The document was longer than the reading limit; only the first part was read.'); }
       if (kind === 'pdf') c.warn('Positions in a PDF are line numbers in the extracted text, not page coordinates. Check tables and tick-boxes against the original.');
@@ -333,7 +328,6 @@ export async function readSource(fileName: string, buffer: Buffer, startAt = 0, 
   if (c.elements.length < 2) {
     throw new ExtractError('UNREADABLE', kind === 'pdf' ? 'No text could be read from that PDF. A scanned (picture-only) PDF needs OCR, which is not supported yet.' : 'No readable questions or fields were found in that file.');
   }
-  if (c.truncated) c.warn(`The file has more than ${MAX_ELEMENTS} items. Only the first ${MAX_ELEMENTS} are listed; build the rest as a second form, or split the file.`);
   return { fileName: safeName, kind, elements: c.elements, warnings: c.warnings, truncated: c.truncated };
 }
 
@@ -355,7 +349,7 @@ export const SUBSTANTIVE: readonly ElementKind[] = ['question', 'option', 'table
  * The elements as text for the AI: one line each with its id and location. Capped so the request stays a sensible size; the ids that did
  * not fit are returned so the coverage check can say they were never sent, rather than pretending they were covered.
  */
-export function renderForPrompt(elements: readonly SourceElement[], maxChars = 28_000): { text: string; sent: number; notSent: string[] } {
+export function renderForPrompt(elements: readonly SourceElement[], maxChars = Infinity): { text: string; sent: number; notSent: string[] } {
   const lines: string[] = [];
   let used = 0;
   let i = 0;
@@ -379,7 +373,7 @@ export function sanitiseElements(raw: unknown): SourceElement[] {
   if (!Array.isArray(raw)) return [];
   const seen = new Set<string>();
   const out: SourceElement[] = [];
-  for (const r of raw.slice(0, MAX_ELEMENTS)) {
+  for (const r of raw) {
     const o = r as Partial<SourceElement> | null;
     if (!o || typeof o.id !== 'string' || !/^E\d{1,4}$/.test(o.id) || seen.has(o.id)) continue;
     if (typeof o.text !== 'string' || !KINDS.includes(o.kind as ElementKind)) continue;

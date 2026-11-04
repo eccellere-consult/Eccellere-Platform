@@ -126,6 +126,19 @@ describe('reading text, CSV and refusals', () => {
 });
 
 
+describe('no reading limit', () => {
+  it('reads every item of a very long document and sends all of it to the AI', async () => {
+    const text = Array.from({ length: 1500 }, (_, i) => `${i + 1}. Question number ${i + 1} about how the business handles area ${i + 1}?`).join('\n');
+    const r = await readSource('big.txt', Buffer.from(text));
+    expect(r.elements.length).toBe(1500);
+    expect(r.truncated).toBe(false);
+    expect(r.warnings.join(' ')).not.toMatch(/Only the first|reading limit/);
+    const out = renderForPrompt(r.elements);
+    expect(out.notSent).toEqual([]);
+    expect(out.sent).toBe(1500);
+  });
+});
+
 describe('reading screenshots and photos', () => {
   const transcript = ['1. How often do you review cash flow?', '- Weekly', '- Monthly', '2. Who owns the forecast? ____', ''].join('\n');
   it('turns a vision transcript into numbered elements and says it came from a picture', async () => {

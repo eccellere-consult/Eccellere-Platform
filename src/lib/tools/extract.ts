@@ -47,28 +47,28 @@ const officeParser: Parser = async (buffer) => {
 export interface Extracted { text: string; chars: number; truncated: boolean; kind: DocKind }
 
 /** Tidy text from a document: no control characters, no runs of blank lines, trimmed and capped. */
-export function tidy(text: string): { text: string; truncated: boolean } {
+export function tidy(text: string, noLimit = false): { text: string; truncated: boolean } {
   const t = text.replace(/\u0000/g, '').replace(/\r\n?/g, '\n').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
-  return t.length > MAX_EXTRACTED_CHARS ? { text: t.slice(0, MAX_EXTRACTED_CHARS), truncated: true } : { text: t, truncated: false };
+  return !noLimit && t.length > MAX_EXTRACTED_CHARS ? { text: t.slice(0, MAX_EXTRACTED_CHARS), truncated: true } : { text: t, truncated: false };
 }
 
 export class ExtractError extends Error {
   constructor(public code: 'UNSUPPORTED' | 'TOO_LARGE' | 'UNREADABLE', message: string) { super(message); this.name = 'ExtractError'; }
 }
 
-export async function extractDocumentText(fileName: string, buffer: Buffer, parse: Parser = officeParser): Promise<Extracted> {
+export async function extractDocumentText(fileName: string, buffer: Buffer, parse: Parser = officeParser, opts: { noLimit?: boolean } = {}): Promise<Extracted> {
   const legacy = legacyOfficeHint(fileName);
   if (legacy) throw new ExtractError('UNSUPPORTED', legacy);
   const kind = docKindOf(fileName);
   if (!kind) throw new ExtractError('UNSUPPORTED', 'Supported files: PDF, Word (.docx), PowerPoint (.pptx), Excel (.xlsx), CSV, TXT and MD.');
-  if (buffer.length > MAX_UPLOAD_BYTES) throw new ExtractError('TOO_LARGE', 'That file is larger than 10 MB. Use a smaller file, or split it.');
+  if (!opts.noLimit && buffer.length > MAX_UPLOAD_BYTES) throw new ExtractError('TOO_LARGE', 'That file is larger than 10 MB. Use a smaller file, or split it.');
   let raw: string;
   try {
     raw = kind === 'text' ? buffer.toString('utf8') : await parse(buffer);
   } catch {
     throw new ExtractError('UNREADABLE', 'That file could not be read. It may be damaged or password-protected.');
   }
-  const { text, truncated } = tidy(raw);
+  const { text, truncated } = tidy(raw, opts.noLimit);
   if (text.length < 20) {
     throw new ExtractError('UNREADABLE', kind === 'pdf' ? 'No text could be read from that PDF. A scanned (picture-only) PDF needs OCR, which is not supported yet.' : 'No readable text was found in that file.');
   }
