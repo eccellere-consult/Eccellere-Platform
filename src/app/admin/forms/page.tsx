@@ -100,9 +100,22 @@ export default function FormBuilderPage() {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ request, name, audience, category, practice, assetType: assetType || undefined, baseSlug: base || undefined, elements: path === "upload" ? analysis.elements : undefined, warnings: path === "upload" ? analysis.warnings : undefined }),
     });
-    const d = await readJson(r);
+    let d = await readJson(r);
+    // The build runs in the background; ask for the answer every few seconds until it is ready (or has failed).
+    let ok = r.ok;
+    if (r.status === 202 && d.jobId) {
+      for (let i = 0; i < 200; i++) {
+        await new Promise((res) => setTimeout(res, 3000));
+        const p = await fetch(`/api/admin/forms/build?job=${encodeURIComponent(d.jobId)}`).catch(() => null);
+        if (!p) continue; // a dropped connection is not a failed build: ask again
+        if (p.status === 202) continue;
+        d = await readJson(p); ok = p.ok;
+        break;
+      }
+      if (!d.slug && ok) { ok = false; d = { error: "The build is taking much longer than expected. Check Tools marketplace in a few minutes; if the form is not there, build again." }; }
+    }
     setBuilding(false);
-    if (!r.ok) return setErr(d.error ?? "Could not build the form.");
+    if (!ok) return setErr(d.error ?? "Could not build the form.");
     setResult(d as Result);
     load().catch(() => {});
   }
