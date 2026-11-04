@@ -13,9 +13,9 @@
   --eccellere-cream: #FAF8F4;
   --eccellere-purple: #1A1428;
   --ink-mid: #3A3935;
-  --ink-light: #7A7870;
+  --ink-light: #6B695F;
   --eccellere-teal: #0F6E56;
-  --eccellere-error: #EF4444;
+  --eccellere-error: #B3392B;
   --eccellere-info: #3B82F6;
 
   /* Semantic Mappings */
@@ -76,13 +76,15 @@
   --color-eccellere-cream: #FAF8F4;
   --color-eccellere-purple: #1A1428;
   --color-ink-mid: #3A3935;
-  --color-ink-light: #7A7870;
+  --color-ink-light: #6B695F;
   --color-eccellere-teal: #0F6E56;
-  --color-eccellere-error: #EF4444;
+  --color-eccellere-error: #B3392B;
   --color-eccellere-info: #3B82F6;
   /* The darker gold used for small labels and the main buttons on the Strategy Hub pages, and the hairline round their cards */
   --color-eccellere-gold-deep: #7F611A;
   --color-eccellere-border: #E5E2DB;
+  /* alias so text-gold-deep / bg-gold-deep work too */
+  --color-gold-deep: #7F611A;
 
   /* Fonts */
   --font-display: var(--font-cormorant);

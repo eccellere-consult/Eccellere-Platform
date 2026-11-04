@@ -2,8 +2,6 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { Header } from "@/components/layout/Header";
-import { Footer } from "@/components/layout/Footer";
 import { prismaRepo } from "@/lib/tools/prismaRepo";
 import { getPublishedTool } from "@/lib/tools/service";
 import type { ToolRecord } from "@/lib/tools/repo";
@@ -47,23 +45,12 @@ export default async function ToolPage({ params }: Props) {
   const session = await getServerSession(authOptions);
   const signedIn = !!session?.user?.email;
   const view = <ToolPageView tool={tool} signedIn={signedIn} mode="client" backHref="/tools" backLabel="All tools" signInHref={`/login?next=/tools/${slug}`} />;
-  if (signedIn) {
-    // Signed-in work opens in the standard frame: side menu on the left, the tool on its right.
-    return (
-      <>
-        <style dangerouslySetInnerHTML={{ __html: PRINT_CSS }} />
-        <ToolFrame groups={await menu()} slug={slug} name={tool.name} category={tool.category}>{view}</ToolFrame>
-      </>
-    );
-  }
+  // Every visitor sees the tool in the standard frame: side menu on the left, the tool on its right, top bar and Stage strip.
+  // (Signing in is still needed to use the worksheet; the page says so.)
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: PRINT_CSS }} />
-      <Header />
-      <main id="main-content" className="bg-eccellere-cream pt-[72px]">
-        {view}
-      </main>
-      <Footer />
+      <ToolFrame groups={await menu()} slug={slug} name={tool.name} category={tool.category}>{view}</ToolFrame>
     </>
   );
 }

@@ -1,8 +1,9 @@
 "use client";
 
+import { TitleBlock } from "@/components/standard/AdminFrame";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ChevronLeft, Loader2, Upload, Play, Pause, RotateCcw, Sparkles, Trash2 } from "lucide-react";
+import { Loader2, Upload, Play, Pause, RotateCcw, Sparkles, Trash2 } from "lucide-react";
 import { readJson } from "@/lib/toolkit/http";
 import { cn } from "@/lib/utils";
 import { fileToListText, isDocument, LIST_FILE_TYPES } from "@/lib/tools/listFile";
@@ -226,14 +227,8 @@ export default function AdminToolsPage() {
   const canCheck = listText().trim().length > 0 && !checking;
 
   return (
-    <div className="mx-auto max-w-6xl p-6 lg:p-10">
-      <Link href="/admin" className="inline-flex items-center gap-1 text-xs text-ink-mid hover:text-eccellere-gold"><ChevronLeft className="h-3 w-3" /> Admin</Link>
-      <h1 className="mt-3 font-display text-3xl font-light text-eccellere-ink">Tools marketplace</h1>
-      <p className="mt-2 max-w-3xl text-sm text-ink-mid">
-        Add tools by name, one at a time or from a list or file. The AI drafts each one to the Eccellere standard (a route, a guided workspace, a calculation,
-        guidance on reading the result, and a 30/60/90 action plan). You review every draft, then publish it into the section you choose.
-        Reviewed tools join the Eccellere consulting library; nothing reaches a client until you expose it.
-      </p>
+    <div className="mx-auto max-w-[1100px] px-4 pb-16 pt-6 md:px-6">
+      <TitleBlock kicker="Stage 3 · Tools marketplace" title="Review, fix and publish" purpose="Add tools by name, one at a time or from a list or file. The AI drafts each one to the Eccellere standard; you review every draft, then publish it. Nothing reaches a client until you expose it." />
       <p className="mt-2 text-sm"><Link className="text-eccellere-gold underline" href="/consulting/library">Open the consulting library</Link></p>
       {!aiReady && <p className="mt-4 rounded bg-red-50 p-3 text-sm text-red-800">No AI provider is switched on with a key, so drafting cannot start. Set one up under <Link className="underline" href="/admin/ai-settings">AI providers</Link>.</p>}
 

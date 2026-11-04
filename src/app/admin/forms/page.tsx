@@ -1,8 +1,9 @@
 "use client";
 
+import { TitleBlock } from "@/components/standard/AdminFrame";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ChevronLeft, FileText, Loader2, Sparkles, Upload } from "lucide-react";
+import { FileText, Loader2, Sparkles, Upload } from "lucide-react";
 import { readJson } from "@/lib/toolkit/http";
 import { cn } from "@/lib/utils";
 import { ASSET_TYPES } from "@/lib/tools/taxonomy";
@@ -125,12 +126,9 @@ export default function FormBuilderPage() {
   if (loadErr) return <div className="mx-auto max-w-3xl p-6 text-sm text-red-700">{loadErr}</div>;
 
   return (
-    <div className="mx-auto max-w-4xl p-6">
-      <Link href="/admin" className="inline-flex items-center gap-1 text-xs text-ink-light hover:text-eccellere-ink"><ChevronLeft className="h-3.5 w-3.5" /> Admin</Link>
-      <p className="mt-4 text-[11px] uppercase tracking-[0.18em] text-gold-deep">Admin</p>
-      <h1 className="font-display text-3xl text-eccellere-ink">Form Builder</h1>
-      <p className="mt-1 text-sm"><Link href="/admin/forms/classify" className="text-gold-deep underline underline-offset-2">Classify and deepen the whole catalogue</Link> (survey forms, transformation toolkits, daily tools; by area and sector)</p>
-      <p className="mt-1 max-w-2xl text-sm text-ink-mid">Turn an Excel, Word or PDF form, a plain description, or an existing template into a form that clients can fill in. You review it, then publish it with the other tools in the marketplace. Nothing reaches a client until you do.</p>
+    <div className="mx-auto max-w-[1100px] px-4 pb-16 pt-6 md:px-6">
+      <TitleBlock kicker="Stage 1 · Form Builder" title="Build a form" purpose="Turn an Excel, Word or PDF form, a picture of a form, a plain description, or an existing template into a form clients can fill in. You review it, then publish it. Nothing reaches a client until you do." />
+      <p className="-mt-3 mb-5 text-sm"><Link href="/admin/forms/classify" className="text-eccellere-gold-deep underline underline-offset-2">Next: classify and deepen the whole catalogue</Link></p>
       {!aiReady && <p className="mt-3 border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">No AI provider is switched on, so a form cannot be built yet. Reading files and finding templates still work. Open &ldquo;AI Providers&rdquo; in the admin menu to switch one on.</p>}
 
       {/* 1. start */}
