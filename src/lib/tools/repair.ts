@@ -148,9 +148,17 @@ export async function tidyTool(repo: ToolsRepo, slug: string): Promise<FixOutcom
   const removed = dropBrokenResults(def);
   if (removed.length) notes.push(`Removed ${removed.length} result${removed.length === 1 ? '' : 's'} that could not run: ${removed.map((r) => `“${r}”`).join(', ')}.`);
   notes.push(...repairStructure(def));
+  if (!(def.outputs ?? []).length) {
+    const f = def.sections.flatMap((s) => s.parts).find((p) => p.kind === 'field');
+    const text = f && f.kind === 'field' ? f.label + ': {' + f.key + '}' : 'Your entries are recorded in the tables above.';
+    def.outputs = [{ key: 'summary', label: 'Summary of your entry', rule: { op: 'template', text } as never }];
+    notes.push('Added a simple summary result so a later tool can build on this one. Ask "Modify with AI" for a richer one.');
+  }
   const quality: QualityResult = assess(def);
   const changed = notes.length > 0;
-  if (!changed || quality.errors.length > before.errors.length) {
+  // Standards-score errors are about thin content, not breakage: they do not count against a structural repair
+  const hard = (l: string[]) => l.filter((e) => !e.startsWith('Standards:')).length;
+  if (!changed || hard(quality.errors) > hard(before.errors) || (hard(quality.errors) === hard(before.errors) && quality.errors.length > before.errors.length)) {
     return { tool, applied: false, before: before.errors.length, after: before.errors.length, notes, remaining: before.errors };
   }
   const status = quality.errors.length ? 'NEEDS_REVIEW' : 'DRAFT';
