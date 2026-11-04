@@ -177,7 +177,15 @@ export default function ReviewPanel({ slug, categories, practices, onChanged, on
               <button className="inline-flex items-center gap-1 bg-eccellere-ink px-3 py-1.5 text-xs text-white disabled:opacity-40" disabled={!!busy} onClick={() => post("fix")}>
                 {busy === "fix" ? <><Loader2 className="mr-1 inline h-3.5 w-3.5 animate-spin" />Fixing with AI (up to 3 minutes)…</> : <><Sparkles className="h-3.5 w-3.5" /> Fix these problems with AI</>}
               </button>
-              <span className="text-xs text-red-900">It adds a missing diagram or worked example and corrects the rest. If a change would make things worse it is not applied.</span>
+              <button className="inline-flex items-center gap-1 border border-eccellere-ink/40 bg-white px-3 py-1.5 text-xs text-eccellere-ink disabled:opacity-40" disabled={!!busy}
+                onClick={() => post("fix", { instruction: ["Fix exactly these problems and change nothing else:", ...q.errors.map((e) => `- ${e}`)].join("\n") })}>
+                <Sparkles className="h-3.5 w-3.5" /> Try again: send the exact problems
+              </button>
+              <button className="inline-flex items-center gap-1 border border-eccellere-ink/40 bg-white px-3 py-1.5 text-xs text-eccellere-ink disabled:opacity-40" disabled={!!busy}
+                onClick={() => confirm("Draft this tool again from its name? Your corrections will be replaced and it goes back to review.") && post("redraft", { brief })}>
+                {busy === "redraft" ? <><Loader2 className="mr-1 inline h-3.5 w-3.5 animate-spin" />Drafting (up to 3 minutes)…</> : "Draft again with AI"}
+              </button>
+              <span className="w-full text-xs text-red-900">If a change would make things worse it is not applied. If both fix buttons fail, use &ldquo;Draft again&rdquo;, or correct the wording yourself in the &ldquo;Wording&rdquo; boxes below (or ask for a specific change in &ldquo;Modify with AI&rdquo;).</span>
             </div>
           )}
         </div>

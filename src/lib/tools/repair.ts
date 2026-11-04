@@ -116,7 +116,7 @@ export async function fixTool(
         }
         const worse = after.errors.length > current.errors.length || (!instruction && after.errors.length >= current.errors.length && (after.standards?.score ?? 0) <= (current.standards?.score ?? 0));
         if (worse) {
-          notes.push(`The AI's correction was not applied: it would leave ${after.errors.length} problem${after.errors.length === 1 ? '' : 's'} (there ${current.errors.length === 1 ? 'is' : 'are'} ${current.errors.length} now). ${instruction ? 'Try rewording the instruction.' : 'Try "Draft again", or edit the wording by hand.'}`);
+          notes.push(`The AI's correction was not applied: it would leave ${after.errors.length} problem${after.errors.length === 1 ? '' : 's'} (there ${current.errors.length === 1 ? 'is' : 'are'} ${current.errors.length} now). ${after.errors.length ? ` Still wrong: ${after.errors.slice(0, 3).join(' | ')}.` : ''} ${instruction ? 'Try rewording the instruction.' : 'Use "Try again: send the exact problems", "Draft again with AI", or edit the wording by hand.'}`);
         } else {
           def = repaired;
           applied = true;
