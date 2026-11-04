@@ -164,6 +164,14 @@ const adminModules = [
     badge: null,
   },
   {
+    label: "Form Builder",
+    href: "/admin/forms",
+    description: "Build a form from an upload (Excel, Word, PDF), a description, or a template, then publish it to the marketplace",
+    icon: Package,
+    stat: "new",
+    badge: null,
+  },
+  {
     label: "Audit Log",
     href: "/admin/audit-log",
     description: "Full platform audit trail",

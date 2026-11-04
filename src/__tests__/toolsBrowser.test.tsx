@@ -7,9 +7,9 @@ import { MARKET_CATEGORIES } from '@/lib/tools/service';
 afterEach(cleanup);
 
 const tools: ToolCard[] = [
-  { slug: '5-why-analysis', name: '5 Why Analysis', category: 'Problem solving', groupName: 'Root cause', does: 'Asks why repeatedly to reach a root cause.', level: 'L2' },
-  { slug: 'pugh-matrix', name: 'Pugh Matrix', category: 'Decision Models', groupName: 'Decision making', does: 'Compares options against a baseline on weighted criteria.', level: 'L1' },
-  { slug: 'okr', name: 'OKR', category: 'Strategy', groupName: null, does: 'Links objectives to measurable key results.', level: null },
+  { slug: '5-why-analysis', name: '5 Why Analysis', category: 'Problem solving', groupName: 'Root cause', does: 'Asks why repeatedly to reach a root cause.', level: 'L2', type: 'toolkit', areas: ['Process'], sectors: ['Manufacturing'] },
+  { slug: 'pugh-matrix', name: 'Pugh Matrix', category: 'Decision Models', groupName: 'Decision making', does: 'Compares options against a baseline on weighted criteria.', level: 'L1', type: 'aid', areas: ['Strategy'], sectors: [] },
+  { slug: 'okr', name: 'OKR', category: 'Strategy', groupName: null, does: 'Links objectives to measurable key results.', level: null, type: 'aid', areas: ['Strategy', 'People'], sectors: [] },
 ];
 
 describe('tools grid', () => {
@@ -33,6 +33,21 @@ describe('tools grid', () => {
     fireEvent.change(screen.getByLabelText('Search tools'), { target: { value: 'zzzz' } });
     expect(screen.queryAllByRole('link')).toHaveLength(0);
     expect(screen.getByText(/No tool matches/)).toBeTruthy();
+  });
+
+  it('filters by type, business area and sector; a tool with no sector fits every sector', () => {
+    render(<ToolsBrowser tools={tools} categories={[...MARKET_CATEGORIES]} />);
+    fireEvent.change(screen.getByLabelText('Type'), { target: { value: 'aid' } });
+    expect(screen.getAllByRole('link')).toHaveLength(2);
+    fireEvent.change(screen.getByLabelText('Business area'), { target: { value: 'People' } });
+    expect(screen.getAllByRole('link')).toHaveLength(1);
+    fireEvent.change(screen.getByLabelText('Type'), { target: { value: 'All' } });
+    fireEvent.change(screen.getByLabelText('Business area'), { target: { value: 'All' } });
+    fireEvent.change(screen.getByLabelText('Sector'), { target: { value: 'Retail' } });
+    expect(screen.getAllByRole('link')).toHaveLength(2); // the Manufacturing-only tool is hidden
+    expect(screen.queryByRole('link', { name: /5 Why/ })).toBeNull();
+    fireEvent.change(screen.getByLabelText('Sector'), { target: { value: 'Manufacturing' } });
+    expect(screen.getAllByRole('link')).toHaveLength(3);
   });
 
   it('shows a friendly empty state before anything is published', () => {

@@ -16,7 +16,7 @@ const OFFICE_TYPES: Record<string, string> = {
 };
 const TEXT_EXT = new Set(['txt', 'md', 'csv', 'tsv']);
 
-export type DocKind = 'pdf' | 'word' | 'powerpoint' | 'excel' | 'text';
+export type DocKind = 'pdf' | 'word' | 'powerpoint' | 'excel' | 'text' | 'image';
 export const EXTRACT_ACCEPT = '.pdf,.docx,.pptx,.xlsx,.txt,.md,.csv,.tsv';
 
 /** What kind of document this is, from its name (browsers often send a vague type), or null if it is not supported. */
