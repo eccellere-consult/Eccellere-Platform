@@ -52,6 +52,31 @@ export interface FixOutcome {
   notes: string[];
 }
 
+/**
+ * A result (an "output" or a "derived" value) whose rule the engine cannot run is optional extra, never the heart of the tool. Rather than
+ * ask the AI to guess again, take such results out and say which. Returns the list of what was removed.
+ */
+export function dropBrokenResults(def: DeclarativeTool): string[] {
+  const dropped: string[] = [];
+  for (let round = 0; round < 8; round++) {
+    const hits = assess(def).errors
+      .map((e) => /^(outputs|derived)\[(\d+)\]/.exec(e))
+      .filter((m): m is RegExpExecArray => !!m);
+    if (!hits.length) break;
+    // remove from the highest index down so earlier indexes stay valid
+    const seen = new Set<string>();
+    for (const m of hits.sort((a, b) => Number(b[2]) - Number(a[2]))) {
+      const key = `${m[1]}${m[2]}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const list = (m[1] === 'outputs' ? def.outputs : def.derived) as { label?: string }[] | undefined;
+      const i = Number(m[2]);
+      if (list && list[i]) { dropped.push(list[i].label || `${m[1]} ${i + 1}`); list.splice(i, 1); }
+    }
+  }
+  return dropped;
+}
+
 /** Fix the problems on a page, and/or change it as instructed, using AI. */
 export async function fixTool(
   repo: ToolsRepo,
@@ -67,6 +92,8 @@ export async function fixTool(
   let def = JSON.parse(JSON.stringify(tool.definition)) as DeclarativeTool;
   const before = assess(def);
   const notes: string[] = [];
+  const removed = dropBrokenResults(def);
+  if (removed.length) notes.push(`Removed ${removed.length} result${removed.length === 1 ? '' : 's'} the AI had written with a rule this tool cannot run: ${removed.map((r) => `“${r}”`).join(', ')}. Ask "Modify with AI" to add a result back if you need it.`);
 
   // 1. missing diagram / worked example: their own focused call
   const need = { diagram: !def.diagram, sample: !def.sample, originator: false };
@@ -79,7 +106,7 @@ export async function fixTool(
 
   // 2. whatever is still wrong (or the administrator's instruction): one correction call
   let current = assess(def);
-  let applied = !!(need.diagram || need.sample) && current.errors.length < before.errors.length;
+  let applied = (removed.length > 0 || !!(need.diagram || need.sample)) && current.errors.length < before.errors.length;
   if (current.errors.length > 0 || instruction) {
     const issues = current.errors;
     const { system, user } = buildRepairMessages(def, issues, instruction, opts.skill);

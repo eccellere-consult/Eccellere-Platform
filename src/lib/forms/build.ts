@@ -20,6 +20,7 @@ import type { ToolInput } from '@/lib/tools/repo';
 import { DEFAULT_FORM_SKILL, FORM_EXTRAS } from './skill';
 import { renderForPrompt, type SourceReading } from './source';
 import { coverageErrors, coverageWarnings, reconcile, type Coverage } from './reconcile';
+import { dropBrokenResults } from '@/lib/tools/repair';
 import { depthOf } from '@/lib/tools/depth';
 import { assetTypeLabel, cleanClassification, suggestClassification, shapeOf, type AssetTypeId, type Classification } from '@/lib/tools/taxonomy';
 import { slideHash } from '@/lib/import/author';
@@ -137,6 +138,8 @@ export function makeFormBuilder(deps: BuilderDeps) {
     tool.source = { draftedBy: 'ai', draftedAt: now().toISOString(), ...(hash ? { hash } : {}) };
 
     const notes: string[] = [];
+    const removedResults = dropBrokenResults(tool);
+    if (removedResults.length) notes.push(`Removed ${removedResults.length} AI-written result(s) with a rule the tool cannot run: ${removedResults.join(', ')}.`);
     const probe = assess(tool);
     if (tool.sample && probe.errors.some((e) => e.startsWith('sample'))) { delete tool.sample; notes.push('The AI-written worked example had errors and was replaced.'); }
     if (tool.diagram && probe.errors.some((e) => e.startsWith('diagram'))) { delete tool.diagram; notes.push('The AI-written diagram had errors and was replaced.'); }
