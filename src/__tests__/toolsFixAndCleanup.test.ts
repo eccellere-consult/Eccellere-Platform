@@ -97,6 +97,19 @@ describe('Fix with AI and Modify with AI', () => {
     expect(r.notes.join(' ')).toMatch(/Added: diagram and sample/);
   });
 
+  it('takes out a result whose rule the engine cannot run, without asking the AI, and says which', async () => {
+    const t = clone(EXAMPLE_TOOL) as unknown as DeclarativeTool;
+    t.outputs = [...(t.outputs ?? []), { key: 'bogus', label: 'Invented total', rule: { op: 'sum_everything' } as never }];
+    const repo = await repoWith(t);
+    expect(assess(t).errors.join(' ')).toMatch(/unknown rule/);
+    let calls = 0;
+    const r = await fixTool(repo, t.slug, async () => { calls++; return ok({}); });
+    expect(calls).toBe(0);
+    expect(r).toMatchObject({ applied: true, after: 0 });
+    expect(r.notes.join(' ')).toMatch(/Removed 1 result.*Invented total/);
+    expect(((r.tool.definition as DeclarativeTool).outputs ?? []).some((o) => o.key === 'bogus')).toBe(false);
+  });
+
   it('fixes other errors with one correction call, keeping identity, keys and the originator', async () => {
     const broken = { ...clone(EXAMPLE_TOOL), does: 'Too short', outputs: [] } as unknown as DeclarativeTool;
     broken.reference.originator = 'Person I confirmed';
