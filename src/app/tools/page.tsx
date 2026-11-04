@@ -3,6 +3,7 @@ import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { prismaRepo } from "@/lib/tools/prismaRepo";
 import { MARKET_CATEGORIES } from "@/lib/tools/service";
+import { readClassification, shapeOf, suggestClassification } from "@/lib/tools/taxonomy";
 import ToolsBrowser, { type ToolCard } from "./ToolsBrowser";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +17,11 @@ export const metadata: Metadata = {
 async function loadTools(): Promise<ToolCard[]> {
   try {
     const rows = await prismaRepo.listTools({ status: "PUBLISHED" });
-    return rows.map((t) => ({ slug: t.slug, name: t.name, category: t.category, groupName: t.groupName, does: t.does ?? "", level: t.quality?.standards?.level ?? null }));
+    return rows.map((t) => {
+      // an approved classification when there is one; otherwise the rules' suggestion, so the filters work from day one
+      const c = readClassification(t.provenance) ?? suggestClassification({ name: t.name, category: t.category, practice: t.practice, groupName: t.groupName, does: t.does, whenToUse: t.whenToUse, shape: shapeOf(t.definition) });
+      return { slug: t.slug, name: t.name, category: t.category, groupName: t.groupName, does: t.does ?? "", level: t.quality?.standards?.level ?? null, type: c.type, areas: c.areas, sectors: c.sectors };
+    });
   } catch {
     return []; // tables not created yet, or the database is unreachable: show the empty state instead of an error page
   }

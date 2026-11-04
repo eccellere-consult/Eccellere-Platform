@@ -1,0 +1,60 @@
+# Eccellere Form Builder: architecture assessment and plan
+
+Source of the requirement: `Eccellere_AI_Form_Builder_Skill.md` (v1.0). This note is the "assess before coding" step that skill asks for.
+
+## 1. The answer
+
+**Do not build a second form engine. The Tools marketplace already is one.** A "tool" is a form stored as data (sections, typed fields, tables, computed columns, rules, diagram, worked example). It is drafted by AI, scored against the Eccellere Standards of Depth and Quality, held for human review, then published to the marketplace. Clients fill it in with autosave, version checks and AI help, in the standard frame.
+
+So the Form Builder is the **admin front door** onto that engine: three ways in (upload, describe, start from a template), a faithful structure reader, a template finder, and a source-coverage check. What it produces is an ordinary marketplace tool, so it publishes beside the frameworks and tools with no extra plumbing.
+
+## 2. What exists and is reused
+
+| Need in the skill | Already in the platform | Reused as is |
+|---|---|---|
+| Declarative, versioned form definition | `DeclarativeTool` (`strategyModels/declarative.ts`), `WsTool` table | yes |
+| Safe rules and calculations (no eval) | rule vocabulary: calc, weighted, top, when, template, quadrant | yes |
+| Autosave and concurrency, per person | `WsFillin` with `version` check | yes |
+| AI draft with validated JSON | `tools/draft.ts`, `tools/complete.ts`, `tools/repair.ts` | yes (functions reused) |
+| Quality bar | `tools/standards.ts` (score out of 100) and the quality gate | yes |
+| Human review before clients see it | NEEDS_REVIEW, REVIEWED, PUBLISHED states, review panel | yes |
+| AI provider and kill switch | `ai/gateway.ts`, admin AI settings | yes |
+| Editable skill files | `tools/skill.ts` + Skill editor | extended with a third file |
+| Upload reading | `tools/extract.ts` (plain text only) | extended |
+
+## 3. What is new (this change)
+
+1. **Structure-aware source reader** (`lib/forms/source.ts`). Excel, Word, PDF, PowerPoint, CSV, text and Markdown become a numbered list of source elements (heading, question, option, table header, table row, instruction, formula), each with its location (sheet and cell, paragraph, line). Hidden sheets and rows, formulas, merged cells and Excel drop-down lists are found and flagged. Formulas are read as text and never run.
+2. **Template finder** (`lib/forms/templateSearch.ts`). A fast word-match shortlist from the whole catalogue, then the AI picks the best three with a reason. The AI can only choose from the shortlist, so it cannot invent a template. Works without AI (word match only).
+3. **Form-builder skill** (`lib/forms/skill.ts`). The standards and references from the specification, in plain text the admin can edit: the six things every form explains, KISS and MECE question rules, field-type mapping, scales, honesty rules, how to treat an uploaded file.
+4. **Builder** (`lib/forms/build.ts`). Prompt, upload or template to a draft tool, with a source map from the AI. Nothing is published; the draft goes to NEEDS_REVIEW.
+5. **Source coverage** (`lib/forms/reconcile.ts`). Every source element is mapped to a field, a table column or an option, or listed as not covered. The AI may *propose* leaving something out; only a person confirms it. Counts and the not-covered list are saved with the tool.
+6. **Admin screen** `/admin/forms` and API `/api/admin/forms/*`.
+
+## 4. Honest limits of this version (decided, not forgotten)
+
+- **Field types follow the existing engine**: short text, long text, choice, 1 to N rating, number, and tables with computed columns. Dates, yes/no, multi-select, ranking, matrix and file attachments are *approximated* (for example yes/no becomes a choice). Every approximation is listed on the review screen. Adding true new field types means changing the engine, the Excel template and the importer together; that is a separate, deliberate step.
+- **Screenshots and photos are read by a vision AI** (PNG, JPG, WebP, GIF; 5 MB; Anthropic or OpenAI only, other providers are skipped). The model transcribes the picture to plain lines, which then become numbered source elements like any file, so the coverage check applies. A picture is labelled as AI-read and must be checked against the original. The picture is not stored. HEIC photos and scanned PDFs are not read (save as JPG, or screenshot the page). Click-to-choose, drag-and-drop and Ctrl+V paste are supported on `/admin/forms`.
+- **Excel drop-down lists** are read from the file's XML; **macros and formulas are never run**.
+- **Conditional logic** (show/hide, branching) is not in the engine today; the builder records such rules from a source as notes for the reviewer rather than pretending they work.
+- **The uploaded file is not stored**; the numbered element list with locations is, as evidence.
+- Not built here: multi-respondent forms, public distribution, signatures, benchmarking (skill Phase 5).
+- **Reference kit read.** `Framework_Workspace_Builder.zip` was supplied after the first build and read (SKILL.md, chapters 08 and 11 in full, the content bar, AI rules and limits). The engine it describes is the one this build extends. Three gaps were closed because of it: a retry that lists the exact quality problems (as its drafting does), a zip-bomb guard on Excel/Word/PowerPoint uploads, and a notice that file text goes to the AI service; plus a source-text hash to warn about building the same form twice.
+- **Not done from the kit's gate ladder:** the browser journeys at desktop and phone width with a fake AI server (G5/G6), a Node 22 build, and a pull request. Its "Done" list also asks for case scope, 'Use this' upstream links and the live preview pane in review; those belong to the existing Tools marketplace screens and were not changed.
+
+## 5. Tests and gates
+
+Unit tests with a pretend AI: source reading for Excel (including hidden sheets, formulas, drop-downs), Word, text and CSV; prompt injection inside a file; template finder with and without AI; malformed AI output; coverage counting; AI off. Then typecheck, lint, the full test run and a production build. Browser and real-model checks are listed as not done unless run.
+
+## 6. Classification and depth (third request)
+
+**Three asset types**, one per asset: Survey forms (collect data to analyse and report), Transformation toolkits (diagnose and solve), Daily tools & aids (do a job at the desk). Each also has one or more **areas** (Strategy, People, Process, Technology, Data, Finance, Customer & growth, Risk & governance) and zero or more **sectors** (the four marketplace sectors plus Financial Services, Healthcare & Life Sciences, Energy & Utilities, Technology & Services, Public Sector; none = every sector).
+
+- **Stored in `provenance.classification`**, so no database migration. Trade-off: it cannot be filtered in SQL; the marketplace filters in the browser, which is fine at catalogue size. Move to columns if the catalogue grows into thousands.
+- **Rules propose, a person approves.** `lib/tools/taxonomy.ts` scores name, description, section and the shape of the form. A guess with weak evidence is marked "Rules unsure". An optional AI pass (`/api/admin/forms/classify` POST) refines up to 25 unsure ones at a time and saves nothing. Approval is `/admin/forms/classify`; it changes metadata only, never content, status or review.
+- **The marketplace** (`/tools`) filters by type, area and sector, using the approved classification or, until approved, the rules' suggestion.
+- **Depth standard per type** (`lib/tools/depth.ts`): structural checks (survey: 3+ dimensions, 12+ scored questions, profile questions, scoring, bands, open comment; toolkit: ordered steps, evidence table, ranking, 2+ results, action plan, links; aid: inputs, working, 2+ results, assumptions; all: purpose, guide, worked example, diagram, next step). It measures structure, not truth.
+- **Enrich** (`/api/admin/forms/enrich`) turns the gaps into an instruction for the existing "Modify with AI" step, which refuses a worse result and sends the tool back to review. Live tools must be withdrawn first; hand-built Strategy Hub tools are never changed.
+- New builds carry a classification (the administrator's choice, else the AI's, else the rules') and list depth gaps as review warnings.
+
+**Not verified:** a real vision call, a real classify/enrich AI call, browser journeys (drag-drop, paste, filters), and the classification of the live catalogue (the rules were tested on examples, not run over the production list).

@@ -143,7 +143,12 @@ export interface GenerateArgs {
   json?: boolean;
   /** out-param: why the model stopped ("length" = it ran out of room and the answer is cut off) */
   finish?: { reason?: string };
+  /** pictures to read (base64, no data: prefix). Only providers that can see pictures are tried when this is set. */
+  images?: ImageInput[];
 }
+export interface ImageInput { mediaType: "image/png" | "image/jpeg" | "image/webp" | "image/gif"; data: string }
+/** providers whose models accept pictures; the others are text only */
+export const VISION_PROVIDERS: ProviderId[] = ["anthropic", "openai"];
 export interface GenerateResult {
   text: string;
   provider: ProviderId;
@@ -184,7 +189,9 @@ export async function callProvider(
         headers: { "Content-Type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
         body: JSON.stringify({
           model, max_tokens: a.maxTokens, temperature: 0.3, system: a.json ? a.system + JSON_ONLY : a.system,
-          messages: [{ role: "user", content: a.user }],
+          messages: [{ role: "user", content: a.images?.length
+            ? [...a.images.map((i) => ({ type: "image", source: { type: "base64", media_type: i.mediaType, data: i.data } })), { type: "text", text: a.user }]
+            : a.user }],
         }),
       });
       if (!res.ok) {
@@ -205,7 +212,9 @@ export async function callProvider(
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
       body: JSON.stringify({
         model, temperature: 0.3, max_tokens: a.maxTokens,
-        messages: [{ role: "system", content: a.json ? a.system + JSON_ONLY : a.system }, { role: "user", content: a.user }],
+        messages: [{ role: "system", content: a.json ? a.system + JSON_ONLY : a.system }, { role: "user", content: a.images?.length
+          ? [...a.images.map((i) => ({ type: "image_url", image_url: { url: `data:${i.mediaType};base64,${i.data}` } })), { type: "text", text: a.user }]
+          : a.user }],
         ...(a.json ? { response_format: { type: "json_object" } } : {}),
       }),
     });
@@ -232,6 +241,7 @@ export async function runProviders(
     ? [PROVIDER_BY_ID[a.only]].filter((p) => p && hasKey(p, env))
     : resolveOrder(s, env);
   for (const p of order) {
+    if (a.images?.length && !VISION_PROVIDERS.includes(p.id)) { a.diag?.push(`${p.label}: cannot read pictures, skipped`); continue; }
     const model = modelFor(p, s, env);
     const finish: { reason?: string } = {};
     const text = await callProvider(p, model, { ...a, finish }, env);

@@ -5,12 +5,12 @@ import { Download, Loader2, RotateCcw } from "lucide-react";
 import { readJson } from "@/lib/toolkit/http";
 import { cn } from "@/lib/utils";
 
-interface Skill { kind: "draft" | "assist"; title: string; text: string; isCustom: boolean; updatedAt: string | null; defaultText: string }
+interface Skill { kind: "draft" | "assist" | "form"; title: string; text: string; isCustom: boolean; updatedAt: string | null; defaultText: string }
 
 /** The two skill files that tell the AI how to build a tool page and how to help a person using one. Plain text; edit and save. */
 export default function SkillEditor() {
   const [skills, setSkills] = useState<Skill[] | null>(null);
-  const [tab, setTab] = useState<"draft" | "assist">("draft");
+  const [tab, setTab] = useState<"draft" | "assist" | "form">("draft");
   const [text, setText] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ kind: "ok" | "warn"; text: string } | null>(null);
@@ -57,7 +57,7 @@ export default function SkillEditor() {
       <div className="inline-flex border border-eccellere-ink/20 text-xs" role="tablist">
         {skills.map((s) => (
           <button key={s.kind} role="tab" aria-selected={tab === s.kind} onClick={() => { setTab(s.kind); setMsg(null); }} className={cn("px-3 py-1.5", tab === s.kind ? "bg-eccellere-ink text-white" : "hover:bg-eccellere-cream")}>
-            {s.kind === "draft" ? "Drafting skill" : "Assist skill"}{s.isCustom && " (edited)"}
+            {s.kind === "draft" ? "Drafting skill" : s.kind === "form" ? "Form builder skill" : "Assist skill"}{s.isCustom && " (edited)"}
           </button>
         ))}
       </div>
@@ -65,7 +65,9 @@ export default function SkillEditor() {
       <p className="mt-1 text-xs text-ink-light">
         {tab === "draft"
           ? "Applies to the next tool the AI drafts, redrafts or completes. Tools already drafted are not changed."
-          : "Applies to the next time a person asks the AI to draft answers, suggest questions or write an analysis."}
+          : tab === "form"
+            ? "Applies to the next form built in the Form builder (from a prompt, an upload or a template). Forms already built are not changed."
+            : "Applies to the next time a person asks the AI to draft answers, suggest questions or write an analysis."}
         {" "}The code always keeps: the format the AI must return, the tool&apos;s name taken from your list, originator and year left for a person to confirm, the quality and standards checks, and review before anything is shown to a client.
       </p>
       <textarea className="mt-3 min-h-[360px] w-full border border-eccellere-ink/20 bg-white p-3 font-mono text-xs leading-relaxed focus:border-eccellere-gold focus:outline-none" value={value} onChange={(e) => { setText((t) => ({ ...t, [tab]: e.target.value })); setMsg(null); }} aria-label={cur.title} spellCheck />

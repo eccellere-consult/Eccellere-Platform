@@ -4,7 +4,7 @@ import { audit, loadSkillInfo, readAuth, resetSkill, saveSkill, toolsGuard, writ
 
 export const dynamic = "force-dynamic";
 
-const KINDS: SkillKind[] = ["draft", "assist"];
+const KINDS: SkillKind[] = ["draft", "assist", "form"];
 
 /** GET /api/admin/tools/skill - both skill files: the text in use, whether it has been edited, and the built-in default. */
 export const GET = toolsGuard(async () => {

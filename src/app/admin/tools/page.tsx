@@ -80,6 +80,8 @@ export default function AdminToolsPage() {
 
   useEffect(() => {
     loadCatalogue().catch(() => setLoadErr("Could not load the tools."));
+    // /admin/tools?open=<slug> opens that tool's review panel (the Form Builder links here)
+    try { const want = new URLSearchParams(window.location.search).get("open"); if (want) setOpen(want); } catch { /* no address bar */ }
     try { const id = localStorage.getItem(RUN_KEY); if (id) loadRun(id).catch(() => {}); } catch { /* storage unavailable */ }
   }, [loadCatalogue, loadRun]);
 

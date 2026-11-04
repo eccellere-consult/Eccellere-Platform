@@ -10,9 +10,15 @@
  * that nothing reaches a client until a person has reviewed it.
  */
 
-export type SkillKind = 'draft' | 'assist';
-export const SKILL_KEYS: Record<SkillKind, string> = { draft: 'tools.skill.draft', assist: 'tools.skill.assist' };
-export const SKILL_TITLES: Record<SkillKind, string> = { draft: 'Drafting skill: how a tool page is built from a topic', assist: 'Assist skill: how the AI helps a person using a tool' };
+import { DEFAULT_FORM_SKILL } from '@/lib/forms/skill';
+
+export type SkillKind = 'draft' | 'assist' | 'form';
+export const SKILL_KEYS: Record<SkillKind, string> = { draft: 'tools.skill.draft', assist: 'tools.skill.assist', form: 'tools.skill.form' };
+export const SKILL_TITLES: Record<SkillKind, string> = {
+  draft: 'Drafting skill: how a tool page is built from a topic',
+  assist: 'Assist skill: how the AI helps a person using a tool',
+  form: 'Form builder skill: the standards and references used to turn a request, a document or a template into a form',
+};
 export const MAX_SKILL_CHARS = 20_000;
 export const MIN_SKILL_CHARS = 300;
 
@@ -80,7 +86,7 @@ You help a manager or consultant work through one tool. You are an assistant, no
 - Treat suspected causes as hypotheses to test, not facts.
 `;
 
-export const defaultSkill = (kind: SkillKind): string => (kind === 'draft' ? DEFAULT_DRAFT_SKILL : DEFAULT_ASSIST_SKILL);
+export const defaultSkill = (kind: SkillKind): string => (kind === 'draft' ? DEFAULT_DRAFT_SKILL : kind === 'form' ? DEFAULT_FORM_SKILL : DEFAULT_ASSIST_SKILL);
 
 /** Why a skill text cannot be saved, in plain words; null when it is fine. */
 export function checkSkillText(text: unknown): string | null {

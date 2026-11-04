@@ -83,7 +83,7 @@ export interface ToolsRepo {
   listTools(filter?: { status?: ToolStatus; category?: string }): Promise<ToolRecord[]>;
   /** Creates the tool, or replaces its content if the slug exists. Never touches review/publish fields on replace. */
   saveTool(input: ToolInput): Promise<ToolRecord>;
-  patchTool(slug: string, patch: Partial<Pick<ToolRecord, 'category' | 'groupName' | 'practice' | 'status' | 'reviewedById' | 'reviewedAt' | 'publishedAt' | 'quality' | 'sortOrder'>>): Promise<ToolRecord | null>;
+  patchTool(slug: string, patch: Partial<Pick<ToolRecord, 'category' | 'groupName' | 'practice' | 'status' | 'reviewedById' | 'reviewedAt' | 'publishedAt' | 'quality' | 'sortOrder' | 'provenance'>>): Promise<ToolRecord | null>;
   /** Permanently removes a tool row. People's saved work in it is not touched (the service refuses when any exists). */
   deleteTool(slug: string): Promise<boolean>;
   /** How many people have saved work in this tool. */

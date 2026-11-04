@@ -90,7 +90,7 @@ export const prismaRepo: ToolsRepo = {
     try {
       const r = await prisma.wsTool.update({
         where: { slug },
-        data: { ...patch, quality: patch.quality === undefined ? undefined : patch.quality === null ? undefined : json(patch.quality) },
+        data: { ...patch, quality: patch.quality === undefined ? undefined : patch.quality === null ? undefined : json(patch.quality), provenance: patch.provenance === undefined ? undefined : patch.provenance === null ? undefined : json(patch.provenance) },
       });
       return toTool(r);
     } catch {
