@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ExtractError } from "@/lib/tools/extract";
 import { generateText } from "@/lib/ai/gateway";
 import { aiReady, toolsGuard, writeAuth } from "@/lib/tools/server";
-import { readSources } from "@/lib/forms/source";
+import { readSources, sourcePages } from "@/lib/forms/source";
 import { makeImageReader } from "@/lib/forms/image";
 import { findTemplates } from "@/lib/forms/templateSearch";
 import { templateCandidates } from "@/lib/forms/server";
@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
 const limiter = rateLimit({ limit: 40, windowSeconds: 3600 });
-const MAX_FILES = 3;
+const MAX_FILES = 12;
 
 /**
  * POST /api/admin/forms/analyse  (multipart: files[], request); files may be pictures
@@ -54,6 +54,7 @@ export const POST = toolsGuard(async (req: NextRequest) => {
     aiReady: await aiReady(),
     files: readings.map((r) => ({ name: r.fileName, kind: r.kind, elements: r.elements.length, warnings: r.warnings, truncated: r.truncated })),
     elements,
+    pages: sourcePages(readings).map((p) => ({ n: p.n, file: p.file, sheet: p.sheet, hidden: p.hidden, items: p.ids.length })),
     counts,
     warnings: readings.flatMap((r) => r.warnings),
     templates: found.matches,

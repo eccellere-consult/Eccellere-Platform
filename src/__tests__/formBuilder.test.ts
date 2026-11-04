@@ -453,3 +453,27 @@ describe('reference-kit hardening', () => {
     expect(out.tool.quality!.warnings.join(' ')).toMatch(/Same source as the existing form “Supplier Intake”/);
   });
 });
+
+describe('several sheets and several files become the next logical pages', () => {
+  it('lists one page per sheet, in order, and continues across files', async () => {
+    const { sourcePages, pagePlanText } = await import('@/lib/forms/source');
+    const readings = await readSources([
+      { name: 'supplier.xlsx', data: await workbook() },
+      { name: 'notes.txt', data: Buffer.from('Instructions\n1. Fill in every section.\n2. Return it by Friday.') },
+    ]);
+    const pages = sourcePages(readings);
+    expect(pages.map((p) => p.sheet ?? p.file)).toEqual(['Survey', 'Notes', 'notes.txt']);
+    expect(pages.map((p) => p.n)).toEqual([1, 2, 3]);
+    expect(pages.flatMap((p) => p.ids).length).toBe(readings.flatMap((r) => r.elements).length);
+    const plan = pagePlanText(pages);
+    expect(plan).toMatch(/SOURCE PAGES \(3/);
+    expect(plan).toMatch(/NEXT logical page/);
+    expect(plan).toMatch(/1\. supplier\.xlsx \/ sheet “Survey”/);
+    expect(pagePlanText(pages.slice(0, 1))).toBe('');
+  });
+  it('puts the page plan into the build prompt', async () => {
+    const readings = await readSources([{ name: 'supplier.xlsx', data: await workbook() }]);
+    const { user } = buildFormPrompt({ request: '', category: 'Others', practice: 'Strategy', readings } as never);
+    expect(user).toMatch(/SOURCE PAGES \(2/);
+  });
+});

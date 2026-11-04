@@ -14,7 +14,7 @@ const ACCEPT = ".xlsx,.docx,.pdf,.pptx,.csv,.tsv,.txt,.md,.png,.jpg,.jpeg,.webp,
 type Path = "upload" | "describe" | "template";
 interface Element { id: string; file: string; kind: string; text: string; where: string }
 interface Match { slug: string; name: string; why: string; status: string; byAi: boolean }
-interface Analysis { aiReady: boolean; files: { name: string; elements: number; warnings: string[] }[]; elements: Element[]; counts: Record<string, number>; warnings: string[]; templates: Match[]; templatesByAi: boolean }
+interface Analysis { aiReady: boolean; files: { name: string; elements: number; warnings: string[] }[]; elements: Element[]; pages?: { n: number; file: string; sheet: string | null; hidden: boolean; items: number }[]; counts: Record<string, number>; warnings: string[]; templates: Match[]; templatesByAi: boolean }
 interface Item { id: string; kind: string; text: string; where: string; status: string; target?: string; note?: string }
 interface Counts { required: number; mapped: number; auto: number; excluded: number; proposed: number; notCovered: number; notSent: number; closedPct: number }
 interface Coverage { counts: Counts; assumptions: string[]; approximations: string[]; items: Item[] }
@@ -150,7 +150,7 @@ export default function FormBuilderPage() {
 
         {path === "upload" && (
           <div className="mt-4">
-            <p className="block text-sm text-eccellere-ink" id="fb-files-label">Files or screenshots (up to 3; no size or length limit for documents; pictures up to 5 MB each)</p>
+            <p className="block text-sm text-eccellere-ink" id="fb-files-label">Files or screenshots (up to 12; Excel files with several sheets are fine: each sheet becomes the next page of the form; no size or length limit for documents; pictures up to 5 MB each)</p>
             <div
               role="group" aria-labelledby="fb-files-label"
               onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
@@ -197,6 +197,12 @@ export default function FormBuilderPage() {
                 Read {analysis.elements.length} items from {analysis.files.map((f) => f.name).join(", ")}:{" "}
                 {Object.entries(analysis.counts).map(([k, n]) => `${n} ${KIND[k] ?? k}`).join(", ")}.
               </p>
+              {(analysis.pages?.length ?? 0) > 1 && (
+                <div className="mt-2 text-xs text-ink-mid">
+                  <p className="font-medium text-eccellere-ink">Pages the form will have, in this order (one per sheet or file):</p>
+                  <ol className="mt-1 list-decimal space-y-0.5 pl-5">{analysis.pages!.map((p) => <li key={p.n}>{p.sheet ?? p.file}{p.sheet && analysis.files.length > 1 ? ` (${p.file})` : ""}{p.hidden ? " (hidden sheet)" : ""}: {p.items} items</li>)}</ol>
+                </div>
+              )}
               {analysis.warnings.length > 0 && (
                 <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-amber-900">{analysis.warnings.map((w) => <li key={w}>{w}</li>)}</ul>
               )}
