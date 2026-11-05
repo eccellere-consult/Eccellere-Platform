@@ -256,7 +256,9 @@ export function makeFormBuilder(deps: BuilderDeps) {
       const { system, user, notSent } = buildFormPrompt(req, compact);
       const finish: { reason?: string } = {};
       calls.n += 1;
-      const res = await deps.generate({ system, user: user + extra, maxTokens: MAX_TOKENS, timeoutMs: TIMEOUT_MS, json: true, quality: true, finish, diag });
+      // An AI call that errors out must never lose the form that was already built from the file.
+      const res = await deps.generate({ system, user: user + extra, maxTokens: MAX_TOKENS, timeoutMs: TIMEOUT_MS, json: true, quality: true, finish, diag })
+        .catch((e: unknown) => { diag.push(`AI call failed: ${e instanceof Error ? e.message : 'unknown error'}`); return null; });
       if (res) used = { provider: res.provider, model: res.model, skipped: diag.slice(0, 3) };
       if (!res) return (await settle(best, 'The AI did not answer, so the form was built directly from your file. Use “Modify with AI” to improve it.')) ?? { kind: 'ai_down', reason: deps.explainDown(diag) };
       const cut = res.finishReason === 'length' || finish.reason === 'length';
