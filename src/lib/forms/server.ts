@@ -9,7 +9,7 @@ import type { Candidate } from './templateSearch';
 
 export const realFormBuilder = () =>
   makeFormBuilder({
-    generate: (a) => generateText(a),
+    generate: (a) => generateText({ quality: true, ...a }),
     slugTaken: async (slug) => !!(await prismaRepo.getToolBySlug(slug)),
     sameSource: async (hash) => {
       const all = await prismaRepo.listTools();
