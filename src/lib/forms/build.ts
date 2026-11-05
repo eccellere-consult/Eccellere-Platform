@@ -244,9 +244,10 @@ export function makeFormBuilder(deps: BuilderDeps) {
       }
       const pick = ai && (!ruled || ai.problems.length <= ruled.problems.length) ? ai : ruled;
       if (!pick) return null;
+      const aiWhy = ai ? `The AI's version had ${ai.problems.length} problem${ai.problems.length === 1 ? '' : 's'} (${ai.problems.slice(0, 2).join(' | ')}), more than the version built from your file (${ruled?.problems.length ?? 0}).` : (used?.skipped.length ? `AI skipped: ${used.skipped.join(' | ')}` : '');
       const made = used ? [`Built with ${used.provider} (${used.model}).${used.skipped.length ? ` Skipped: ${used.skipped.join(' | ')}` : ''}`] : [];
-      const notes = pick === ruled ? [why, ...pick.notes] : [...made, ...pick.notes];
-      if (pick === ruled && ruled.input.provenance) (ruled.input.provenance as Record<string, unknown>).draftedBy = 'rules';
+      const notes = pick === ruled ? [why, ...(aiWhy ? [aiWhy] : []), ...pick.notes] : [...made, ...pick.notes];
+      if (pick === ruled && ruled.input.provenance) { const pv = ruled.input.provenance as Record<string, unknown>; pv.draftedBy = 'rules'; pv.provider = 'rules'; pv.model = 'built from your file'; }
       return { kind: 'ok', tool: pick.input, coverage: pick.coverage, notes };
     };
     // At most two attempts. The second happens when the first was cut off (asks for a shorter form) or the quality check found
