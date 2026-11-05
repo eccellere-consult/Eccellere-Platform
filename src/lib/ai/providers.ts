@@ -151,7 +151,7 @@ export interface GenerateArgs {
 export interface ImageInput { mediaType: "image/png" | "image/jpeg" | "image/webp" | "image/gif"; data: string }
 /** For important work: the strongest providers first. The model is the admin's choice when set; otherwise the strongest Claude. */
 export const QUALITY_ORDER: ProviderId[] = ["anthropic", "openai"];
-export const QUALITY_MODEL = { anthropic: "claude-opus-5-5" } as const;
+export const QUALITY_MODEL = { anthropic: "claude-opus-5-5", openai: "gpt-4o" } as const;
 /** providers whose models accept pictures; the others are text only */
 export const VISION_PROVIDERS: ProviderId[] = ["anthropic", "openai"];
 export interface GenerateResult {
@@ -251,7 +251,10 @@ export async function runProviders(
       : usable;
   for (const p of order) {
     if (a.images?.length && !VISION_PROVIDERS.includes(p.id)) { a.diag?.push(`${p.label}: cannot read pictures, skipped`); continue; }
-    const model = a.quality && p.id === "anthropic" && !s.providers.anthropic.model && !(env[p.envModel] ?? "").trim() ? (env.ANTHROPIC_QUALITY_MODEL ?? "").trim() || QUALITY_MODEL.anthropic : modelFor(p, s, env);
+    const chosen = !s.providers[p.id].model && !(env[p.envModel] ?? "").trim();
+    const model = a.quality && chosen && (p.id === "anthropic" || p.id === "openai")
+      ? (env[p.id === "anthropic" ? "ANTHROPIC_QUALITY_MODEL" : "OPENAI_QUALITY_MODEL"] ?? "").trim() || QUALITY_MODEL[p.id]
+      : modelFor(p, s, env);
     const finish: { reason?: string } = {};
     const text = await callProvider(p, model, { ...a, finish }, env);
     if (text) {

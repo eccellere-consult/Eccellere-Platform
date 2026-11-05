@@ -71,7 +71,8 @@ export async function resetSkill(kind: SkillKind): Promise<void> {
 /** The drafter that talks to the real AI providers set in the admin AI settings, using the saved drafting skill. */
 export function realDrafter() {
   return makeDrafter({
-    generate: (a) => generateText(a),
+    // drafting a tool page is important work: strongest models first
+    generate: (a) => generateText({ ...a, quality: true }),
     getSkill: async () => {
       const info = await loadSkillInfo('draft');
       return info.isCustom ? info.text : undefined;
