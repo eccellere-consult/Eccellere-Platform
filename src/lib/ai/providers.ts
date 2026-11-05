@@ -256,10 +256,18 @@ export async function runProviders(
       ? (env[p.id === "anthropic" ? "ANTHROPIC_QUALITY_MODEL" : "OPENAI_QUALITY_MODEL"] ?? "").trim() || QUALITY_MODEL[p.id]
       : modelFor(p, s, env);
     const finish: { reason?: string } = {};
-    const text = await callProvider(p, model, { ...a, finish }, env);
+    let usedModel = model;
+    let text = await callProvider(p, model, { ...a, finish }, env);
+    // the strongest model may be unavailable to this account or too slow: try the same provider's standard model before moving on
+    const standard = modelFor(p, s, env);
+    if (!text && a.quality && model !== standard) {
+      a.diag?.push(`${p.label}: ${model} did not answer, trying ${standard}`);
+      usedModel = standard;
+      text = await callProvider(p, standard, { ...a, finish }, env);
+    }
     if (text) {
       if (a.finish) a.finish.reason = finish.reason;
-      return { text, provider: p.id, model, finishReason: finish.reason };
+      return { text, provider: p.id, model: usedModel, finishReason: finish.reason };
     }
   }
   return null;
