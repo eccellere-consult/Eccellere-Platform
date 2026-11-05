@@ -477,3 +477,54 @@ describe('several sheets and several files become the next logical pages', () =>
     expect(user).toMatch(/SOURCE PAGES \(2/);
   });
 });
+
+describe('an upload always becomes a working form, then the AI improves it', () => {
+  it('builds a valid form straight from the sheets with no AI, in the original order', async () => {
+    const { faithfulForm } = await import('@/lib/forms/fromSheets');
+    const { normaliseDeclarative } = await import('@/lib/strategyModels/declarative');
+    const { assess } = await import('@/lib/tools/standards');
+    const readings = await readSources([{ name: 'supplier.xlsx', data: await workbook() }]);
+    const r = faithfulForm(readings, { category: 'other' })!;
+    const { tool } = normaliseDeclarative(r.form);
+    expect(tool).toBeTruthy();
+    expect(tool!.sections.map((s) => s.title)).toEqual(['About this form', 'Survey', 'Notes', 'Action plan']);
+    const q = assess(tool!);
+    expect(q.errors).toEqual([]);
+  });
+
+  it('keeps the file-built form when the AI is down, and says so', async () => {
+    const readings = await readSources([{ name: 'supplier.xlsx', data: await workbook() }]);
+    const build = makeFormBuilder({ generate: async () => null, explainDown: () => 'down', slugTaken: async () => false });
+    const out = await build({ request: '', category: 'Others', practice: 'Strategy', readings } as never);
+    expect(out.kind).toBe('ok');
+    if (out.kind === 'ok') {
+      expect(out.notes.join(' ')).toMatch(/built directly from your file/);
+      expect(out.tool.quality?.errors ?? []).toEqual([]);
+      expect(out.coverage?.counts.notCovered).toBe(0);
+    }
+  });
+
+  it('asks for the strongest models for a build', async () => {
+    const seen: (boolean | undefined)[] = [];
+    const readings = await readSources([{ name: 'supplier.xlsx', data: await workbook() }]);
+    const build = makeFormBuilder({ generate: async (a) => { seen.push(a.quality); return null; }, explainDown: () => 'down', slugTaken: async () => false });
+    await build({ request: '', category: 'Others', practice: 'Strategy', readings } as never);
+    expect(seen[0]).toBe(true);
+  });
+});
+
+describe('strongest models first for important work', () => {
+  it('tries Claude then OpenAI and skips the fast models, using the strongest Claude unless the admin chose one', async () => {
+    const { runProviders, defaultSettings } = await import('@/lib/ai/providers');
+    const calls: string[] = [];
+    const real = globalThis.fetch;
+    globalThis.fetch = (async (url: string, init: { body: string }) => { calls.push(`${url} ${JSON.parse(init.body).model}`); return new Response('{}', { status: 500 }); }) as never;
+    try {
+      const env = { GROQ_API_KEY: 'g', OPENAI_API_KEY: 'o', ANTHROPIC_API_KEY: 'a' };
+      await runProviders(defaultSettings(), env, { system: 's', user: 'u', maxTokens: 10, quality: true });
+    } finally { globalThis.fetch = real; }
+    expect(calls[0]).toMatch(/anthropic\.com.*claude-opus-5-5/);
+    expect(calls[1]).toMatch(/openai\.com/);
+    expect(calls.some((c) => /groq/.test(c))).toBe(false);
+  });
+});

@@ -24,6 +24,7 @@ import { dropBrokenResults } from '@/lib/tools/repair';
 import { depthOf } from '@/lib/tools/depth';
 import { assetTypeLabel, cleanClassification, suggestClassification, shapeOf, type AssetTypeId, type Classification } from '@/lib/tools/taxonomy';
 import { slideHash } from '@/lib/import/author';
+import { faithfulForm } from './fromSheets';
 
 export interface BuildRequest {
   /** what the administrator wants, in their own words (may be empty when a document is supplied) */
@@ -37,6 +38,8 @@ export interface BuildRequest {
   assetType?: AssetTypeId;
   readings?: SourceReading[];
   base?: { slug: string; name: string; tool: DeclarativeTool } | null;
+  /** the form already built from the uploaded file without AI; the AI is asked to improve it (set by the builder, not by callers) */
+  baseline?: Record<string, unknown>;
   /** edited skill texts; defaults are used when absent */
   formSkill?: string;
   draftSkill?: string;
@@ -60,7 +63,7 @@ export interface BuilderDeps {
 }
 
 const MAX_TOKENS = 9000;
-const TIMEOUT_MS = 110_000;
+const TIMEOUT_MS = 200_000;
 const MAX_BASE_CHARS = 14_000;
 
 export const modeOf = (r: Pick<BuildRequest, 'readings' | 'base'>): 'upload' | 'template' | 'prompt' =>
@@ -111,6 +114,19 @@ export function buildFormPrompt(req: BuildRequest, compact = false): { system: s
       r.text,
       warn.length ? `\nREADING NOTES: ${warn.join(' | ')}` : '',
     ].join('\n'));
+  }
+  if (req.baseline) {
+    const { sourceMap, assumptions, approximations, confidence, concerns, ...form } = req.baseline; void sourceMap; void assumptions; void approximations; void confidence; void concerns;
+    const json = JSON.stringify(form);
+    if (json.length <= MAX_BASE_CHARS * 2) {
+      parts.push([
+        'STARTING FORM, ALREADY BUILT FROM THE SHEETS WITHOUT AI. It follows the original layout. IMPROVE it, do not replace it:',
+        '- Keep every section, in the same order, with the same title, and every field and table column (same keys and labels) so the form stays similar to the original file.',
+        '- Improve: the help text (say what to enter and why), the field types (rating for scales, number for amounts, select for fixed choices), real calculations from the safe rule set where the source has formulas, useful results, the worked example and the guidance. Fill in "sourceMap" for EVERY element id.',
+        '- Do not invent figures, benchmarks, names or sources. Return the COMPLETE improved JSON.',
+        json,
+      ].join("\n"));
+    }
   }
   if (req.base) parts.push(`BASE TEMPLATE "${req.base.name}" (structure and depth to adapt; do not copy word for word; say in "assumptions" if you change its method):\n${compactBase(req.base.tool)}`);
   parts.push('Reply with the JSON object only.');
@@ -210,18 +226,38 @@ export function makeFormBuilder(deps: BuilderDeps) {
     if (!req.request.trim() && !req.readings?.length && !req.base) return { kind: 'failed', reason: 'Describe the form, upload a document, or choose a template to start from.' };
     const diag: string[] = [];
     const calls = { n: 0 };
+    // An upload first becomes a working form with no AI, so there is always a valid result; the AI then improves it.
+    const rule = req.readings?.length ? faithfulForm(req.readings, { name: req.name, category: declarativeCategory(req.category) }) : null;
+    if (rule) req = { ...req, baseline: rule.form };
     let problem = '';
     let compact = false;
     let extra = '';
     let best: { input: ToolInput; coverage: Coverage | null; notes: string[]; problems: string[] } | null = null;
+    let used: { provider: string; model: string; skipped: string[] } | null = null;
+    type Got = { input: ToolInput; coverage: Coverage | null; notes: string[]; problems: string[] };
+    /** The AI's form when it is no worse than the one built straight from the file; otherwise the file-built one. Null when there is neither. */
+    const settle = async (ai: Got | null, why: string): Promise<BuildOutcome | null> => {
+      let ruled: Got | null = null;
+      if (rule) {
+        const stub = { text: '', provider: 'groq', model: 'built-from-file' } as unknown as GenerateResult;
+        ruled = await assemble(req, rule.form, stub, [], calls).catch(() => null);
+      }
+      const pick = ai && (!ruled || ai.problems.length <= ruled.problems.length) ? ai : ruled;
+      if (!pick) return null;
+      const made = used ? [`Built with ${used.provider} (${used.model}).${used.skipped.length ? ` Skipped: ${used.skipped.join(' | ')}` : ''}`] : [];
+      const notes = pick === ruled ? [why, ...pick.notes] : [...made, ...pick.notes];
+      if (pick === ruled && ruled.input.provenance) (ruled.input.provenance as Record<string, unknown>).draftedBy = 'rules';
+      return { kind: 'ok', tool: pick.input, coverage: pick.coverage, notes };
+    };
     // At most two attempts. The second happens when the first was cut off (asks for a shorter form) or the quality check found
     // errors (lists them for the AI to fix), the same way the marketplace's own drafting works.
     for (let attempt = 1; attempt <= 2; attempt++) {
       const { system, user, notSent } = buildFormPrompt(req, compact);
       const finish: { reason?: string } = {};
       calls.n += 1;
-      const res = await deps.generate({ system, user: user + extra, maxTokens: MAX_TOKENS, timeoutMs: TIMEOUT_MS, json: true, finish, diag });
-      if (!res) return best ? { kind: 'ok', tool: best.input, coverage: best.coverage, notes: best.notes } : { kind: 'ai_down', reason: deps.explainDown(diag) };
+      const res = await deps.generate({ system, user: user + extra, maxTokens: MAX_TOKENS, timeoutMs: TIMEOUT_MS, json: true, quality: true, finish, diag });
+      if (res) used = { provider: res.provider, model: res.model, skipped: diag.slice(0, 3) };
+      if (!res) return (await settle(best, 'The AI did not answer, so the form was built directly from your file. Use “Modify with AI” to improve it.')) ?? { kind: 'ai_down', reason: deps.explainDown(diag) };
       const cut = res.finishReason === 'length' || finish.reason === 'length';
       const raw = cut ? null : extractJson(res.text);
       if (!raw || typeof raw !== 'object') {
@@ -236,7 +272,8 @@ export function makeFormBuilder(deps: BuilderDeps) {
       if (!got.problems.length) break;
       extra = `\n\nYour previous reply had these problems; fix them and return the whole JSON again (keep the sourceMap complete):\n${got.problems.slice(0, 8).map((e) => `- ${e}`).join('\n')}`;
     }
-    if (best) return { kind: 'ok', tool: best.input, coverage: best.coverage, notes: best.notes };
+    const settled = await settle(best, 'The AI could not improve the form without breaking it, so it was built directly from your file. Use “Modify with AI” to improve it.');
+    if (settled) return settled;
     return { kind: 'failed', reason: `${problem} It was tried twice. Try again later, with a shorter document, or use a template.` };
   };
 }

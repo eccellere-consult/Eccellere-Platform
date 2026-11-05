@@ -143,10 +143,15 @@ export interface GenerateArgs {
   json?: boolean;
   /** out-param: why the model stopped ("length" = it ran out of room and the answer is cut off) */
   finish?: { reason?: string };
+  /** important work (building or fixing a form): try the strongest models first (Claude, then OpenAI) and skip the fast, low-cost ones */
+  quality?: boolean;
   /** pictures to read (base64, no data: prefix). Only providers that can see pictures are tried when this is set. */
   images?: ImageInput[];
 }
 export interface ImageInput { mediaType: "image/png" | "image/jpeg" | "image/webp" | "image/gif"; data: string }
+/** For important work: the strongest providers first. The model is the admin's choice when set; otherwise the strongest Claude. */
+export const QUALITY_ORDER: ProviderId[] = ["anthropic", "openai"];
+export const QUALITY_MODEL = { anthropic: "claude-opus-5-5" } as const;
 /** providers whose models accept pictures; the others are text only */
 export const VISION_PROVIDERS: ProviderId[] = ["anthropic", "openai"];
 export interface GenerateResult {
@@ -238,12 +243,15 @@ export async function callProvider(
 export async function runProviders(
   s: AiSettings, env: Record<string, string | undefined>, a: GenerateArgs,
 ): Promise<GenerateResult | null> {
+  const usable = resolveOrder(s, env);
   const order = a.only
     ? [PROVIDER_BY_ID[a.only]].filter((p) => p && hasKey(p, env))
-    : resolveOrder(s, env);
+    : a.quality
+      ? [...QUALITY_ORDER.map((id) => usable.find((p) => p.id === id)).filter((p): p is ProviderDef => !!p), ...usable.filter((p) => !QUALITY_ORDER.includes(p.id) && p.id !== "groq" && p.id !== "xai")]
+      : usable;
   for (const p of order) {
     if (a.images?.length && !VISION_PROVIDERS.includes(p.id)) { a.diag?.push(`${p.label}: cannot read pictures, skipped`); continue; }
-    const model = modelFor(p, s, env);
+    const model = a.quality && p.id === "anthropic" && !s.providers.anthropic.model && !(env[p.envModel] ?? "").trim() ? (env.ANTHROPIC_QUALITY_MODEL ?? "").trim() || QUALITY_MODEL.anthropic : modelFor(p, s, env);
     const finish: { reason?: string } = {};
     const text = await callProvider(p, model, { ...a, finish }, env);
     if (text) {

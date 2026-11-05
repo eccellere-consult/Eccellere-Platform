@@ -147,6 +147,15 @@ export default function AdminToolsPage() {
     await loadRun(run.job.id);
   }
 
+  /** Takes every name that failed to draft out of the run, so only what worked is left. */
+  async function removeFailedItems() {
+    if (!run) return;
+    const failed = run.items.filter((i) => i.status === "FAILED");
+    if (!failed.length || !confirm(`Remove the ${failed.length} name${failed.length === 1 ? "" : "s"} that failed from this run?`)) return;
+    for (const i of failed) await fetch(`/api/admin/tools/jobs/${run.job.id}?item=${encodeURIComponent(i.id)}`, { method: "DELETE" });
+    await loadRun(run.job.id);
+  }
+
   async function deleteRun() {
     if (!run || !confirm("Delete this run from the list? Tools already drafted from it are kept in the catalogue below.")) return;
     stopRef.current = true;
@@ -370,6 +379,7 @@ export default function AdminToolsPage() {
               {driving
                 ? <button className="inline-flex items-center gap-1 border border-eccellere-ink/20 px-3 py-2 text-xs hover:bg-eccellere-cream" onClick={() => { stopRef.current = true; }}><Pause className="h-3 w-3" /> Pause</button>
                 : (counts.QUEUED ?? 0) + (counts.DRAFTING ?? 0) > 0 && <button className="inline-flex items-center gap-1 bg-eccellere-ink px-3 py-2 text-xs text-white" onClick={() => runAction("resume")}><Play className="h-3 w-3" /> Continue</button>}
+              {(counts.FAILED ?? 0) > 0 && !driving && <button className="inline-flex items-center gap-1 border border-red-300 px-3 py-2 text-xs text-red-700 hover:bg-red-50" onClick={removeFailedItems}><Trash2 className="h-3 w-3" /> Remove {counts.FAILED} failed</button>}
               {(counts.FAILED ?? 0) > 0 && !driving && <button className="inline-flex items-center gap-1 border border-eccellere-gold px-3 py-2 text-xs text-eccellere-gold" onClick={() => runAction("retry")}><RotateCcw className="h-3 w-3" /> Retry {counts.FAILED} failed</button>}
             </div>
           </div>

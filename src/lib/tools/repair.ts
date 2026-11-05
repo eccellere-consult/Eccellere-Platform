@@ -87,7 +87,7 @@ type GridBox = { name?: string; hint?: string; col?: number; row?: number; colSp
  *  - a calculated column whose rule the engine cannot run (it becomes a plain number column people fill in, so the table keeps working).
  * Returns plain-words notes of what was changed.
  */
-export function repairStructure(def: DeclarativeTool): string[] {
+export function repairStructure(def: DeclarativeTool, opts: { simpleDiagram?: boolean } = {}): string[] {
   const notes: string[] = [];
   const d = def.diagram as unknown as ({ template?: string; title?: string; cols?: number; rows?: number; boxes?: GridBox[] } | undefined);
   if (d && d.template === 'canvasGrid' && diagramIssues(def.diagram as DiagramSpec).length > 0) {
@@ -110,6 +110,31 @@ export function repairStructure(def: DeclarativeTool): string[] {
       d.boxes = named;
       if (!d.title?.trim()) d.title = def.name;
       notes.push('Fixed the diagram: every box now has a name and sits inside the grid.');
+    }
+  }
+  // no diagram at all: a simple "steps" picture of the sections, in order (3 to 8 steps), so the tool is not blocked for want of one
+  if (opts.simpleDiagram && !def.diagram && def.sections.length >= 3) {
+    const names = def.sections.map((s) => s.title.trim()).filter(Boolean);
+    const steps = (names.length > 8 ? [...names.slice(0, 7), names[names.length - 1]] : names).map((n) => ({ name: n.length > 30 ? `${n.slice(0, 29)}…` : n }));
+    if (steps.length >= 3) {
+      (def as { diagram?: unknown }).diagram = { template: 'steps', title: def.name.slice(0, 60), steps };
+      notes.push('Added a simple diagram showing the sections as steps. Ask “Modify with AI” for a richer one.');
+    }
+  }
+  // a choice list with fewer than 2 choices cannot be answered: it becomes a plain text answer
+  for (const s of def.sections) {
+    for (const p of s.parts) {
+      if (p.kind === 'field' && p.type === 'select' && (p.options?.length ?? 0) < 2) {
+        p.type = 'text'; delete (p as { options?: unknown }).options;
+        notes.push(`“${p.label}” had fewer than 2 choices, so it is now a plain text answer.`);
+      } else if (p.kind === 'table' && !p.board) {
+        for (const c of p.columns) {
+          if (c.type === 'select' && (c.options?.length ?? 0) < 2) {
+            c.type = 'text'; delete (c as { options?: unknown }).options;
+            notes.push(`The column “${c.header || c.key}” had fewer than 2 choices, so it is now a plain text column.`);
+          }
+        }
+      }
     }
   }
   for (let round = 0; round < 6; round++) {
@@ -147,7 +172,7 @@ export async function tidyTool(repo: ToolsRepo, slug: string): Promise<FixOutcom
   const notes: string[] = [];
   const removed = dropBrokenResults(def);
   if (removed.length) notes.push(`Removed ${removed.length} result${removed.length === 1 ? '' : 's'} that could not run: ${removed.map((r) => `“${r}”`).join(', ')}.`);
-  notes.push(...repairStructure(def));
+  notes.push(...repairStructure(def, { simpleDiagram: true }));
   if (!(def.outputs ?? []).length) {
     const f = def.sections.flatMap((s) => s.parts).find((p) => p.kind === 'field');
     const text = f && f.kind === 'field' ? f.label + ': {' + f.key + '}' : 'Your entries are recorded in the tables above.';
@@ -206,7 +231,7 @@ export async function fixTool(
   if (current.errors.length > 0 || instruction) {
     const issues = current.errors;
     const { system, user } = buildRepairMessages(def, issues, instruction, opts.skill);
-    const res = await generate({ system, user, maxTokens: 7000, timeoutMs: 110_000, json: true }).catch(() => null);
+    const res = await generate({ system, user, maxTokens: 7000, timeoutMs: 110_000, json: true, quality: true }).catch(() => null);
     if (!res) throw new ToolsError('AI_DOWN', 'The AI did not answer, so nothing was changed. Check the AI providers setting, then try again.');
     const raw = res.finishReason === 'length' ? null : extractJson(res.text);
     if (!raw || typeof raw !== 'object') {
