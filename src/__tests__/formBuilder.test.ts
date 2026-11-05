@@ -524,7 +524,8 @@ describe('strongest models first for important work', () => {
       await runProviders(defaultSettings(), env, { system: 's', user: 'u', maxTokens: 10, quality: true });
     } finally { globalThis.fetch = real; }
     expect(calls[0]).toMatch(/anthropic\.com.*claude-opus-5-5/);
-    expect(calls[1]).toMatch(/openai\.com/);
+    expect(calls[1]).toMatch(/anthropic\.com.*claude-sonnet-5-5/);
+    expect(calls[2]).toMatch(/openai\.com.*gpt-4o/);
     expect(calls.some((c) => /groq/.test(c))).toBe(false);
   });
 });

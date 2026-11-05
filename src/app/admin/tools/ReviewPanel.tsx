@@ -141,7 +141,7 @@ export default function ReviewPanel({ slug, categories, practices, onChanged, on
             <StatusChip s={tool.status} />
             {handBuilt && <span className="rounded-sm bg-violet-100 px-2 py-0.5 text-violet-800">Hand-built Strategy Hub tool</span>}
             {tool.groupName && <span>Group: {tool.groupName}</span>}
-            {typeof prov.provider === "string" && <span>Drafted by {String(prov.provider)} ({String(prov.model)}), confidence {String(prov.confidence)}{prov.customSkill ? ", edited skill file" : ""}</span>}
+            {typeof prov.provider === "string" && <span>{prov.provider === "rules" ? "Built straight from your file, without AI" : `Drafted by ${String(prov.provider)} (${String(prov.model)})`}, confidence {String(prov.confidence)}{prov.customSkill ? ", edited skill file" : ""}</span>}
             {tool.reviewedAt && <span>Reviewed {new Date(tool.reviewedAt).toLocaleDateString()}</span>}
           </p>
         </div>
