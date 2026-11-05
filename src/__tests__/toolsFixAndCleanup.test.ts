@@ -159,6 +159,17 @@ describe('Fix with AI and Modify with AI', () => {
     expect(r.remaining.join(' ')).not.toMatch(/at least one output/);
   });
 
+  it('automatic clean-up fixes a select with too few choices and adds a missing diagram', async () => {
+    const t = clone(EXAMPLE_TOOL) as unknown as DeclarativeTool;
+    const f = t.sections.flatMap((x) => x.parts).find((p) => p.kind === 'field');
+    if (f && f.kind === 'field') { f.type = 'select'; f.options = ['Only one']; }
+    delete (t as { diagram?: unknown }).diagram;
+    const repo = await repoWith(t);
+    const r = await tidyTool(repo, t.slug);
+    expect(r.applied).toBe(true);
+    expect(r.remaining.join(' ')).not.toMatch(/at least 2 options|Diagram:/);
+  });
+
   it('automatic clean-up leaves a sound tool alone', async () => {
     const t = clone(EXAMPLE_TOOL) as unknown as DeclarativeTool;
     const repo = await repoWith(t, 'DRAFT');

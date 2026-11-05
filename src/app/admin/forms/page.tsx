@@ -1,5 +1,7 @@
 "use client";
 
+import FormActions from "./FormActions";
+import { Fragment } from "react";
 import { TitleBlock } from "@/components/standard/AdminFrame";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -38,7 +40,7 @@ export default function FormBuilderPage() {
   const [assetType, setAssetType] = useState("");
   const addFiles = useCallback((more: File[]) => {
     if (!more.length) return;
-    setFiles((p) => [...p, ...more].slice(0, 3));
+    setFiles((p) => [...p, ...more].slice(0, 12));
     setAnalysis(null);
   }, []);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
@@ -53,6 +55,8 @@ export default function FormBuilderPage() {
   const [building, setBuilding] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
 
+  const [manage, setManage] = useState<string | null>(null);
+  const [cleanMsg, setCleanMsg] = useState<string | null>(null);
   const [pick, setPick] = useState<string[]>([]);
   const [reason, setReason] = useState("");
   const [covBusy, setCovBusy] = useState(false);
@@ -129,6 +133,22 @@ export default function FormBuilderPage() {
     if (!r.ok) return setCovMsg(d.error ?? "Could not update.");
     setResult({ ...result, status: d.status, quality: d.quality, coverage: d.coverage });
     setPick([]); setReason(""); setCovMsg(ok);
+    load().catch(() => {});
+  }
+
+  /** Deletes every earlier build that still has problems. Live forms and forms with saved work are kept, and the reason is shown. */
+  async function removeFailed() {
+    const slugs = built.filter((b) => b.errors > 0 && b.status !== "PUBLISHED").map((b) => b.slug);
+    if (!slugs.length || !confirm(`Delete ${slugs.length} earlier form${slugs.length === 1 ? "" : "s"} that still have problems? This cannot be undone. Forms that are live, or that people have saved work in, are kept.`)) return;
+    setCleanMsg("Deleting…");
+    const r = await fetch("/api/admin/tools/bulk", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "delete", slugs }) });
+    const d = await readJson(r);
+    if (!r.ok) setCleanMsg(d.error ?? "That did not work.");
+    else {
+      const res = d.results as { ok: boolean; message?: string }[];
+      const kept = res.filter((x) => !x.ok);
+      setCleanMsg(`Deleted ${res.length - kept.length}.${kept.length ? ` ${kept.length} kept: ${kept[0].message ?? "could not be deleted"}` : ""}`);
+    }
     load().catch(() => {});
   }
 
@@ -299,6 +319,10 @@ export default function FormBuilderPage() {
             </div>
           )}
 
+          <div className="mt-5 border-t border-eccellere-ink/10 pt-4">
+            <p className="mb-2 text-xs font-semibold text-eccellere-ink">Look at it, fix it or delete it, right here</p>
+            <FormActions slug={result.slug} status={result.status} aiReady={aiReady} onChanged={() => { load().catch(() => {}); }} onDeleted={() => { reset(); load().catch(() => {}); }} />
+          </div>
           <div className="mt-5 flex flex-wrap gap-3">
             <Link href={`/admin/tools?open=${encodeURIComponent(result.slug)}`} className="bg-eccellere-ink px-4 py-2 text-xs text-white hover:opacity-90">Open to review and publish</Link>
             <button className="border border-eccellere-ink/20 px-4 py-2 text-xs hover:bg-eccellere-cream" onClick={reset}>Build another</button>
@@ -309,19 +333,31 @@ export default function FormBuilderPage() {
       {/* forms built so far */}
       <section className="mt-12">
         <h2 className="text-sm font-semibold text-eccellere-ink">Forms built with the Form Builder</h2>
+        {built.some((b) => b.errors > 0 && b.status !== "PUBLISHED") && (
+          <div className="mt-3 flex flex-wrap items-center gap-3 bg-amber-50 p-3 text-sm text-amber-950">
+            <span>{built.filter((b) => b.errors > 0 && b.status !== "PUBLISHED").length} earlier forms still have problems.</span>
+            <button type="button" className="border border-red-300 bg-white px-3 py-1.5 text-xs text-red-700 hover:bg-red-50" onClick={removeFailed}>Delete the ones that did not work</button>
+            {cleanMsg && <span className="text-xs">{cleanMsg}</span>}
+          </div>
+        )}
         {built.length === 0 ? <p className="mt-2 text-sm text-ink-light">None yet.</p> : (
           <table className="mt-3 w-full text-left text-xs">
             <thead><tr className="text-ink-light"><th className="py-1 pr-2">Form</th><th className="pr-2">Started from</th><th className="pr-2">Status</th><th className="pr-2">Standard</th><th className="pr-2">Source items open</th><th /></tr></thead>
             <tbody>
               {built.map((b) => (
-                <tr key={b.slug} className="border-t border-eccellere-ink/10">
+                <Fragment key={b.slug}>
+                <tr className="border-t border-eccellere-ink/10">
                   <td className="py-2 pr-2">{b.name}</td>
                   <td className="pr-2">{b.mode === "upload" ? "A file" : b.mode === "template" ? "A template" : "A description"}</td>
                   <td className="pr-2">{b.status.toLowerCase().replace("_", " ")}</td>
                   <td className="pr-2">{b.standards ? `${b.standards.score}/100` : "n/a"}</td>
                   <td className="pr-2">{b.coverage ? b.coverage.notCovered + b.coverage.proposed + b.coverage.notSent : "n/a"}</td>
-                  <td><Link className="underline" href={`/admin/tools?open=${encodeURIComponent(b.slug)}`}>Open</Link></td>
+                  <td className="whitespace-nowrap"><button type="button" className="mr-3 underline" onClick={() => setManage(manage === b.slug ? null : b.slug)}>{manage === b.slug ? "Close" : "Preview / fix / delete"}</button><Link className="underline" href={`/admin/tools?open=${encodeURIComponent(b.slug)}`}>Open</Link></td>
                 </tr>
+                {manage === b.slug && (
+                  <tr><td colSpan={6} className="pb-4 pt-1"><FormActions slug={b.slug} status={b.status} aiReady={aiReady} onChanged={() => { load().catch(() => {}); }} onDeleted={() => { setManage(null); load().catch(() => {}); }} /></td></tr>
+                )}
+                </Fragment>
               ))}
             </tbody>
           </table>
