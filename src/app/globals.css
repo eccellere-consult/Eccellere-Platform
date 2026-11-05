@@ -94,7 +94,7 @@
 
 /* Base styles */
 html {
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 body {
@@ -103,7 +103,7 @@ body {
   font-family: var(--font-body, "DM Sans", sans-serif);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 /* Typography utilities */
