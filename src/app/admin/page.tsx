@@ -1,29 +1,19 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import {
   Users,
   Briefcase,
   Package,
-  ShoppingCart,
   IndianRupee,
   FileText,
   MessageCircle,
-  Mail,
-  Shield,
-  Tag,
   ClipboardList,
-  TrendingUp,
   ArrowUpRight,
   ArrowDownRight,
-  BarChart3,
   Bell,
   Search,
-  ChevronRight,
-  LogOut,
 } from "lucide-react";
-import { signOut } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
@@ -55,129 +45,6 @@ const kpis = [
     change: "3 urgent",
     positive: false,
     icon: ClipboardList,
-  },
-];
-
-const adminModules = [
-  {
-    label: "Clients",
-    href: "/admin/clients",
-    description: "Manage client profiles, lead scoring, and onboarding status",
-    icon: Users,
-    stat: "342",
-    badge: null,
-  },
-  {
-    label: "Specialists",
-    href: "/admin/specialists",
-    description: "Review applications, manage active specialists",
-    icon: Briefcase,
-    stat: "47",
-    badge: "5 pending",
-  },
-  {
-    label: "Assets",
-    href: "/admin/assets",
-    description: "Review, approve, and manage marketplace assets",
-    icon: Package,
-    stat: "218",
-    badge: "8 pending",
-  },
-  {
-    label: "Orders",
-    href: "/admin/orders",
-    description: "Order management, refunds, and invoices",
-    icon: ShoppingCart,
-    stat: "1,247",
-    badge: null,
-  },
-  {
-    label: "Finance",
-    href: "/admin/finance",
-    description: "Revenue dashboard, payouts, tax reports",
-    icon: IndianRupee,
-    stat: "₹24.8L",
-    badge: null,
-  },
-  {
-    label: "Content",
-    href: "/admin/content",
-    description: "Blog posts, case studies, testimonials",
-    icon: FileText,
-    stat: "86",
-    badge: "3 drafts",
-  },
-  {
-    label: "Chatbot",
-    href: "/admin/chatbot",
-    description: "Analytics, flagged conversations, training data",
-    icon: MessageCircle,
-    stat: "2,418",
-    badge: "2 flagged",
-  },
-  {
-    label: "Users",
-    href: "/admin/users",
-    description: "Admin user management and role assignments",
-    icon: Shield,
-    stat: "12",
-    badge: null,
-  },
-  {
-    label: "Coupons",
-    href: "/admin/coupons",
-    description: "Create and manage discount coupons",
-    icon: Tag,
-    stat: "15",
-    badge: null,
-  },
-  {
-    label: "Enquiries",
-    href: "/admin/contact-enquiries",
-    description: "View and manage website contact submissions",
-    icon: Mail,
-    stat: "new",
-    badge: null,
-  },
-  {
-    label: "Eccellere Advisor",
-    href: "/admin/advisor",
-    description: "Advisor on/off switch, protected names and the approved Google Drive library",
-    icon: Shield,
-    stat: "new",
-    badge: null,
-  },
-  {
-    label: "AI Providers",
-    href: "/admin/ai-settings",
-    description: "Switch AI providers on or off, choose the primary and fallback order",
-    icon: Shield,
-    stat: "4",
-    badge: null,
-  },
-  {
-    label: "Tools Marketplace",
-    href: "/admin/tools",
-    description: "Add strategy and problem-solving tools by name, review the AI drafts, publish by section",
-    icon: Package,
-    stat: "new",
-    badge: null,
-  },
-  {
-    label: "Form Builder",
-    href: "/admin/forms",
-    description: "Build a form from an upload (Excel, Word, PDF), a description, or a template, then publish it to the marketplace",
-    icon: Package,
-    stat: "new",
-    badge: null,
-  },
-  {
-    label: "Audit Log",
-    href: "/admin/audit-log",
-    description: "Full platform audit trail",
-    icon: ClipboardList,
-    stat: "—",
-    badge: null,
   },
 ];
 
@@ -242,91 +109,13 @@ const topAssets = [
 ];
 
 export default function AdminDashboard() {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
   const maxBar = Math.max(...revenueData.map((d) => d.value));
 
   return (
-    <div className="flex min-h-screen bg-eccellere-cream">
-      {/* Sidebar */}
-      <aside
-        className={cn(
-          "fixed left-0 top-0 z-40 flex h-screen flex-col border-r border-eccellere-ink/5 bg-white transition-all duration-300",
-          sidebarOpen ? "w-64" : "w-16"
-        )}
-      >
-        <div className="flex h-16 items-center justify-between border-b border-eccellere-ink/5 px-4">
-          {sidebarOpen && (
-            <div className="flex items-center gap-2">
-              <span className="font-display text-lg font-semibold text-eccellere-ink">
-                ECCELLERĒ
-              </span>
-              <span className="rounded-sm bg-eccellere-gold/10 px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-eccellere-gold">
-                Admin
-              </span>
-            </div>
-          )}
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="rounded p-1.5 text-ink-light transition-colors hover:bg-eccellere-cream hover:text-eccellere-ink"
-          >
-            <BarChart3 className="h-4 w-4" />
-          </button>
-        </div>
-
-        <nav className="flex-1 overflow-y-auto p-3">
-          <div className="space-y-1">
-            <Link
-              href="/admin"
-              className="flex items-center gap-3 rounded-md bg-eccellere-gold/5 px-3 py-2.5 text-sm font-medium text-eccellere-gold"
-            >
-              <TrendingUp className="h-4 w-4 shrink-0" />
-              {sidebarOpen && "Dashboard"}
-            </Link>
-            {adminModules.map((mod) => (
-              <Link
-                key={mod.label}
-                href={mod.href}
-                className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm text-ink-mid transition-colors hover:bg-eccellere-cream hover:text-eccellere-ink"
-              >
-                <mod.icon className="h-4 w-4 shrink-0" />
-                {sidebarOpen && (
-                  <span className="flex-1">{mod.label}</span>
-                )}
-                {sidebarOpen && mod.badge && (
-                  <span className="rounded-full bg-eccellere-gold/10 px-2 py-0.5 text-[10px] text-eccellere-gold">
-                    {mod.badge}
-                  </span>
-                )}
-              </Link>
-            ))}
-          </div>
-        </nav>
-
-        <div className="border-t border-eccellere-ink/5 p-3 space-y-1">
-          <Link
-            href="/"
-            className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-ink-light transition-colors hover:text-eccellere-ink"
-          >
-            <ChevronRight className="h-4 w-4 rotate-180" />
-            {sidebarOpen && "Back to site"}
-          </Link>
-          <button
-            onClick={() => signOut({ callbackUrl: "/" })}
-            className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-ink-light transition-colors hover:bg-red-50 hover:text-red-600"
-          >
-            <LogOut className="h-4 w-4" />
-            {sidebarOpen && "Sign out"}
-          </button>
-        </div>
-      </aside>
+    <div className="bg-eccellere-cream">
 
       {/* Main content */}
-      <main
-        className={cn(
-          "flex-1 transition-all duration-300",
-          sidebarOpen ? "ml-64" : "ml-16"
-        )}
-      >
+      <div>
         {/* Top bar */}
         <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-eccellere-ink/5 bg-white/80 px-6 backdrop-blur-md">
           <div className="relative">
@@ -550,7 +339,7 @@ export default function AdminDashboard() {
             </div>
           </div>
         </div>
-      </main>
+      </div>
     </div>
   );
 }
