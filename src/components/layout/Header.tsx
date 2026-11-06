@@ -8,8 +8,12 @@ import { MobileNav } from "./MobileNav";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { NotificationBell } from "@/components/NotificationBell";
 
-const navLinks = [
+/** The original site: strategy and planning advisor. Shown on its own on wide screens and inside "More" on narrower ones. */
+export const ADVISOR_LINK = { label: "Strategy & Plan Advisor ↗", href: "https://eccellere.in" };
+
+const navLinks: { label: string; href: string; wideOnly?: boolean; children?: { label: string; href: string }[] }[] = [
   { label: "Home", href: "/" },
+  { ...ADVISOR_LINK, wideOnly: true },
   { label: "Marketplace", href: "/marketplace" },
   { label: "Tools", href: "/tools" },
   { label: "Agentic AI", href: "/agentic-ai" },
@@ -27,6 +31,7 @@ const navLinks = [
     label: "More",
     href: "#",
     children: [
+      { ...ADVISOR_LINK, label: "Strategy & Plan Advisor (eccellere.in) ↗" },
       { label: "MSME Hub", href: "/msme-hub" },
       { label: "About", href: "/about" },
       { label: "Perspectives", href: "/perspectives" },
@@ -72,7 +77,7 @@ export function Header() {
           {navLinks.map((link) => (
             <div
               key={link.label}
-              className="relative"
+              className={cn("relative", link.wideOnly && "hidden xl:block")}
               onMouseEnter={() => link.children && setActiveDropdown(link.label)}
               onMouseLeave={() => setActiveDropdown(null)}
             >
@@ -144,7 +149,11 @@ export function Header() {
           >
             <Link href="/contact">Talk to Us</Link>
           </Button>
-          <MobileNav links={navLinks} scrolled={scrolled} />
+          {/* on phones the advisor link sits at the top level, so it is dropped from the "More" group there */}
+          <MobileNav
+            links={navLinks.map((l) => (l.children ? { ...l, children: l.children.filter((c) => c.href !== ADVISOR_LINK.href) } : l))}
+            scrolled={scrolled}
+          />
         </div>
       </div>
     </header>
