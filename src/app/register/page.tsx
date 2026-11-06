@@ -166,12 +166,12 @@ export default function RegisterPage() {
                 <svg className="h-8 w-8 text-eccellere-teal" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
               </div>
               <h2 className="mt-6 font-display text-2xl text-eccellere-ink">
-                {role === "SPECIALIST" ? "Application Submitted!" : "Account Created!"}
+                {role === "SPECIALIST" ? "Application Submitted!" : "Thank you, we have your request"}
               </h2>
               <p className="mt-3 text-sm text-ink-light">
                 {role === "SPECIALIST"
                   ? "Your specialist application is under review. We'll notify you once approved."
-                  : "Your account is ready. Sign in to access your dashboard."}
+                  : "Your account has been created and is waiting for approval from the Eccellere team. We will email you as soon as it is approved, and then you can sign in."}
               </p>
               <Button asChild className="mt-8">
                 <Link href="/login">Sign In</Link>

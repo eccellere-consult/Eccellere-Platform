@@ -3,6 +3,8 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import { currentBlock, loginBlock } from "@/lib/access";
+import { notifyRegistration } from "@/lib/notify-admin";
 
 export const authOptions: NextAuthOptions = {
   session: {
@@ -35,6 +37,10 @@ export const authOptions: NextAuthOptions = {
           user.passwordHash
         );
         if (!isValid) return null;
+
+        // Only someone who knows the password is told why they cannot come in.
+        const blocked = loginBlock(user.role, user.accountStatus);
+        if (blocked) throw new Error(blocked);
 
         // Update last login
         await prisma.user.update({
@@ -75,6 +81,13 @@ export const authOptions: NextAuthOptions = {
         } else {
           token.role = (user as { role: string }).role;
         }
+      } else if (token.id) {
+        // Every later request: a login that was blocked, or is still waiting for approval, is signed out here (an error clears the session).
+        const why = await currentBlock(String(token.id), async (id) => {
+          const u = await prisma.user.findUnique({ where: { id }, select: { role: true, accountStatus: true } });
+          return u ? { role: u.role, accountStatus: u.accountStatus } : null;
+        });
+        if (why) throw new Error(why);
       }
       return token;
     },
@@ -87,11 +100,11 @@ export const authOptions: NextAuthOptions = {
     },
     async signIn({ user, account }) {
       if (account?.provider === "google") {
-        // Upsert user on Google sign-in
         const existing = await prisma.user.findUnique({
           where: { email: user.email! },
         });
         if (!existing) {
+          // A first Google sign-in is a new client sign-up: it waits for approval like any other.
           await prisma.user.create({
             data: {
               email: user.email!,
@@ -99,9 +112,14 @@ export const authOptions: NextAuthOptions = {
               role: "CLIENT",
               avatar: user.image,
               emailVerified: true,
+              accountStatus: "PENDING",
             },
           });
+          notifyRegistration({ name: user.name || "User", email: user.email!, role: "CLIENT" }).catch(() => undefined);
+          return "/login?error=PENDING_APPROVAL";
         }
+        const blocked = loginBlock(existing.role, existing.accountStatus);
+        if (blocked) return `/login?error=${blocked}`;
       }
       return true;
     },

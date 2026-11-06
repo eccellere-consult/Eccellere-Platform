@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { signIn, getSession } from "next-auth/react";
+import { accessMessage } from "@/lib/access";
 import { useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
@@ -13,6 +14,12 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+
+  // Coming back from Google sign-in with a reason (waiting for approval, or blocked).
+  useEffect(() => {
+    const m = accessMessage(new URLSearchParams(window.location.search).get("error"));
+    if (m) setError(m);
+  }, []);
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -27,7 +34,7 @@ export default function LoginPage() {
     });
 
     if (result?.error) {
-      setError("Invalid email or password");
+      setError(accessMessage(result.error) ?? "Invalid email or password");
       setLoading(false);
     } else {
       const session = await getSession();

@@ -31,6 +31,7 @@ export async function GET() {
           name: true,
           email: true,
           isActive: true,
+          accountStatus: true,
           createdAt: true,
           clientProfile: {
             select: {
@@ -96,6 +97,7 @@ export async function GET() {
       city: profile?.city || "",
       state: profile?.state || "",
       status,
+      approval: u.accountStatus,
       plan: sub?.plan?.name || "—",
       revenue: totalRevenue > 0
         ? `₹${totalRevenue.toLocaleString("en-IN")}`
