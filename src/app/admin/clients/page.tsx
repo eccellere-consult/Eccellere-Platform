@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Search, ChevronLeft, Filter, MoreHorizontal, RefreshCw } from "lucide-react";
+import { Search, ChevronLeft, Filter, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // One sample row — shown only when no real clients have registered yet
@@ -25,6 +25,7 @@ type Client = {
   email: string;
   sector: string;
   status: string;
+  approval?: "PENDING" | "APPROVED" | "BLOCKED";
   plan: string;
   revenue: string;
   joined: string;
@@ -44,6 +45,24 @@ export default function AdminClients() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [filterSector, setFilterSector] = useState("all");
+  const [waitingOnly, setWaitingOnly] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  async function decide(id: string, action: "approve" | "block" | "unblock") {
+    if (action === "block" && !confirm("Block this client? They will be signed out and cannot sign in until you unblock them.")) return;
+    setBusyId(id); setNotice(null);
+    try {
+      const r = await fetch(`/api/admin/clients/${encodeURIComponent(id)}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) setNotice(d.error ?? "That did not work.");
+      else {
+        setNotice(action === "approve" ? (d.emailed ? "Approved. The client has been emailed." : "Approved. The email could not be sent, so please tell the client.") : action === "block" ? "Blocked." : "Unblocked.");
+        await fetchClients();
+      }
+    } catch { setNotice("Lost the connection. Please try again."); }
+    setBusyId(null);
+  }
 
   const fetchClients = useCallback(async () => {
     setLoading(true);
@@ -73,9 +92,10 @@ export default function AdminClients() {
       c.email?.toLowerCase().includes(search.toLowerCase()) ||
       c.id.toLowerCase().includes(search.toLowerCase());
     const matchesSector = filterSector === "all" || c.sector === filterSector;
-    return matchesSearch && matchesSector;
+    return matchesSearch && matchesSector && (!waitingOnly || c.approval === "PENDING");
   });
 
+  const waiting = clients.filter((c) => c.approval === "PENDING").length;
   const isSampleOnly = clients.length === 0 && !loading && !error;
 
   return (
@@ -162,6 +182,16 @@ export default function AdminClients() {
               </div>
             </div>
 
+            <div className="mt-4 flex flex-wrap items-center gap-3 text-sm">
+              <button
+                onClick={() => setWaitingOnly((v) => !v)}
+                className={cn("rounded-md px-3 py-1.5 text-xs font-medium", waitingOnly ? "bg-eccellere-gold text-white" : "bg-white text-ink-mid hover:bg-eccellere-cream")}
+              >
+                Awaiting approval ({waiting})
+              </button>
+              {notice && <span role="status" className="text-xs text-ink-mid">{notice}</span>}
+            </div>
+
             <div className="mt-6 overflow-hidden rounded-lg bg-white shadow-sm">
               <div className="overflow-x-auto">
                 <table className="w-full">
@@ -185,7 +215,7 @@ export default function AdminClients() {
                       <th className="px-6 py-3.5 text-right text-[10px] font-medium uppercase tracking-wider text-ink-light">
                         Joined
                       </th>
-                      <th className="w-10" />
+                      <th className="px-6 py-3.5 text-right text-[10px] font-medium uppercase tracking-wider text-ink-light">Access</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-eccellere-ink/5">
@@ -203,17 +233,32 @@ export default function AdminClients() {
                         </td>
                         <td className="px-6 py-4 text-sm text-ink-mid">{client.sector}</td>
                         <td className="px-6 py-4">
-                          <span className={cn("rounded-sm px-2 py-0.5 text-[10px] uppercase tracking-wider", statusColors[client.status] ?? "bg-ink-light/10 text-ink-light")}>
-                            {client.status}
-                          </span>
+                          {client.approval === "PENDING" || client.approval === "BLOCKED" ? (
+                            <span className={cn("rounded-sm px-2 py-0.5 text-[10px] uppercase tracking-wider", client.approval === "PENDING" ? "bg-eccellere-gold/10 text-eccellere-gold-deep" : "bg-eccellere-error/10 text-eccellere-error")}>
+                              {client.approval === "PENDING" ? "Awaiting approval" : "Blocked"}
+                            </span>
+                          ) : (
+                            <span className={cn("rounded-sm px-2 py-0.5 text-[10px] uppercase tracking-wider", statusColors[client.status] ?? "bg-ink-light/10 text-ink-light")}>
+                              {client.status}
+                            </span>
+                          )}
                         </td>
                         <td className="px-6 py-4 text-sm text-ink-mid">{client.plan}</td>
                         <td className="px-6 py-4 text-right font-mono text-sm text-eccellere-ink">{client.revenue}</td>
                         <td className="px-6 py-4 text-right text-xs text-ink-light">{client.joined}</td>
                         <td className="px-4 py-4">
-                          <button className="rounded p-1 text-ink-light hover:bg-eccellere-cream hover:text-eccellere-ink">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </button>
+                          {client.id !== "SAMPLE" && (
+                            <div className="flex justify-end gap-2 whitespace-nowrap">
+                              {client.approval === "PENDING" && (
+                                <button disabled={busyId === client.id} onClick={() => decide(client.id, "approve")} className="border border-eccellere-ink/25 bg-eccellere-ink px-3 py-1.5 text-xs text-white hover:opacity-90 disabled:opacity-40">Approve</button>
+                              )}
+                              {client.approval === "BLOCKED" ? (
+                                <button disabled={busyId === client.id} onClick={() => decide(client.id, "unblock")} className="border border-eccellere-ink/25 bg-white px-3 py-1.5 text-xs hover:bg-eccellere-cream disabled:opacity-40">Unblock</button>
+                              ) : (
+                                <button disabled={busyId === client.id} onClick={() => decide(client.id, "block")} className="border border-red-300 bg-white px-3 py-1.5 text-xs text-red-700 hover:bg-red-50 disabled:opacity-40">Block</button>
+                              )}
+                            </div>
+                          )}
                         </td>
                       </tr>
                     ))}

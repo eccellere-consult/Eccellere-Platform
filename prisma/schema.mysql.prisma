@@ -22,6 +22,9 @@ model User {
   emailVerified Boolean   @default(false)
   phoneVerified Boolean   @default(false)
   isActive      Boolean   @default(true)
+  accountStatus AccountStatus @default(APPROVED)
+  approvedAt    DateTime?
+  approvedBy    String?
   lastLoginAt   DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -35,6 +38,13 @@ model User {
   sessions          Session[]
   assessments       Assessment[]
   cartItems         CartItem[]
+}
+
+/// Whether the Eccellere team has let this login in. Existing logins are APPROVED; new client sign-ups start PENDING.
+enum AccountStatus {
+  PENDING
+  APPROVED
+  BLOCKED
 }
 
 enum UserRole {

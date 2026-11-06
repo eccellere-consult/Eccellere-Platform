@@ -79,6 +79,8 @@ export async function POST(request: Request) {
         passwordHash,
         phone: phone || undefined,
         role: isSpecialist ? "SPECIALIST" : "CLIENT",
+        // A new client login waits for an admin's approval before it can sign in. (Specialists go through their own application review.)
+        accountStatus: isSpecialist ? "APPROVED" : "PENDING",
         ...(isSpecialist && profile
           ? {
               specialistProfile: {
@@ -151,7 +153,7 @@ export async function POST(request: Request) {
     }).catch((err) => console.error("[register] notify failed:", err));
 
     return NextResponse.json(
-      { message: "Account created successfully", user },
+      { message: isSpecialist ? "Account created successfully" : "Account created. It will be active once the Eccellere team approves it.", user, pendingApproval: !isSpecialist },
       { status: 201 }
     );
   } catch {

@@ -119,7 +119,9 @@ export async function notifyRegistration(data: {
   const label = data.role === "SPECIALIST" ? "specialist" : "client";
   await send(
     `New ${label} registration: ${data.name}`,
-    `${data.name} (${data.email}) just registered as a ${label}.`,
+    data.role === "CLIENT"
+      ? `${data.name} (${data.email}) just registered as a client. They cannot sign in until you approve them: open Admin, Clients and press Approve.`
+      : `${data.name} (${data.email}) just registered as a ${label}.`,
     {
       Name: data.name,
       Email: data.email,
