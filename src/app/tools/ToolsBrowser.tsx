@@ -8,9 +8,9 @@ import { ASSET_TYPES, AREAS, TOOL_SECTORS, assetTypeLabel } from "@/lib/tools/ta
 
 export interface ToolCard { slug: string; name: string; category: string; groupName: string | null; does: string; level: string | null; type: string; areas: string[]; sectors: string[] }
 
-export default function ToolsBrowser({ tools, categories }: { tools: ToolCard[]; categories: string[] }) {
+export default function ToolsBrowser({ tools, categories, initialCategory = "All" }: { tools: ToolCard[]; categories: string[]; initialCategory?: string }) {
   const [q, setQ] = useState("");
-  const [cat, setCat] = useState("All");
+  const [cat, setCat] = useState(initialCategory);
   const [type, setType] = useState("All");
   const [area, setArea] = useState("All");
   const [sector, setSector] = useState("All");

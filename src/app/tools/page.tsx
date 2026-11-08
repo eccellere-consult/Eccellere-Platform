@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { prismaRepo } from "@/lib/tools/prismaRepo";
-import { MARKET_CATEGORIES } from "@/lib/tools/service";
+import { MARKET_CATEGORIES, asMarketCategory } from "@/lib/tools/service";
 import { readClassification, shapeOf, suggestClassification } from "@/lib/tools/taxonomy";
 import ToolsBrowser, { type ToolCard } from "./ToolsBrowser";
 
@@ -27,8 +27,9 @@ async function loadTools(): Promise<ToolCard[]> {
   }
 }
 
-export default async function ToolsPage() {
+export default async function ToolsPage({ searchParams }: { searchParams: Promise<{ category?: string }> }) {
   const tools = await loadTools();
+  const initialCategory = asMarketCategory((await searchParams).category ?? "") ?? "All";
   return (
     <>
       <Header />
@@ -46,7 +47,7 @@ export default async function ToolsPage() {
           </div>
         </section>
         <section className="mx-auto max-w-[1280px] px-6 py-10">
-          <ToolsBrowser tools={tools} categories={[...MARKET_CATEGORIES]} />
+          <ToolsBrowser tools={tools} categories={[...MARKET_CATEGORIES]} initialCategory={initialCategory} />
         </section>
       </main>
       <Footer />
