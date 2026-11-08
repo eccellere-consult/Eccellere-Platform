@@ -28,7 +28,11 @@ export type Expr =
   | { add: Expr[] } | { sub: [Expr, Expr] } | { mul: Expr[] } | { div: [Expr, Expr] }
   // Added for the Agent pilots (decision analysis, pricing, inventory, capital budgeting). All are pure functions; an impossible input
   // (square root of a negative, logarithm of zero, division by zero) gives no answer rather than a wrong one.
-  | { pow: [Expr, Expr] } | { sqrt: Expr } | { ln: Expr } | { exp: Expr } | { abs: Expr } | { min: Expr[] } | { max: Expr[] };
+  | { pow: [Expr, Expr] } | { sqrt: Expr } | { ln: Expr } | { exp: Expr } | { abs: Expr } | { min: Expr[] } | { max: Expr[] }
+  /** The z-score for a service level or confidence given as a probability between 0 and 1 (inverse of the standard normal curve). */
+  | { nsinv: Expr }
+  /** IRR (a percentage) and payback (years) of a list of cash flows, the first being period 0. Usable inside a row, where the flows are that row's cells. */
+  | { irr: Expr[] } | { payback: Expr[] };
 
 export type Rule =
   | { op: 'calc'; expr: Expr; format?: 'int' | 'dp1' | 'dp2' | 'pct'; suffix?: string }
@@ -40,7 +44,12 @@ export type Rule =
   /** Internal rate of return of the cash flows in a column (first row = period 0), as a percentage. No answer unless the flows change sign. */
   | { op: 'irr'; table: string; col: string; format?: 'dp1' | 'dp2' }
   /** Years until the running total of a cash-flow column turns positive (first row = period 0), interpolated within the year. */
-  | { op: 'payback'; table: string; col: string; never?: string };
+  | { op: 'payback'; table: string; col: string; never?: string }
+  /**
+   * Capital rationing: from a table of projects, pick those to fund within a budget. Projects are ranked by value per unit of cost (profitability index);
+   * a project is funded when its value is positive and it still fits in what is left of the budget. `show` chooses the list of names, the total cost or the total value.
+   */
+  | { op: 'ration'; table: string; name: string; cost: string; value: string; budget: string; show: 'names' | 'cost' | 'value' };
 
 // ── The declarative tool ─────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -129,7 +138,25 @@ function evalExpr(e: Expr, row: Row | undefined, v: ModelValues, cm?: ComputedMa
   if ('ln' in e) { const n = one(e.ln); return n === null || n <= 0 ? null : Math.log(n); }
   if ('exp' in e) { const n = one(e.exp); return n === null ? null : fin(Math.exp(n)); }
   if ('abs' in e) { const n = one(e.abs); return n === null ? null : Math.abs(n); }
+  if ('nsinv' in e) { const n = one(e.nsinv); return n === null ? null : nsinv(n); }
+  if ('irr' in e) { const ns = all(e.irr); return ns && ns.length >= 2 ? irrOf(ns as number[]) : null; }
+  if ('payback' in e) { const ns = all(e.payback); return ns && ns.length >= 2 ? paybackOf(ns as number[]) : null; }
   return null;
+}
+
+/** Inverse of the standard normal distribution (Acklam's rational approximation, relative error below 1.2e-9). Null outside 0 < p < 1. */
+export function nsinv(p: number): number | null {
+  if (!(p > 0 && p < 1)) return null;
+  const a = [-39.69683028665376, 220.9460984245205, -275.9285104469687, 138.357751867269, -30.66479806614716, 2.506628277459239];
+  const b = [-54.47609879822406, 161.5858368580409, -155.6989798598866, 66.80131188771972, -13.28068155288572];
+  const c = [-0.007784894002430293, -0.3223964580411365, -2.400758277161838, -2.549732539343734, 4.374664141464968, 2.938163982698783];
+  const d = [0.007784695709041462, 0.3224671290700398, 2.445134137142996, 3.754408661907416];
+  const tail = (q: number) => (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1);
+  const low = 0.02425;
+  if (p < low) return tail(Math.sqrt(-2 * Math.log(p)));
+  if (p > 1 - low) return -tail(Math.sqrt(-2 * Math.log(1 - p)));
+  const q = p - 0.5, r = q * q;
+  return ((((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q) / (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1);
 }
 
 /** The cash flows of a column, in row order; null if any filled row is not a number or fewer than two rows are filled. */
@@ -199,6 +226,18 @@ export function ruleFn(rule: Rule, cm?: ComputedMap): (row: Row | undefined, v: 
           if (!cf) return null;
           const p = paybackOf(cf);
           return p === null ? (rule.never ?? 'Not within the period') : `${fmtNum(p, 1)} years`;
+        }
+        case 'ration': {
+          const budget = toNum(v.fields[rule.budget]);
+          if (budget === null) return null;
+          const ps = rowsOf(v, rule.table).map((r) => ({ n: colText(r, rule.table, rule.name, v, cm).trim(), c: toNum(colText(r, rule.table, rule.cost, v, cm)), x: toNum(colText(r, rule.table, rule.value, v, cm)) }))
+            .filter((p): p is { n: string; c: number; x: number } => p.n !== '' && p.c !== null && p.x !== null && p.c > 0)
+            .sort((p, q) => q.x / q.c - p.x / p.c);
+          let left = budget, cost = 0, value = 0;
+          const chosen: string[] = [];
+          for (const p of ps) if (p.x > 0 && p.c <= left) { chosen.push(p.n); left -= p.c; cost += p.c; value += p.x; }
+          if (!ps.length) return null;
+          return rule.show === 'names' ? (chosen.length ? chosen.join(', ') : 'None fits the budget with a positive value') : fmtNum(rule.show === 'cost' ? cost : value, 1);
         }
         case 'when': {
           const n = evalExpr(rule.expr, row, v, cm);
@@ -359,11 +398,12 @@ export function validateDeclarative(raw: unknown): Issue[] {
     if ('field' in e) { if (!fieldKeys.has(e.field)) err(path, `unknown field ${e.field}`); return; }
     if ('cell' in e) { if (!rowCols || !rowCols.has(e.cell)) err(path, `unknown column ${e.cell} (a cell can be read only inside a computed column of the same table)`); return; }
     if ('agg' in e) { const cols = tableCols.get(e.table); if (!cols) err(path, `unknown table ${e.table}`); else if (e.col && !cols.has(e.col)) err(path, `unknown column ${e.col} in ${e.table}`); return; }
-    const single = 'sqrt' in e ? e.sqrt : 'ln' in e ? e.ln : 'exp' in e ? e.exp : 'abs' in e ? e.abs : undefined;
+    const single = 'sqrt' in e ? e.sqrt : 'ln' in e ? e.ln : 'exp' in e ? e.exp : 'abs' in e ? e.abs : 'nsinv' in e ? e.nsinv : undefined;
     if (single !== undefined) { checkExpr(single, path, rowCols); return; }
-    const list = 'add' in e ? e.add : 'mul' in e ? e.mul : 'sub' in e ? e.sub : 'div' in e ? e.div : 'pow' in e ? e.pow : 'min' in e ? e.min : 'max' in e ? e.max : null;
+    const list = 'add' in e ? e.add : 'mul' in e ? e.mul : 'sub' in e ? e.sub : 'div' in e ? e.div : 'pow' in e ? e.pow : 'min' in e ? e.min : 'max' in e ? e.max : 'irr' in e ? e.irr : 'payback' in e ? e.payback : null;
     if (!list || !Array.isArray(list)) { err(path, 'unknown expression'); return; }
     if (('sub' in e || 'div' in e || 'pow' in e) && list.length !== 2) err(path, 'this operation takes exactly two values');
+    if (('irr' in e || 'payback' in e) && list.length < 2) err(path, 'cash flows need at least two values');
     list.forEach((x, i) => checkExpr(x, `${path}[${i}]`, rowCols));
   };
   const checkRule = (r: Rule | undefined, path: string, rowCols?: Set<string>): void => {
@@ -382,6 +422,13 @@ export function validateDeclarative(raw: unknown): Issue[] {
       case 'irr': case 'payback': {
         const cols = tableCols.get(r.table);
         if (!cols) err(path, `unknown table ${r.table}`); else if (!cols.has(r.col)) err(path, `unknown column ${r.col} in ${r.table}`);
+        break;
+      }
+      case 'ration': {
+        const cols = tableCols.get(r.table);
+        if (!cols) { err(path, `unknown table ${r.table}`); break; }
+        for (const c of [r.name, r.cost, r.value]) if (!cols.has(c)) err(path, `unknown column ${c} in ${r.table}`);
+        if (!fieldKeys.has(r.budget)) err(path, `unknown field ${r.budget}`);
         break;
       }
       case 'template': for (const m of r.text.matchAll(/\{([a-z0-9_]+)\}/g)) if (!fieldKeys.has(m[1])) err(path, `unknown field {${m[1]}}`); break;

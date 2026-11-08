@@ -70,3 +70,41 @@ describe('the quality gate understands the new functions', () => {
     expect(validateDeclarative(bad).filter((i) => i.level === 'error')).toEqual([]);
   });
 });
+
+import { nsinv } from '@/lib/strategyModels/declarative';
+
+describe('normal inverse, row-wise cash-flow functions and capital rationing', () => {
+  it('gives the standard z-scores', () => {
+    expect(nsinv(0.5)).toBeCloseTo(0, 6);
+    expect(nsinv(0.8413447)).toBeCloseTo(1, 4);
+    expect(nsinv(0.9)).toBeCloseTo(1.281552, 5);
+    expect(nsinv(0.95)).toBeCloseTo(1.644854, 5);
+    expect(nsinv(0.975)).toBeCloseTo(1.959964, 5);
+    expect(nsinv(0.99)).toBeCloseTo(2.326348, 5);
+    expect(nsinv(0.999)).toBeCloseTo(3.090232, 5);
+    expect(nsinv(0.05)).toBeCloseTo(-1.644854, 5);
+    expect(nsinv(0)).toBeNull();
+    expect(nsinv(1)).toBeNull();
+  });
+  it('works inside an expression', () => {
+    expect(Number(raw({ nsinv: { div: [95, 100] } }))).toBeCloseTo(1.64, 1);
+  });
+  it('irr and payback of a list of values', () => {
+    expect(Number(raw({ irr: [-1000, 0, 0, 1331] }))).toBeCloseTo(10, 1);
+    expect(Number(raw({ payback: [-1000, 400, 400, 400] }))).toBeCloseTo(2.5, 1);
+    expect(raw({ payback: [-1000, 10, 10] })).toBeNull();
+    expect(raw({ irr: [100, 200] })).toBeNull();
+  });
+  it('rations a budget by value per cost, skipping what does not fit', () => {
+    // A: cost 100 value 50 (0.5)  B: cost 200 value 140 (0.7)  C: cost 150 value 90 (0.6)  D: cost 100 value -10  Budget 350
+    const v = vals({ budget: '350' }, { p: [
+      { n: 'A', c: '100', x: '50' }, { n: 'B', c: '200', x: '140' }, { n: 'C', c: '150', x: '90' }, { n: 'D', c: '100', x: '-10' },
+    ] });
+    const r = (show: 'names' | 'cost' | 'value') => ruleFn({ op: 'ration', table: 'p', name: 'n', cost: 'c', value: 'x', budget: 'budget', show })(undefined, v);
+    // order B (0.7), C (0.6), A (0.5): B 200 fits (150 left), C 150 fits (0 left), A no, D negative
+    expect(r('names')).toBe('B, C');
+    expect(r('cost')).toBe('350');
+    expect(r('value')).toBe('230');
+    expect(ruleFn({ op: 'ration', table: 'p', name: 'n', cost: 'c', value: 'x', budget: 'budget', show: 'names' })(undefined, vals({ budget: '50' }, v.tables))).toBe('None fits the budget with a positive value');
+  });
+});
