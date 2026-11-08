@@ -97,14 +97,15 @@ describe('normal inverse, row-wise cash-flow functions and capital rationing', (
   });
   it('rations a budget by value per cost, skipping what does not fit', () => {
     // A: cost 100 value 50 (0.5)  B: cost 200 value 140 (0.7)  C: cost 150 value 90 (0.6)  D: cost 100 value -10  Budget 350
-    const v = vals({ budget: '350' }, { p: [
+    const projects = [
       { n: 'A', c: '100', x: '50' }, { n: 'B', c: '200', x: '140' }, { n: 'C', c: '150', x: '90' }, { n: 'D', c: '100', x: '-10' },
-    ] });
+    ];
+    const v = vals({ budget: '350' }, { p: projects });
     const r = (show: 'names' | 'cost' | 'value') => ruleFn({ op: 'ration', table: 'p', name: 'n', cost: 'c', value: 'x', budget: 'budget', show })(undefined, v);
     // order B (0.7), C (0.6), A (0.5): B 200 fits (150 left), C 150 fits (0 left), A no, D negative
     expect(r('names')).toBe('B, C');
     expect(r('cost')).toBe('350');
     expect(r('value')).toBe('230');
-    expect(ruleFn({ op: 'ration', table: 'p', name: 'n', cost: 'c', value: 'x', budget: 'budget', show: 'names' })(undefined, vals({ budget: '50' }, v.tables))).toBe('None fits the budget with a positive value');
+    expect(ruleFn({ op: 'ration', table: 'p', name: 'n', cost: 'c', value: 'x', budget: 'budget', show: 'names' })(undefined, vals({ budget: '50' }, { p: projects }))).toBe('None fits the budget with a positive value');
   });
 });
