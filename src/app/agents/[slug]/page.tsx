@@ -10,6 +10,8 @@ import { prismaRepo } from "@/lib/tools/prismaRepo";
 import { getPublishedTool } from "@/lib/tools/service";
 import { loadEdits, sipocWithEdit } from "@/lib/agents/overrides";
 import { prismaEditRepo } from "@/lib/agents/editRepo";
+import { demoOf, tourSteps } from "@/lib/agents/demo";
+import DemoPanel from "./DemoPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +41,7 @@ export default async function AgentPage({ params }: Props) {
   const edit = (await loadEdits(prismaEditRepo))[slug];
   const sipoc = pilot ? sipocWithEdit(pilot.sipoc, edit) : null;
   const does = edit?.does || agent.does;
+  const demo = pilot ? demoOf(pilot.tool) : null;
   const inputs = pilot ? inputsOf(pilot.tool) : [];
   const outputs = pilot ? outputsOf(pilot.tool) : [];
   const results = outputs.filter((o) => o.kind === "result");
@@ -80,6 +83,20 @@ export default async function AgentPage({ params }: Props) {
         ) : (
           <div className="bg-eccellere-cream py-14 lg:py-20">
             <div className="mx-auto max-w-[1280px] space-y-14 px-6">
+              {/* Guided tour */}
+              <section aria-label="Guided tour">
+                <h2 className="font-display text-2xl text-eccellere-ink">How to use this agent</h2>
+                <ol className="mt-4 grid gap-3 md:grid-cols-5">
+                  {tourSteps(live).map((t, i) => (
+                    <li key={t.title} className="border border-eccellere-ink/10 bg-white p-4">
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-gold-deep">Stage {i + 1} of 5</p>
+                      <a href={t.href} className="mt-1 block text-sm font-semibold text-eccellere-ink underline-offset-2 hover:underline">{t.title}</a>
+                      <p className="mt-1 text-xs leading-relaxed text-ink-mid">{t.text}</p>
+                    </li>
+                  ))}
+                </ol>
+              </section>
+
               {/* SIPOC */}
               <section>
                 <h2 className="font-display text-2xl text-eccellere-ink">SIPOC: how the agent works</h2>
@@ -105,7 +122,7 @@ export default async function AgentPage({ params }: Props) {
               </section>
 
               {/* Input data */}
-              <section>
+              <section id="inputs">
                 <h2 className="font-display text-2xl text-eccellere-ink">Input data it needs</h2>
                 <p className="mt-2 max-w-2xl text-sm text-ink-mid">Everything the agent asks for, in the order it asks. Columns marked &quot;worked out&quot; are calculated for you; you only fill the rest.</p>
                 <div className="mt-5 overflow-x-auto border border-eccellere-ink/10 bg-white">
@@ -131,8 +148,17 @@ export default async function AgentPage({ params }: Props) {
                 </div>
               </section>
 
+              {/* Standard demo */}
+              {demo && (
+                <section id="demo">
+                  <h2 className="font-display text-2xl text-eccellere-ink">Try the demo</h2>
+                  <p className="mt-2 max-w-2xl text-sm text-ink-mid">See a complete run on a fictional company before you enter anything of your own. No account, no AI, nothing saved.</p>
+                  <div className="mt-5"><DemoPanel demo={demo} name={agent.name} /></div>
+                </section>
+              )}
+
               {/* Provide and update data */}
-              <section>
+              <section id="your-data">
                 <h2 className="font-display text-2xl text-eccellere-ink">Provide and update your data</h2>
                 <ol className="mt-4 max-w-3xl list-decimal space-y-2 pl-5 text-sm leading-relaxed text-ink-mid">
                   <li>Open the pilot and choose <strong>Download blank Excel template</strong>, or <strong>Download sample</strong> to see a filled example.</li>
@@ -144,7 +170,7 @@ export default async function AgentPage({ params }: Props) {
               </section>
 
               {/* Outputs */}
-              <section>
+              <section id="outputs">
                 <h2 className="font-display text-2xl text-eccellere-ink">What you get back</h2>
                 <div className="mt-5 grid gap-6 md:grid-cols-2">
                   <div className="border border-eccellere-ink/10 bg-white p-5">
