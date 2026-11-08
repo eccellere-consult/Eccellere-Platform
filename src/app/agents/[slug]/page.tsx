@@ -8,6 +8,8 @@ import { pilotByAgent } from "@/lib/agents/pilots";
 import { inputsOf, outputsOf } from "@/lib/agents/sipoc";
 import { prismaRepo } from "@/lib/tools/prismaRepo";
 import { getPublishedTool } from "@/lib/tools/service";
+import { loadEdits, sipocWithEdit } from "@/lib/agents/overrides";
+import { prismaEditRepo } from "@/lib/agents/editRepo";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +36,9 @@ export default async function AgentPage({ params }: Props) {
   const area = AREAS.find((a) => a.agents.some((x) => x.slug === slug))!;
   const pilot = pilotByAgent(slug);
   const live = pilot ? await isLive(slug) : false;
+  const edit = (await loadEdits(prismaEditRepo))[slug];
+  const sipoc = pilot ? sipocWithEdit(pilot.sipoc, edit) : null;
+  const does = edit?.does || agent.does;
   const inputs = pilot ? inputsOf(pilot.tool) : [];
   const outputs = pilot ? outputsOf(pilot.tool) : [];
   const results = outputs.filter((o) => o.kind === "result");
@@ -49,7 +54,7 @@ export default async function AgentPage({ params }: Props) {
               <Link href="/agents" className="hover:underline">Agent Marketplace</Link> · {area.name}
             </p>
             <h1 className="mt-4 max-w-3xl font-display text-[clamp(32px,5vw,56px)] font-light leading-[1.1] text-eccellere-cream">{agent.name}</h1>
-            <p className="mt-5 max-w-2xl text-lg font-light text-white/60">{agent.does}</p>
+            <p className="mt-5 max-w-2xl text-lg font-light text-white/60">{does}</p>
             <div className="mt-6 flex flex-wrap items-center gap-3">
               <span className="rounded-sm bg-eccellere-gold/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-eccellere-gold">
                 {pilot ? (live ? "Pilot · open" : "Pilot · in review") : "Coming soon"}
@@ -88,11 +93,11 @@ export default async function AgentPage({ params }: Props) {
                     </thead>
                     <tbody>
                       <tr>
-                        <td className={td}><ul className="space-y-2">{pilot.sipoc.suppliers.map((x) => <li key={x}>{x}</li>)}</ul></td>
+                        <td className={td}><ul className="space-y-2">{sipoc!.suppliers.map((x) => <li key={x}>{x}</li>)}</ul></td>
                         <td className={td}><ul className="space-y-2">{inputs.map((i) => <li key={i.label}>{i.label}</li>)}</ul></td>
-                        <td className={td}><ol className="list-decimal space-y-2 pl-4">{pilot.sipoc.process.map((x) => <li key={x}>{x}</li>)}</ol></td>
+                        <td className={td}><ol className="list-decimal space-y-2 pl-4">{sipoc!.process.map((x) => <li key={x}>{x}</li>)}</ol></td>
                         <td className={td}><ul className="space-y-2">{results.map((o) => <li key={o.label}>{o.label}</li>)}</ul></td>
-                        <td className={td}><ul className="space-y-2">{pilot.sipoc.customers.map((x) => <li key={x}>{x}</li>)}</ul></td>
+                        <td className={td}><ul className="space-y-2">{sipoc!.customers.map((x) => <li key={x}>{x}</li>)}</ul></td>
                       </tr>
                     </tbody>
                   </table>
@@ -133,7 +138,7 @@ export default async function AgentPage({ params }: Props) {
                   <li>Open the pilot and choose <strong>Download blank Excel template</strong>, or <strong>Download sample</strong> to see a filled example.</li>
                   <li>Fill the template with your own data and use <strong>Upload</strong> to load it; or type straight into the page. Both give the same result.</li>
                   <li>Your work saves automatically while you type, so you can come back and change any figure; results update at once.</li>
-                  <li>To refresh: {pilot.sipoc.refresh}</li>
+                  <li>To refresh: {sipoc!.refresh}</li>
                 </ol>
                 {!live && <p className="mt-3 text-sm text-ink-mid">The pilot is being reviewed and opens to clients once it is approved.</p>}
               </section>
