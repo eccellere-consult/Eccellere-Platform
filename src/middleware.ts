@@ -10,6 +10,12 @@ const PUBLIC_EXCEPTIONS = ["/specialist/register", "/api/account/register"];
 // Routes that redirect authenticated users away (login, register)
 const AUTH_REDIRECT_PATHS = ["/login", "/register"];
 
+/**
+ * Pages may not be shown inside another page (clickjacking), with one exception: the admin "Preview as clients see it" shows the
+ * client page for a form inside the admin page of the same site, so that page may be framed by our own site (and only by it).
+ */
+const frameOption = (pathname: string): string => (pathname.startsWith("/consulting/library/") ? "SAMEORIGIN" : "DENY");
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -18,7 +24,7 @@ export async function middleware(request: NextRequest) {
     const response = NextResponse.next();
     response.headers.set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
     response.headers.set("X-Content-Type-Options", "nosniff");
-    response.headers.set("X-Frame-Options", "DENY");
+    response.headers.set("X-Frame-Options", frameOption(pathname));
     response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
     return response;
   }
@@ -85,7 +91,7 @@ export async function middleware(request: NextRequest) {
   response.headers.set("X-Content-Type-Options", "nosniff");
 
   // Clickjacking protection
-  response.headers.set("X-Frame-Options", "DENY");
+  response.headers.set("X-Frame-Options", frameOption(pathname));
 
   // Referrer leakage control
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");

@@ -17,7 +17,7 @@ const securityHeaders = [
       "font-src 'self' https://fonts.gstatic.com",
       "img-src 'self' data: blob: https:",
       "connect-src 'self' https: https://api.razorpay.com https://lumberjack.razorpay.com",
-      "frame-src https://api.razorpay.com https://checkout.razorpay.com",
+      "frame-src 'self' https://api.razorpay.com https://checkout.razorpay.com",
       "frame-ancestors 'self'",
     ].join("; "),
   },
