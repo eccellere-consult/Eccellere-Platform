@@ -9,7 +9,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { NotificationBell } from "@/components/NotificationBell";
 
 /** The original site (eccellere.in): the way back, at the right end of the menu. */
-export const ADVISOR_LINK = { label: "Back to ECCELLERE ↗", href: "https://eccellere.in" };
+export const ADVISOR_LINK = { label: "Back to ECCELLĒRE ↗", href: "https://eccellere.in" };
 
 interface NavItem { label: string; href: string; blurb?: string; end?: boolean; children?: { label: string; href: string }[] }
 
