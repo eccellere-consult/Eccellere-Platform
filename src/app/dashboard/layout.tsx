@@ -67,7 +67,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Brand */}
       <div className="flex h-[64px] items-center justify-between border-b border-white/10 px-5">
         <Link href="/" className="font-display text-lg font-semibold tracking-wide text-white">
-          ECCELLERĒ
+          ECCELLERĒ<span className="text-eccellere-gold">+</span>
         </Link>
         {mobile && (
           <button onClick={() => setMobileOpen(false)} className="text-white/70 hover:text-white">

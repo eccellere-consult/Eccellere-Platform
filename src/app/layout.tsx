@@ -42,7 +42,7 @@ const organizationJsonLd = {
         url: "https://eccellere.co.in/logo.png",
       },
       description:
-        "India's premier consulting platform for MSMEs and startups. Strategy, Process Transformation, Agentic AI, and 200+ business frameworks.",
+        "Eccellere+ is the advanced solution for deeper industry and function specific strategic planning and operations assets: frameworks, toolkits and tools built for real operating decisions.",
       address: {
         "@type": "PostalAddress",
         addressCountry: "IN",
@@ -56,9 +56,10 @@ const organizationJsonLd = {
       "@type": "WebSite",
       "@id": "https://eccellere.co.in/#website",
       url: "https://eccellere.co.in",
-      name: "Eccellere",
+      name: "Eccellere+",
+      alternateName: "Eccellere Plus",
       description:
-        "Strategy, AI & Consulting for India's MSMEs",
+        "The advanced solution for deeper industry and function specific strategic planning and operations assets.",
       publisher: { "@id": "https://eccellere.co.in/#organization" },
       potentialAction: {
         "@type": "SearchAction",
@@ -74,11 +75,11 @@ const organizationJsonLd = {
 
 export const metadata: Metadata = {
   title: {
-    default: "Eccellere — Strategy, AI & Consulting for India's MSMEs",
-    template: "%s | Eccellere",
+    default: "Eccellere+ — Industry and function specific strategy and operations assets",
+    template: "%s | Eccellere+",
   },
   description:
-    "India's premier consulting platform for MSMEs and startups. Strategy, Process Transformation, Agentic AI, and 200+ business frameworks for Manufacturing, Retail, Consumer Products & Logistics.",
+    "Eccellere+ is the advanced solution for deeper industry and function specific strategic planning and operations assets: frameworks, toolkits and tools for Manufacturing, Retail, Consumer Products, Logistics and more.",
   keywords: [
     "MSME consulting",
     "Agentic AI",
@@ -88,22 +89,25 @@ export const metadata: Metadata = {
     "logistics consulting",
     "business frameworks",
     "Eccellere",
+    "Eccellere+",
+    "industry specific strategy",
+    "functional operations assets",
   ],
   metadataBase: new URL("https://eccellere.co.in"),
   openGraph: {
     type: "website",
     locale: "en_IN",
     url: "https://eccellere.co.in",
-    siteName: "Eccellere Consulting",
-    title: "Eccellere — Strategy, AI & Consulting for India's MSMEs",
+    siteName: "Eccellere+",
+    title: "Eccellere+ — Industry and function specific strategy and operations assets",
     description:
-      "Consulting, AI skills, and business toolkits — designed for MSMEs and startups that mean business.",
+      "Deeper industry and function specific strategic planning and operations assets, frameworks and toolkits.",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Eccellere — Strategy, AI & Consulting for India's MSMEs",
+    title: "Eccellere+ — Industry and function specific strategy and operations assets",
     description:
-      "Consulting, AI skills, and business toolkits — designed for MSMEs and startups that mean business.",
+      "Deeper industry and function specific strategic planning and operations assets, frameworks and toolkits.",
   },
   robots: {
     index: true,

@@ -57,7 +57,7 @@ export function renderWelcomeEmail({ recipientName, assessmentUrl }: WelcomeEmai
   return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
 <body style="margin:0;padding:0;">
 <div style="${wrapper}">
-  <div style="${header}"><span style="${logo}">ECCELLERĒ</span></div>
+  <div style="${header}"><span style="${logo}">ECCELLERĒ<span style="color:#B8913A;">+</span></span></div>
   <div style="${body}">
     <h1 style="${h1}">Welcome to Eccellere, ${sanitize(recipientName)}</h1>
     <p style="${paragraph}">You've joined India's premier consulting and AI platform for MSMEs and startups. Here's how to get the most out of Eccellere:</p>
@@ -93,7 +93,7 @@ export function renderOrderConfirmation({
   return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
 <body style="margin:0;padding:0;">
 <div style="${wrapper}">
-  <div style="${header}"><span style="${logo}">ECCELLERĒ</span></div>
+  <div style="${header}"><span style="${logo}">ECCELLERĒ<span style="color:#B8913A;">+</span></span></div>
   <div style="${body}">
     <h1 style="${h1}">Order Confirmed</h1>
     <p style="${paragraph}">Hi ${sanitize(recipientName)}, your purchase is confirmed. Here are the details:</p>
@@ -130,7 +130,7 @@ export function renderAssessmentResults({
   return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
 <body style="margin:0;padding:0;">
 <div style="${wrapper}">
-  <div style="${header}"><span style="${logo}">ECCELLERĒ</span></div>
+  <div style="${header}"><span style="${logo}">ECCELLERĒ<span style="color:#B8913A;">+</span></span></div>
   <div style="${body}">
     <h1 style="${h1}">Your AI Readiness Score</h1>
     <p style="${paragraph}">Hi ${sanitize(recipientName)}, here are your assessment results:</p>
@@ -174,7 +174,7 @@ export function renderNewsletter({ recipientName, articles }: NewsletterProps): 
   return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
 <body style="margin:0;padding:0;">
 <div style="${wrapper}">
-  <div style="${header}"><span style="${logo}">ECCELLERĒ</span><p style="margin:8px 0 0;color:#7A7870;font-size:12px;text-transform:uppercase;letter-spacing:0.15em;">Weekly Perspectives</p></div>
+  <div style="${header}"><span style="${logo}">ECCELLERĒ<span style="color:#B8913A;">+</span></span><p style="margin:8px 0 0;color:#7A7870;font-size:12px;text-transform:uppercase;letter-spacing:0.15em;">Weekly Perspectives</p></div>
   <div style="${body}">
     <p style="${paragraph}">Hi ${sanitize(recipientName)}, here's this week's collection of insights for growth-minded businesses:</p>
     ${articlesHtml}

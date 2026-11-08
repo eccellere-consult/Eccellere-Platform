@@ -74,11 +74,11 @@ export function Footer() {
         {/* Column 1: Brand */}
         <div className="space-y-4">
           <span className="font-display text-xl font-semibold tracking-wide">
-            ECCELLERĒ
+            ECCELLERĒ<span className="text-eccellere-gold">+</span>
           </span>
           <p className="text-sm leading-relaxed text-white/60">
-            India&apos;s premier consulting platform for MSMEs and startups.
-            Strategy, AI, and business frameworks for growth.
+            The advanced solution for deeper industry and function specific
+            strategic planning and operations assets.
           </p>
           <div className="space-y-1 text-sm text-white/50">
             <p>contact@eccellere.co.in</p>

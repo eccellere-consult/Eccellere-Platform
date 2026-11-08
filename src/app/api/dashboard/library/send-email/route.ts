@@ -191,7 +191,7 @@ function buildEmailHtml(
 <head><meta charset="UTF-8"/></head>
 <body style="font-family:Georgia,serif;color:#1B2A4A;max-width:600px;margin:0 auto;padding:32px 24px;">
   <div style="border-bottom:2px solid #c9a84c;padding-bottom:16px;margin-bottom:24px;">
-    <span style="font-family:Cambria,serif;font-size:20px;font-weight:bold;color:#1B2A4A;">ECCELLERE</span>
+    <span style="font-family:Cambria,serif;font-size:20px;font-weight:bold;color:#1B2A4A;">ECCELLERE<span style="color:#B8913A;">+</span></span>
   </div>
   <p style="margin:0 0 12px;">Dear ${escapeHtml(name)},</p>
   <p style="margin:0 0 16px;">
