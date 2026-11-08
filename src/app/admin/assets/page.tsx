@@ -179,6 +179,7 @@ export default function AdminAssets() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [resubmitTarget, setResubmitTarget] = useState<{ id: string; title: string } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
+  const [online, setOnline] = useState<{ kind: "working" | "ok" | "warn"; text: string; href?: string } | null>(null);
 
   const fetchAssets = useCallback(async () => {
     setLoading(true);
@@ -196,6 +197,26 @@ export default function AdminAssets() {
   }, []);
 
   useEffect(() => { fetchAssets(); }, [fetchAssets]);
+
+  /** Builds a fill-online DRAFT from the toolkit's own file (a few minutes). Nothing is published; it waits for review in Admin > Tools. */
+  async function makeOnline(dbId: string, title: string) {
+    if (online?.kind === "working") return;
+    setOnline({ kind: "working", text: `Reading "${title}" and drafting its online version. This can take a few minutes; please keep this page open.` });
+    try {
+      const start = await fetch(`/api/admin/assets/${dbId}/make-online`, { method: "POST" });
+      const first = await start.json().catch(() => ({}));
+      if (start.status !== 202 || !first.jobId) return setOnline({ kind: "warn", text: first.error ?? "Could not start the build." });
+      for (let i = 0; i < 150; i++) {
+        await new Promise((r) => setTimeout(r, 4000));
+        const res = await fetch(`/api/admin/assets/${dbId}/make-online?job=${first.jobId}`);
+        const body = await res.json().catch(() => ({}));
+        if (res.status === 202) continue;
+        if (res.ok) return setOnline({ kind: "ok", text: `Draft saved: "${body.name}". It is not live yet. Review and publish it in Admin > Tools.`, href: "/admin/tools" });
+        return setOnline({ kind: "warn", text: body.error ?? "The build did not finish." });
+      }
+      setOnline({ kind: "warn", text: "This is taking longer than expected. Check Admin > Tools in a few minutes before trying again." });
+    } catch { setOnline({ kind: "warn", text: "No connection. Please try again." }); }
+  }
 
   async function handleAction(dbId: string, action: "approve" | "reject") {
     setActionLoading(dbId + action);
@@ -312,6 +333,14 @@ export default function AdminAssets() {
       </header>
 
       <main className="mx-auto max-w-[1280px] px-6 py-8">
+        {online && (
+          <div role="status" className={cn("mb-4 rounded-md border px-4 py-3 text-sm", online.kind === "ok" ? "border-eccellere-gold bg-eccellere-gold/10 text-eccellere-ink" : online.kind === "warn" ? "border-amber-200 bg-amber-50 text-amber-800" : "border-eccellere-ink/10 bg-white text-ink-mid")}>
+            {online.kind === "working" && <Loader2 className="mr-2 inline h-4 w-4 animate-spin" />}
+            {online.text}{" "}
+            {online.href && <Link href={online.href} className="font-medium underline">Open Admin &gt; Tools</Link>}
+            {online.kind !== "working" && <button onClick={() => setOnline(null)} className="ml-3 underline">Dismiss</button>}
+          </div>
+        )}
         {error && (
           <div className="mb-4 flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
             <AlertCircle className="h-4 w-4 shrink-0" />
@@ -436,6 +465,14 @@ export default function AdminAssets() {
                               }
                             </button>
 
+                            <button
+                              title="Make a fill-online version from this toolkit's file (a draft for review)"
+                              disabled={actionLoading !== null || online?.kind === "working"}
+                              onClick={() => makeOnline(asset.dbId!, asset.title)}
+                              className="rounded border border-eccellere-gold px-2 py-1 text-[10px] font-medium text-eccellere-gold hover:bg-eccellere-gold/10 disabled:opacity-50"
+                            >
+                              Make online
+                            </button>
                             {asset.canAct && (
                               <Button
                                 size="sm"
