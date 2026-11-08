@@ -23,7 +23,12 @@ export type ToolCategory = (typeof TOOL_CATEGORIES)[number];
 
 /** A number a rule can read: a literal, a single field, a cell of the current row (computed columns only), or an aggregate over a table's column. */
 export type Operand = number | { field: string } | { cell: string } | { agg: 'sum' | 'avg' | 'min' | 'max' | 'count'; table: string; col?: string };
-export type Expr = Operand | { add: Expr[] } | { sub: [Expr, Expr] } | { mul: Expr[] } | { div: [Expr, Expr] };
+export type Expr =
+  | Operand
+  | { add: Expr[] } | { sub: [Expr, Expr] } | { mul: Expr[] } | { div: [Expr, Expr] }
+  // Added for the Agent pilots (decision analysis, pricing, inventory, capital budgeting). All are pure functions; an impossible input
+  // (square root of a negative, logarithm of zero, division by zero) gives no answer rather than a wrong one.
+  | { pow: [Expr, Expr] } | { sqrt: Expr } | { ln: Expr } | { exp: Expr } | { abs: Expr } | { min: Expr[] } | { max: Expr[] };
 
 export type Rule =
   | { op: 'calc'; expr: Expr; format?: 'int' | 'dp1' | 'dp2' | 'pct'; suffix?: string }
@@ -31,7 +36,11 @@ export type Rule =
   | { op: 'top'; table: string; by: string; label: string }
   | { op: 'quadrant'; x: Expr; y: Expr; midX: number; midY: number; names: [string, string, string, string] }
   | { op: 'template'; text: string }
-  | { op: 'when'; expr: Expr; gt?: number; lt?: number; then: string; else: string; tones?: { then?: Tone; else?: Tone } };
+  | { op: 'when'; expr: Expr; gt?: number; lt?: number; then: string; else: string; tones?: { then?: Tone; else?: Tone } }
+  /** Internal rate of return of the cash flows in a column (first row = period 0), as a percentage. No answer unless the flows change sign. */
+  | { op: 'irr'; table: string; col: string; format?: 'dp1' | 'dp2' }
+  /** Years until the running total of a cash-flow column turns positive (first row = period 0), interpolated within the year. */
+  | { op: 'payback'; table: string; col: string; never?: string };
 
 // ── The declarative tool ─────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -110,8 +119,51 @@ function evalExpr(e: Expr, row: Row | undefined, v: ModelValues, cm?: ComputedMa
   if ('add' in e) { const ns = all(e.add); return ns ? ns.reduce((a, b) => a + b, 0) : null; }
   if ('mul' in e) { const ns = all(e.mul); return ns ? ns.reduce((a, b) => a * b, 1) : null; }
   if ('sub' in e) { const ns = all(e.sub); return ns ? ns[0] - ns[1] : null; }
-  const ns = all(e.div);
-  return ns && ns[1] !== 0 ? ns[0] / ns[1] : null;
+  if ('div' in e) { const ns = all(e.div); return ns && ns[1] !== 0 ? ns[0] / ns[1] : null; }
+  const fin = (n: number): number | null => (Number.isFinite(n) ? n : null);
+  if ('pow' in e) { const ns = all(e.pow); return ns ? fin(Math.pow(ns[0], ns[1])) : null; }
+  if ('min' in e) { const ns = all(e.min); return ns && ns.length ? Math.min(...ns) : null; }
+  if ('max' in e) { const ns = all(e.max); return ns && ns.length ? Math.max(...ns) : null; }
+  const one = (x: Expr) => evalExpr(x, row, v, cm);
+  if ('sqrt' in e) { const n = one(e.sqrt); return n === null || n < 0 ? null : Math.sqrt(n); }
+  if ('ln' in e) { const n = one(e.ln); return n === null || n <= 0 ? null : Math.log(n); }
+  if ('exp' in e) { const n = one(e.exp); return n === null ? null : fin(Math.exp(n)); }
+  if ('abs' in e) { const n = one(e.abs); return n === null ? null : Math.abs(n); }
+  return null;
+}
+
+/** The cash flows of a column, in row order; null if any filled row is not a number or fewer than two rows are filled. */
+function flows(v: ModelValues, table: string, col: string, cm?: ComputedMap): number[] | null {
+  const raw = rowsOf(v, table).map((r) => colText(r, table, col, v, cm).trim()).filter((t) => t !== '');
+  const ns = raw.map((t) => toNum(t));
+  return ns.length >= 2 && ns.every((n): n is number => n !== null) ? (ns as number[]) : null;
+}
+
+/** IRR by bisection on net present value. Returns a percentage, or null when the flows do not change sign or no rate between -99% and 1000% fits. */
+export function irrOf(cf: number[]): number | null {
+  if (!(cf.some((x) => x < 0) && cf.some((x) => x > 0))) return null;
+  const npv = (r: number) => cf.reduce((s, x, t) => s + x / Math.pow(1 + r, t), 0);
+  let lo = -0.99, hi = 10;
+  let flo = npv(lo), fhi = npv(hi);
+  if (!Number.isFinite(flo) || !Number.isFinite(fhi) || flo * fhi > 0) return null;
+  for (let i = 0; i < 200; i++) {
+    const mid = (lo + hi) / 2, fm = npv(mid);
+    if (fm === 0) return mid * 100;
+    if (flo * fm < 0) { hi = mid; fhi = fm; } else { lo = mid; flo = fm; }
+  }
+  return ((lo + hi) / 2) * 100;
+}
+
+/** Payback in years: the point where the running total crosses zero, interpolated within the period; null if it never does. */
+export function paybackOf(cf: number[]): number | null {
+  let cum = 0;
+  for (let t = 0; t < cf.length; t++) {
+    const prev = cum;
+    cum += cf[t];
+    if (cum >= 0 && t > 0 && prev < 0) return t - 1 + -prev / cf[t];
+    if (cum >= 0 && t === 0 && cf[0] >= 0) return 0;
+  }
+  return null;
 }
 
 const show = (n: number, f: 'int' | 'dp1' | 'dp2' | 'pct' | undefined): string =>
@@ -140,6 +192,13 @@ export function ruleFn(rule: Rule, cm?: ComputedMap): (row: Row | undefined, v: 
           let blank = false;
           const out = rule.text.replace(/\{([a-z0-9_]+)\}/g, (_m, k: string) => { const val = (v.fields[k] ?? '').trim(); if (!val) blank = true; return val; });
           return blank ? null : out;
+        }
+        case 'irr': { const cf = flows(v, rule.table, rule.col, cm); const r = cf ? irrOf(cf) : null; return r === null ? null : show(r, rule.format ?? 'dp1') + '%'; }
+        case 'payback': {
+          const cf = flows(v, rule.table, rule.col, cm);
+          if (!cf) return null;
+          const p = paybackOf(cf);
+          return p === null ? (rule.never ?? 'Not within the period') : `${fmtNum(p, 1)} years`;
         }
         case 'when': {
           const n = evalExpr(rule.expr, row, v, cm);
@@ -300,8 +359,11 @@ export function validateDeclarative(raw: unknown): Issue[] {
     if ('field' in e) { if (!fieldKeys.has(e.field)) err(path, `unknown field ${e.field}`); return; }
     if ('cell' in e) { if (!rowCols || !rowCols.has(e.cell)) err(path, `unknown column ${e.cell} (a cell can be read only inside a computed column of the same table)`); return; }
     if ('agg' in e) { const cols = tableCols.get(e.table); if (!cols) err(path, `unknown table ${e.table}`); else if (e.col && !cols.has(e.col)) err(path, `unknown column ${e.col} in ${e.table}`); return; }
-    const list = 'add' in e ? e.add : 'mul' in e ? e.mul : 'sub' in e ? e.sub : 'div' in e ? e.div : null;
+    const single = 'sqrt' in e ? e.sqrt : 'ln' in e ? e.ln : 'exp' in e ? e.exp : 'abs' in e ? e.abs : undefined;
+    if (single !== undefined) { checkExpr(single, path, rowCols); return; }
+    const list = 'add' in e ? e.add : 'mul' in e ? e.mul : 'sub' in e ? e.sub : 'div' in e ? e.div : 'pow' in e ? e.pow : 'min' in e ? e.min : 'max' in e ? e.max : null;
     if (!list || !Array.isArray(list)) { err(path, 'unknown expression'); return; }
+    if (('sub' in e || 'div' in e || 'pow' in e) && list.length !== 2) err(path, 'this operation takes exactly two values');
     list.forEach((x, i) => checkExpr(x, `${path}[${i}]`, rowCols));
   };
   const checkRule = (r: Rule | undefined, path: string, rowCols?: Set<string>): void => {
@@ -315,6 +377,11 @@ export function validateDeclarative(raw: unknown): Issue[] {
         if (!cols) { err(path, `unknown table ${r.table}`); break; }
         const need = r.op === 'weighted' ? [r.value, r.weight] : [r.by, r.label];
         for (const c of need) if (!cols.has(c)) err(path, `unknown column ${c} in ${r.table}`);
+        break;
+      }
+      case 'irr': case 'payback': {
+        const cols = tableCols.get(r.table);
+        if (!cols) err(path, `unknown table ${r.table}`); else if (!cols.has(r.col)) err(path, `unknown column ${r.col} in ${r.table}`);
         break;
       }
       case 'template': for (const m of r.text.matchAll(/\{([a-z0-9_]+)\}/g)) if (!fieldKeys.has(m[1])) err(path, `unknown field {${m[1]}}`); break;
