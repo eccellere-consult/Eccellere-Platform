@@ -14,6 +14,7 @@ import { prismaEditRepo } from "@/lib/agents/editRepo";
 import { demoOf, tourSteps } from "@/lib/agents/demo";
 import DemoPanel from "./DemoPanel";
 import KitPanel from "./KitPanel";
+import AgentRunner from "./AgentRunner";
 
 export const dynamic = "force-dynamic";
 
@@ -179,6 +180,13 @@ export default async function AgentPage({ params }: Props) {
                   <div className="mt-5"><DemoPanel demo={demo} name={agent.name} /></div>
                 </section>
               )}
+
+              {/* Use it now: online form and report */}
+              <section id="use-it">
+                <h2 className="font-display text-2xl text-eccellere-ink">Use it on your data</h2>
+                <p className="mt-2 max-w-2xl text-sm text-ink-mid">Fill the form below or upload the Excel template, then read the report, print it or save it as PDF, or download it as Excel. No account needed; nothing is saved.</p>
+                <div className="mt-5"><AgentRunner tool={pilot.tool} slug={slug} name={agent.name} /></div>
+              </section>
 
               {/* Provide and update data */}
               <section id="your-data">
