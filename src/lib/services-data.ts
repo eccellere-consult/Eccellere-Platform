@@ -41,7 +41,7 @@ export const servicesData: ServiceData[] = [
   {
     slug: "agentic-ai",
     name: "Agentic AI",
-    tagline: "AI strategy and implementation purpose-built for India's MSMEs",
+    tagline: "AI strategy and implementation built around your industry and function",
     heroDescription:
       "From AI readiness assessments to full agentic workflow implementation — we help you identify exactly where AI fits in your business, build the ROI case, and deploy working AI solutions your teams actually use. No vendors pushing products. No bloated proposals. Just AI that delivers measurable outcomes.",
     heroCtaLabel: "Book a Free AI Diagnostic",

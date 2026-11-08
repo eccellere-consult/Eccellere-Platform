@@ -39,7 +39,7 @@ const offerings = [
     description:
       "A structured diagnostic that maps your business across six AI readiness dimensions — data maturity, process digitisation, leadership alignment, talent readiness, infrastructure, and governance. Produces a scored report, sector benchmark comparison, and a prioritised 90-day AI roadmap specific to your industry and scale.",
     summary:
-      "Most MSMEs waste their first AI investment because they start with the wrong problem. This assessment identifies your highest-ROI AI opportunity — not in theory, but grounded in your actual data quality, workflows, and team capability.",
+      "Most organisations waste their first AI investment because they start with the wrong problem. This assessment identifies your highest-ROI AI opportunity — not in theory, but grounded in your actual data quality, workflows, and team capability.",
     outputs: [
       "6-dimension AI Readiness Score benchmarked against sector peers",
       "Capability gap analysis — what's missing and how to close it fast",
@@ -78,11 +78,11 @@ const offerings = [
     icon: BookOpen,
     number: "02",
     title: "Ready-to-Use AI Skills Library",
-    tagline: "20 pre-built, tested AI skills across 4 MSME sectors",
+    tagline: "20 pre-built, tested AI skills across 4 industry sectors",
     description:
       "Each AI skill is a complete, plug-in capability that instantly gives your team — or your AI agent — deep operational expertise in a specific domain. No prompting. No configuration. No AI expertise needed. Select a skill, describe your challenge, and receive structured India-contextualised outputs within minutes. Built on real MSME operational knowledge, not generic templates.",
     summary:
-      "Enterprise AI teams take months to build domain knowledge. Our Skills Library gives MSME founders that knowledge pre-packaged — a Manufacturing Production Planner, a Retail Inventory Velocity Manager, a D2C Revenue Engine, and 17 more — all instantly deployable with zero technical setup.",
+      "Enterprise AI teams take months to build domain knowledge. Our Skills Library gives founders and functional leaders that knowledge pre-packaged — a Manufacturing Production Planner, a Retail Inventory Velocity Manager, a D2C Revenue Engine, and 17 more — all instantly deployable with zero technical setup.",
     outputs: [
       "Manufacturing (5 skills): Production Planner, Inventory Controller, Quality System Builder, Supplier Development, Cost & Profitability Analyser",
       "Retail (5 skills): Store Performance Optimizer, Inventory Velocity Manager, Loyalty & Customer Growth, Digital Presence Activator, Credit & Collections Manager",
@@ -123,9 +123,9 @@ const offerings = [
     title: "AI Agents for Recurring Tasks",
     tagline: "Set it up once — your agent handles it every single time",
     description:
-      "Purpose-built agentic workflows that autonomously execute your most time-consuming recurring business tasks. Each agent is pre-configured with MSME-specific business logic, integrates with your existing tools (WhatsApp, ERP, POS, email), and escalates to a human only when genuinely needed. From purchase order creation to daily sales health cards — you design the rule, the agent executes it.",
+      "Purpose-built agentic workflows that autonomously execute your most time-consuming recurring business tasks. Each agent is pre-configured with industry and function specific business logic, integrates with your existing tools (WhatsApp, ERP, POS, email), and escalates to a human only when genuinely needed. From purchase order creation to daily sales health cards — you design the rule, the agent executes it.",
     summary:
-      "MSME managers spend 60–70% of their time on tasks that follow predictable, repeatable logic — creating POs, generating reports, sending reminders, updating scorecards. These are exactly the tasks AI agents eliminate. Free your team for decisions that actually require human judgment.",
+      "Managers spend 60–70% of their time on tasks that follow predictable, repeatable logic — creating POs, generating reports, sending reminders, updating scorecards. These are exactly the tasks AI agents eliminate. Free your team for decisions that actually require human judgment.",
     outputs: [
       "Purchase order auto-creation when inventory crosses reorder point — supplier query, PO draft, WhatsApp approval loop",
       "Weekly production schedule generation and distribution to floor supervisors via WhatsApp",
@@ -211,7 +211,7 @@ const offerings = [
     title: "AI Consulting",
     tagline: "Strategy, business case, platform selection, and implementation roadmap",
     description:
-      "For MSMEs that want to build a credible AI strategy before committing to platforms or vendors. Our consulting engagement delivers a board-ready AI strategy aligned to your 3-year growth plan, a quantified business case with ROI model, a shortlist of platforms matched to your budget and IT maturity, and a phased implementation roadmap with change management built in. We help you make the right AI investment decision — not just any AI decision.",
+      "For organisations that want to build a credible AI strategy before committing to platforms or vendors. Our consulting engagement delivers a board-ready AI strategy aligned to your 3-year growth plan, a quantified business case with ROI model, a shortlist of platforms matched to your budget and IT maturity, and a phased implementation roadmap with change management built in. We help you make the right AI investment decision — not just any AI decision.",
     summary:
       "Most AI projects fail because they start with a technology choice, not a business problem. Our AI Consulting engagement flips that — we start with your P&L, your bottlenecks, and your 3-year growth plan, then work backwards to identify the right AI use cases, the right platforms, and the right phasing to generate ROI without disrupting operations.",
     outputs: [
@@ -418,7 +418,7 @@ export default function AgenticAIPage() {
               <h1 className="mt-6 font-display text-[clamp(36px,7vw,80px)] font-light leading-[1.05] text-eccellere-cream">
                 Agentic AI for{" "}
                 <span className="italic text-eccellere-gold">
-                  Indian MSMEs
+                  India&apos;s growing organisations
                 </span>
               </h1>
               <p className="mt-6 text-lg font-light leading-relaxed text-white/60">
@@ -598,16 +598,16 @@ export default function AgenticAIPage() {
           </section>
         )}
 
-        {/* ── 5 MSME Offerings ── */}
+        {/* ── 5 Offerings ── */}
         <section className="bg-gold-pale py-20 lg:py-[120px]">
           <div className="mx-auto max-w-[1280px] px-6">
             <div className="mx-auto max-w-2xl text-center">
               <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-eccellere-gold">
-                MSME-Specific Offerings
+                Five Offerings
               </p>
               <h2 className="mt-4 font-display text-[clamp(28px,5vw,48px)] font-light leading-tight text-eccellere-ink">
                 Five offerings built{" "}
-                <span className="italic">only for MSMEs</span>
+                <span className="italic">for industry and function depth</span>
               </h2>
               <p className="mt-4 text-base leading-relaxed text-ink-mid">
                 Not enterprise tools stripped down. Purpose-built for India&apos;s
@@ -730,7 +730,7 @@ export default function AgenticAIPage() {
               </h2>
               <p className="mt-4 text-base leading-relaxed text-ink-mid">
                 Each skill is a pre-built, tested AI capability for a specific
-                MSME operational domain. Select a skill, describe your challenge,
+                industry or functional domain. Select a skill, describe your challenge,
                 and get structured India-contextualised reports, trackers, and
                 decision frameworks within minutes.
               </p>
@@ -878,7 +878,7 @@ export default function AgenticAIPage() {
                 <span className="italic">spend a rupee on AI</span>
               </h2>
               <p className="mt-4 text-base leading-relaxed text-ink-mid">
-                Most MSME AI projects fail because they start with a technology
+                Most AI projects fail because they start with a technology
                 choice, not a business problem. Our consulting engagement starts
                 with your P&amp;L and growth priorities — then works backwards to the
                 right AI strategy, the right platforms, and a phased roadmap with
@@ -1027,7 +1027,7 @@ export default function AgenticAIPage() {
             <p className="mx-auto mt-4 max-w-lg text-base text-eccellere-ink/70">
               Start with a free assessment. No commitment, no contracts. Just
               clarity on where AI can drive the most impact — across all five
-              of our MSME offerings.
+              of our five offerings.
             </p>
             <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
               <Button

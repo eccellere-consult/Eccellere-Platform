@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 export const metadata: Metadata = {
   title: "Careers | Eccellere",
   description:
-    "Join Eccellere — India's premier consulting platform for MSMEs. We're building a team of specialists, technologists, and operators who care about outcomes.",
+    "Join Eccellere+ — the platform for India's aspiring and growing organisations. We're building a team of specialists, technologists, and operators who care about outcomes.",
 };
 
 const openRoles = [
@@ -16,7 +16,7 @@ const openRoles = [
     team: "Consulting",
     type: "Full-time · Remote",
     description:
-      "Work directly with cross-sector MSME clients on growth strategy, market entry, and organisational improvement engagements.",
+      "Work directly with cross-sector clients, from MSMEs to large enterprises, on growth strategy, market entry, and organisational improvement engagements.",
   },
   {
     title: "AI Solutions Engineer",
@@ -61,7 +61,7 @@ export default function CareersPage() {
               Careers
             </p>
             <h1 className="mb-4 font-display text-4xl font-semibold md:text-5xl">
-              Build the Future of MSME Consulting
+              Build the Future of Consulting for Growing India
             </h1>
             <p className="max-w-2xl text-lg text-white/70">
               We&apos;re a small team doing ambitious work. If you want your

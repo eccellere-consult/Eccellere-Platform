@@ -51,7 +51,7 @@ export function Footer() {
       <div className="border-b border-white/10">
         <div className="mx-auto flex max-w-[1280px] flex-col items-center gap-4 px-6 py-10 sm:flex-row sm:justify-between">
           <p className="font-display text-lg italic text-white/90">
-            Get weekly insights for MSMEs
+            Get weekly insights for growing organisations
           </p>
           <form
             className="flex w-full max-w-md gap-2"

@@ -36,7 +36,7 @@ function generateResponse(input: string): string {
     return "Eccellere offers five core services:\n\n• **Strategy** — Growth plans, market entry, fundraising readiness\n• **Process Transformation** — Lean ops, SOPs, KPI frameworks\n• **Agentic AI** — AI strategy, agent design, implementation\n• **Digital** — D2C enablement, tech stack advisory\n• **Organisation Transformation** — Org design, OKRs, change management\n\nWhich area are you most interested in?";
   }
   if (q.includes("marketplace") || q.includes("framework") || q.includes("toolkit") || q.includes("playbook")) {
-    return "Our marketplace has 200+ business frameworks, toolkits, and playbooks — all designed for Indian MSMEs. Categories include Strategy, Agentic AI, Process Transformation, Digital, and Organisation. Bestsellers start from ₹799. Visit /marketplace to browse.";
+    return "Our marketplace has 200+ business frameworks, toolkits, and playbooks — all designed for India's aspiring and growing organisations. Categories include Strategy, Agentic AI, Process Transformation, Digital, and Organisation. Bestsellers start from ₹799. Visit /marketplace to browse.";
   }
   if (q.includes("manufacturing") || q.includes("factory") || q.includes("lean")) {
     return "We specialise in Manufacturing transformation. Our top resources for manufacturers include:\n\n• Lean Manufacturing Implementation Guide (₹3,499)\n• Supply Chain Optimisation Toolkit (₹4,499)\n• Quality Management System Template Pack (₹3,999)\n\nWould you like more details on any of these?";

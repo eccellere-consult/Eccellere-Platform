@@ -159,7 +159,7 @@ export default function PerspectivesPage() {
             </h1>
             <p className="mx-auto mt-4 max-w-lg text-base text-white/50">
               Strategy, AI, and transformation perspectives — written for
-              Indian MSMEs, founders, and operators.
+              Indian organisations, founders, and operators.
             </p>
 
             {/* Search */}
@@ -291,7 +291,7 @@ export default function PerspectivesPage() {
             </h2>
             <p className="mx-auto mt-3 max-w-md text-sm text-white/50">
               Strategy, AI, and transformation perspectives curated for Indian
-              MSMEs and founders. No spam. Unsubscribe anytime.
+              organisations and founders. No spam. Unsubscribe anytime.
             </p>
             <form
               className="mx-auto mt-8 flex max-w-md gap-2"
