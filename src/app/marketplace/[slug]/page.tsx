@@ -6,6 +6,9 @@ import { Footer } from "@/components/layout/Footer";
 import { assets as staticAssets, type Asset } from "@/lib/marketplace-data";
 import { prisma } from "@/lib/prisma";
 import { PurchaseCard } from "@/components/marketplace/PurchaseCard";
+import { prismaRepo } from "@/lib/tools/prismaRepo";
+import { getPublishedTool } from "@/lib/tools/service";
+import { toolkitModes } from "@/lib/marketplace/modes";
 
 // Cache each slug page for 5 minutes; revalidate in background.
 // Avoids a live DB round-trip on every request which caused 503 hangs.
@@ -99,6 +102,11 @@ async function getAsset(slug: string): Promise<Asset | null> {
   return staticAssets.find((a) => a.slug === slug) ?? null;
 }
 
+/** The name of the published online version of this toolkit (a tool with the same slug), or null. Never blocks the page. */
+async function onlineVersionName(slug: string): Promise<string | null> {
+  try { return (await withTimeout(getPublishedTool(prismaRepo, slug), 3000))?.name ?? null; } catch { return null; }
+}
+
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const asset = await getAsset(slug);
@@ -114,6 +122,7 @@ export default async function AssetDetailPage({ params }: { params: Promise<{ sl
   const { slug } = await params;
   const asset = await getAsset(slug);
   if (!asset) notFound();
+  const onlineName = await onlineVersionName(asset.slug);
 
   const related = staticAssets
     .filter((a) => a.slug !== asset!.slug && (a.category === asset!.category || a.sectors.some((s) => asset!.sectors.includes(s))))
@@ -192,6 +201,22 @@ export default async function AssetDetailPage({ params }: { params: Promise<{ sl
                 ))}
               </div>
 
+              {/* Two ways to use it */}
+              <section aria-label="Two ways to use this toolkit" className="mt-8 grid gap-4 sm:grid-cols-2">
+                {toolkitModes(asset.slug, onlineName).map((m) => (
+                  <div key={m.id} className="border border-eccellere-ink bg-eccellere-ink p-5 text-eccellere-cream">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gold-light">{m.id === "online" ? "Option A" : "Option B"}</p>
+                    <h2 className="mt-1 font-display text-xl text-eccellere-cream">{m.title}</h2>
+                    <p className="mt-2 text-sm text-white/70">{m.text}</p>
+                    {m.href ? (
+                      <a href={m.href} className="mt-4 inline-block bg-eccellere-gold px-4 py-2 text-sm font-medium text-eccellere-ink hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-light">{m.action}</a>
+                    ) : (
+                      <span className="mt-4 inline-block border border-eccellere-gold/60 px-4 py-2 text-sm text-gold-light" aria-disabled="true">{m.action}</span>
+                    )}
+                  </div>
+                ))}
+              </section>
+
               {/* Description */}
               <div className="mt-8 border-t border-eccellere-ink/5 pt-8">
                 <h2 className="font-display text-xl font-light text-eccellere-ink">About this resource</h2>
@@ -241,7 +266,7 @@ export default async function AssetDetailPage({ params }: { params: Promise<{ sl
             </div>
 
             {/* Right: purchase card */}
-            <div className="lg:sticky lg:top-24 h-fit">
+            <div id="get-it" className="lg:sticky lg:top-24 h-fit scroll-mt-24">
               <PurchaseCard asset={asset!} discount={discount} />
             </div>
           </div>
