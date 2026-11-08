@@ -12,6 +12,7 @@ import { loadEdits, sipocWithEdit } from "@/lib/agents/overrides";
 import { prismaEditRepo } from "@/lib/agents/editRepo";
 import { demoOf, tourSteps } from "@/lib/agents/demo";
 import DemoPanel from "./DemoPanel";
+import KitPanel from "./KitPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -166,6 +167,7 @@ export default async function AgentPage({ params }: Props) {
                   <li>Your work saves automatically while you type, so you can come back and change any figure; results update at once.</li>
                   <li>To refresh: {sipoc!.refresh}</li>
                 </ol>
+                <KitPanel tool={pilot.tool} slug={slug} live={live} />
                 {!live && <p className="mt-3 text-sm text-ink-mid">The pilot is being reviewed and opens to clients once it is approved.</p>}
               </section>
 
