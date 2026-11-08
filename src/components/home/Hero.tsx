@@ -31,7 +31,7 @@ export function Hero() {
           transition={{ duration: 0.6 }}
           className="mb-6 text-[11px] font-medium uppercase tracking-[0.2em] text-eccellere-gold"
         >
-          Growth Assets · Agentic AI · Consulting for India&apos;s MSMEs
+          Industry Assets · Functional Assets · Agentic AI · Expert Consulting
         </motion.p>
 
         <motion.h1
@@ -40,8 +40,8 @@ export function Hero() {
           transition={{ duration: 0.8, delay: 0.1 }}
           className="mx-auto max-w-4xl font-display text-[clamp(42px,8vw,90px)] font-light leading-[1.05] text-eccellere-cream"
         >
-          <span className="italic text-eccellere-gold">Growth Assets</span>
-          {" "}& Agentic AI — Built for India&apos;s MSMEs
+          <span className="italic text-eccellere-gold">Industry-deep</span>
+          {" "}and function-specific strategy and operations assets
         </motion.h1>
 
         <motion.p
@@ -50,8 +50,8 @@ export function Hero() {
           transition={{ duration: 0.6, delay: 0.3 }}
           className="mx-auto mt-6 max-w-2xl text-lg font-light leading-relaxed text-white/60"
         >
-          Start with proven diagnostic kits and playbooks. Power up with Agentic AI.
-          Then bring in expert consulting when you need to push harder — all on one platform.
+          Strategic planning and operations assets built for your industry and your function: frameworks, toolkits and tools you can use today.
+          Power up with Agentic AI, then bring in expert consulting when you need to push harder — all on one platform.
         </motion.p>
 
         <motion.div
@@ -61,7 +61,7 @@ export function Hero() {
           className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center"
         >
           <Button asChild size="lg">
-            <Link href="/marketplace">Browse Growth Assets</Link>
+            <Link href="/marketplace">Browse the Assets</Link>
           </Button>
           <Button asChild variant="ghostLight" size="lg">
             <Link href="/msme-hub">The MSME Growth Path</Link>

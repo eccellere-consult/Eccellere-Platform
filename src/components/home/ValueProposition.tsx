@@ -9,9 +9,9 @@ const steps = [
   {
     step: "01",
     icon: BookOpen,
-    title: "Start Smart — Self-Help Growth Assets",
+    title: "Start Smart — Industry and Function Assets",
     description:
-      "Pick up diagnostic kits, best-practice playbooks, and ready-to-use frameworks from the marketplace. Cost-effective, immediate, and built for India's MSME realities. No consultant required.",
+      "Pick up diagnostic kits, best-practice playbooks, and ready-to-use frameworks from the marketplace, organised by industry and by function. Immediate, practical, and deep enough for real planning and operations decisions. No consultant required.",
     cta: { label: "Browse the Marketplace", href: "/marketplace" },
     color: "text-eccellere-gold",
     borderColor: "border-eccellere-gold",
@@ -52,7 +52,7 @@ export function ValueProposition() {
     <section className="bg-eccellere-cream py-20 lg:py-[120px]">
       <div className="mx-auto max-w-[1280px] px-6">
         <p className="text-center text-[11px] font-medium uppercase tracking-[0.2em] text-eccellere-gold">
-          The Eccellere MSME Growth Path
+          The Eccellere+ Path
         </p>
         <h2 className="mt-4 text-center font-display text-[clamp(28px,5vw,52px)] font-light leading-tight text-eccellere-ink">
           Three steps to <span className="italic">transform your business</span>

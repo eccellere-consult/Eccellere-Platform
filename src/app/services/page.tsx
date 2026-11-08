@@ -8,7 +8,7 @@ const services = [
     number: "01",
     slug: "agentic-ai",
     name: "Agentic AI",
-    tagline: "AI strategy and implementation purpose-built for India's MSMEs",
+    tagline: "AI strategy and implementation built around your industry and function",
     description:
       "From AI readiness assessments to full agentic workflow implementation — we help you identify where AI fits, build the business case, and deploy working solutions that your teams actually use. No jargon. No bloated proposals. Just AI that delivers ROI.",
     capabilities: [
@@ -28,7 +28,7 @@ const services = [
     name: "Strategy",
     tagline: "Market entry, growth planning, and competitive positioning",
     description:
-      "200+ proven frameworks covering market sizing, growth strategy, competitive analysis, business model innovation, and strategic planning. We bring Big 4 methodologies adapted for the speed and budgets of Indian MSMEs and startups.",
+      "200+ proven frameworks covering market sizing, growth strategy, competitive analysis, business model innovation, and strategic planning. We bring Big 4 methodologies adapted for industry and function specific planning decisions.",
     capabilities: [
       "Market Entry & Expansion Strategy",
       "Competitive Positioning & Differentiation",
@@ -99,7 +99,7 @@ const services = [
 export const metadata: Metadata = {
   title: "Our Services",
   description:
-    "Strategy, Process Transformation, Agentic AI, Digital, and Organisation Transformation — five disciplines for India's MSMEs and startups.",
+    "Strategy, Process Transformation, Agentic AI, Digital, and Organisation Transformation — five disciplines for deeper, industry and function specific planning and operations.",
 };
 
 export default function ServicesPage() {
@@ -118,8 +118,8 @@ export default function ServicesPage() {
               <span className="italic">one transformation platform</span>
             </h1>
             <p className="mt-6 max-w-2xl text-lg font-light text-white/50">
-              Every capability designed for the scale, speed, and budgets of
-              India&apos;s MSMEs and growth-stage businesses.
+              Every capability goes deeper than generic advice: it is built for your
+              industry, your function, and the decisions your operations face.
             </p>
           </div>
         </section>
