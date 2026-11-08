@@ -16,6 +16,7 @@ export const ADMIN_GROUPS: AdminGroup[] = [
       { label: "Review and publish", href: "/admin/tools" },
     ],
   },
+  { id: "agents", label: "Agent Marketplace", items: [{ label: "Agent control", href: "/admin/agents" }] },
   { id: "people", label: "People", items: [{ label: "Clients", href: "/admin/clients" }, { label: "Specialists", href: "/admin/specialists" }, { label: "Users", href: "/admin/users" }] },
   { id: "commerce", label: "Commerce", items: [{ label: "Assets", href: "/admin/assets" }, { label: "Orders", href: "/admin/orders" }, { label: "Finance", href: "/admin/finance" }, { label: "Coupons", href: "/admin/coupons" }] },
   { id: "engage", label: "Content and enquiries", items: [{ label: "Content", href: "/admin/content" }, { label: "Chatbot", href: "/admin/chatbot" }, { label: "Contact enquiries", href: "/admin/contact-enquiries" }, { label: "AI advisor", href: "/admin/advisor" }] },

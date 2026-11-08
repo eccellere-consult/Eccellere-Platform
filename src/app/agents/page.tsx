@@ -3,6 +3,8 @@ import Link from "next/link";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { AREAS, allAgents, pilotCount } from "@/lib/agents/catalogue";
+import { loadEdits } from "@/lib/agents/overrides";
+import { prismaEditRepo } from "@/lib/agents/editRepo";
 import NotifyForm from "./NotifyForm";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +15,8 @@ export const metadata: Metadata = {
     "Eccellere+ Agent Marketplace: ready-to-deploy agents and tools mapped to every functional area of a business, from strategic planning to HR.",
 };
 
-export default function AgentMarketplacePage() {
+export default async function AgentMarketplacePage() {
+  const edits = await loadEdits(prismaEditRepo);
   const total = allAgents().length;
   const pilots = pilotCount();
   return (
@@ -60,7 +63,7 @@ export default function AgentMarketplacePage() {
                             {agent.status === "pilot" ? "Pilot" : "Coming soon"}
                           </span>
                         </div>
-                        <p className="mt-2 flex-1 text-sm leading-relaxed text-ink-mid">{agent.does}</p>
+                        <p className="mt-2 flex-1 text-sm leading-relaxed text-ink-mid">{edits[agent.slug]?.does || agent.does}</p>
                         <Link href={`/agents/${agent.slug}`} className="mt-4 text-sm font-medium text-gold-deep underline underline-offset-2">
                           {agent.status === "pilot" ? "Inputs, SIPOC and outputs →" : "What it will do →"}
                         </Link>
