@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 export const metadata: Metadata = {
   title: "Pricing",
   description:
-    "Transparent, modular pricing for India's MSMEs. Start free — access frameworks, AI advisory, and specialist expertise at every budget.",
+    "Eccellere+ plans for small, medium and large enterprises: industry and function specific strategic planning and operations assets, AI advisory and specialist expertise.",
 };
 
 const plans = [
@@ -52,6 +52,7 @@ const plans = [
     features: [
       { label: "AI Readiness Assessment (full + sector benchmarks)", included: true },
       { label: "Unlimited marketplace downloads (member pricing)", included: true },
+      { label: "Ready-to-use assets for your industry and your key functions", included: true },
       { label: "Perspectives articles (unlimited)", included: true },
       { label: "AI Advisor chatbot (unlimited sessions)", included: true },
       { label: "Community forum access", included: true },
@@ -75,6 +76,7 @@ const plans = [
     featured: false,
     features: [
       { label: "Everything in Small plan", included: true },
+      { label: "Industry and function assets across every business line you run", included: true },
       { label: "Unlimited team seats", included: true },
       { label: "GSTIN-level billing and PO support", included: true },
       { label: "Custom onboarding and training", included: true },
@@ -86,31 +88,60 @@ const plans = [
       { label: "Quarterly business review with Eccellere leadership", included: true },
     ],
   },
+  {
+    id: "enterprise",
+    name: "Enterprise",
+    tagline: "For large enterprises and groups with several business units",
+    monthlyPrice: null,
+    annualPrice: null,
+    priceLabel: "Custom",
+    priceSub: "scoped with you; PO-based billing",
+    cta: "Talk to us",
+    ctaHref: "/contact?plan=enterprise",
+    featured: false,
+    features: [
+      { label: "Everything in Medium plan", included: true },
+      { label: "Every industry and function, rolled out across all business units", included: true },
+      { label: "Custom industry and function assets built to your operating model", included: true },
+      { label: "Dedicated specialist team", included: true },
+      { label: "Enterprise security and access review (single sign-on, roles)", included: true },
+      { label: "Programme governance and executive reporting", included: true },
+      { label: "Agentic AI use cases scoped for your processes", included: true },
+      { label: "Scope, price and terms agreed with you in writing", included: true },
+    ],
+  },
 ];
 
 const featureCategories = [
   {
+    name: "Industry and function depth",
+    rows: [
+      { label: "Industry and function assets", micro: "Starter selection", small: "Your industry and key functions", medium: "Every business line you run", enterprise: "All, plus custom-built" },
+      { label: "Custom framework development", micro: "—", small: "—", medium: "Included", enterprise: "Included, scoped with you" },
+    ],
+  },
+  {
     name: "Marketplace",
     rows: [
-      { label: "Annual asset downloads", starter: "5 assets", growth: "Unlimited (member price)", enterprise: "Unlimited" },
-      { label: "Member pricing discount", starter: "—", growth: "Up to 40% off", enterprise: "Up to 50% off" },
-      { label: "Early access to new assets", starter: "—", growth: "7-day early access", enterprise: "First access" },
+      { label: "Annual asset downloads", micro: "5 assets", small: "Unlimited (member price)", medium: "Unlimited", enterprise: "Unlimited" },
+      { label: "Member pricing discount", micro: "—", small: "Up to 40% off", medium: "Up to 50% off", enterprise: "Agreed with you" },
+      { label: "Early access to new assets", micro: "—", small: "7-day early access", medium: "First access", enterprise: "First access" },
     ],
   },
   {
     name: "AI Tools",
     rows: [
-      { label: "AI Readiness Assessment", starter: "Basic (3 dimensions)", growth: "Full (6 dimensions + benchmarks)", enterprise: "Full + custom dimensions" },
-      { label: "AI Advisor chatbot sessions", starter: "5/month", growth: "Unlimited", enterprise: "Unlimited + custom context" },
-      { label: "AI Roadmap report", starter: "—", growth: "1 per year", enterprise: "Quarterly" },
+      { label: "AI Readiness Assessment", micro: "Basic (3 dimensions)", small: "Full (6 dimensions + benchmarks)", medium: "Full + custom dimensions", enterprise: "Full + custom dimensions" },
+      { label: "AI Advisor chatbot sessions", micro: "5/month", small: "Unlimited", medium: "Unlimited + custom context", enterprise: "Unlimited + custom context" },
+      { label: "AI Roadmap report", micro: "—", small: "1 per year", medium: "Quarterly", enterprise: "Quarterly, per business unit" },
     ],
   },
   {
     name: "Specialists & Support",
     rows: [
-      { label: "Specialist consultations", starter: "1 session (1 hr)", growth: "2 sessions (4 hrs each)", enterprise: "Dedicated team" },
-      { label: "Customer success", starter: "Email support", growth: "Priority support", enterprise: "Named CSM" },
-      { label: "Team seats", starter: "1", growth: "5", enterprise: "Unlimited" },
+      { label: "Specialist consultations", micro: "1 session (1 hr)", small: "2 sessions (4 hrs each)", medium: "Dedicated team", enterprise: "Dedicated team" },
+      { label: "Customer success", micro: "Email support", small: "Priority support", medium: "Named CSM", enterprise: "Named CSM + programme lead" },
+      { label: "Team seats", micro: "1", small: "5", medium: "Unlimited", enterprise: "Unlimited" },
     ],
   },
 ];
@@ -118,23 +149,27 @@ const featureCategories = [
 const faqs = [
   {
     q: "Can I cancel anytime?",
-    a: "Yes. MSME Pro subscriptions can be cancelled at any time. You keep access until the end of your billing period. No auto-renewal without reminder.",
+    a: "Yes. Eccellere+ subscriptions can be cancelled at any time. You keep access until the end of your billing period. No auto-renewal without reminder.",
   },
   {
-    q: "Do you offer a free trial for MSME Pro?",
+    q: "Do you offer a free trial?",
     a: "Yes — paid plans include a 14-day free trial. No credit card required to start. You'll be notified 3 days before the trial ends.",
   },
   {
     q: "Can I get a GST invoice?",
-    a: "Yes. All plans include GST-compliant invoices with Eccellere's GSTIN. Enterprise plans support PO-based billing.",
+    a: "Yes. All plans include GST-compliant invoices with Eccellere's GSTIN. Medium and Enterprise plans support PO-based billing.",
   },
   {
     q: "What happens to my purchased assets if I cancel?",
     a: "Individual marketplace asset purchases are permanent — you keep lifetime access to anything you've bought, regardless of subscription status.",
   },
   {
-    q: "Does MSME Pro cover consulting engagements?",
+    q: "Do the plans cover consulting engagements?",
     a: "Subscriptions cover platform access, digital tools, and marketplace discounts. Consulting engagements (Strategy, Process Transformation, etc.) are separately scoped and priced.",
+  },
+  {
+    q: "How do I choose between Small, Medium and Enterprise?",
+    a: "Small suits one business with a clear industry and a few key functions. Medium suits a company running several business lines that needs every function covered. Enterprise suits groups with several business units that want assets built to their own operating model; it is scoped and priced with you.",
   },
   {
     q: "Is there a discount for NGOs or educational institutions?",
@@ -158,8 +193,8 @@ export default function PricingPage() {
               <span className="italic">no surprises</span>
             </h1>
             <p className="mt-6 mx-auto max-w-xl text-lg font-light text-white/50">
-              Start free. Upgrade when you need more. Cancel anytime. All plans
-              include a 14-day free trial.
+              Choose the plan that matches your size and how deep you need to go in your
+              industry and functions. Cancel anytime. Paid plans include a 14-day free trial.
             </p>
           </div>
         </section>
@@ -167,7 +202,7 @@ export default function PricingPage() {
         {/* ── Plan Cards ───────────────────────────────────────────────── */}
         <section className="bg-eccellere-cream py-20">
           <div className="mx-auto max-w-[1280px] px-6">
-            <div className="grid gap-6 md:grid-cols-3">
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
               {plans.map((plan) => (
                 <div
                   key={plan.id}
@@ -304,7 +339,7 @@ export default function PricingPage() {
                     <>
                       <tr key={`cat-${cat.name}`}>
                         <td
-                          colSpan={4}
+                          colSpan={5}
                           className="pt-6 pb-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-eccellere-gold"
                         >
                           {cat.name}
@@ -318,15 +353,10 @@ export default function PricingPage() {
                           <td className="py-3 font-light text-eccellere-ink/70">
                             {row.label}
                           </td>
-                          <td className="py-3 text-center text-eccellere-ink/60">
-                            {row.starter}
-                          </td>
-                          <td className="py-3 text-center font-medium text-eccellere-ink">
-                            {row.growth}
-                          </td>
-                          <td className="py-3 text-center text-eccellere-ink/60">
-                            {row.enterprise}
-                          </td>
+                          <td className="py-3 text-center text-eccellere-ink/60">{row.micro}</td>
+                          <td className="py-3 text-center font-medium text-eccellere-ink">{row.small}</td>
+                          <td className="py-3 text-center text-eccellere-ink/60">{row.medium}</td>
+                          <td className="py-3 text-center text-eccellere-ink/60">{row.enterprise}</td>
                         </tr>
                       ))}
                     </>

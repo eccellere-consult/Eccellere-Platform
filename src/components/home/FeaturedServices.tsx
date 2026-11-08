@@ -8,7 +8,7 @@ const services = [
     number: "01",
     name: "Agentic AI",
     description:
-      "AI strategy, implementation, and workforce enablement — purpose-built for MSMEs ready to leapfrog.",
+      "AI strategy, implementation, and workforce enablement — built around your industry's and your function's real operating decisions.",
     sectors: ["Manufacturing", "Retail", "Logistics"],
     featured: true,
     href: "/agentic-ai",
