@@ -16,6 +16,7 @@ const footerCompany = [
   { label: "About", href: "/about" },
   { label: "For MSMEs", href: "/msme-hub" },
   { label: "Marketplace", href: "/marketplace" },
+  { label: "Agent Marketplace", href: "/agents" },
   { label: "Perspectives", href: "/perspectives" },
   { label: "Case Studies", href: "/case-studies" },
   { label: "Careers", href: "/careers" },

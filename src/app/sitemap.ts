@@ -62,6 +62,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     },
   ];
 
+  const agentRoute: MetadataRoute.Sitemap = [{ url: `${BASE_URL}/agents`, lastModified: new Date(), changeFrequency: "weekly", priority: 0.7 }];
   const marketplaceRoutes: MetadataRoute.Sitemap = marketplaceAssets.map((asset) => ({
     url: `${BASE_URL}/marketplace/${asset.slug}`,
     lastModified: new Date(),
@@ -76,5 +77,5 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.7,
   }));
 
-  return [...staticRoutes, ...marketplaceRoutes, ...perspectivesRoutes];
+  return [...staticRoutes, ...agentRoute, ...marketplaceRoutes, ...perspectivesRoutes];
 }

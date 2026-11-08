@@ -32,6 +32,7 @@ const navLinks: { label: string; href: string; wideOnly?: boolean; children?: { 
     href: "#",
     children: [
       { ...ADVISOR_LINK, label: "Strategy & Plan Advisor (eccellere.in) ↗" },
+      { label: "Agent Marketplace", href: "/agents" },
       { label: "MSME Hub", href: "/msme-hub" },
       { label: "About", href: "/about" },
       { label: "Perspectives", href: "/perspectives" },
