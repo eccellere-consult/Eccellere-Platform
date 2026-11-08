@@ -29,6 +29,8 @@ export interface FunctionArea {
 }
 
 const soon = (slug: string, name: string, does: string): Agent => ({ slug, name, does, status: 'soon' });
+/** A pilot: a working tool exists, under the same slug in the Tools marketplace. */
+const pilot = (slug: string, name: string, does: string): Agent => ({ slug, name, does, status: 'pilot', tool: slug });
 
 export const AREAS: FunctionArea[] = [
   {
@@ -36,8 +38,8 @@ export const AREAS: FunctionArea[] = [
     purpose: 'Corporate strategy, planning cadence, and capital allocation.',
     agents: [
       soon('strategy-plan-cascade', 'Strategy Cascade Agent', 'Turns board-level strategy into OKRs and quarterly plans.'),
-      soon('scenario-planner', 'Scenario Planner Agent', 'Builds best, base and worst case scenarios from your financial and market inputs.'),
-      soon('capital-allocation-advisor', 'Capital Allocation Advisor', 'Recommends where to deploy capital across competing initiatives.'),
+      pilot('scenario-planner', 'Scenario Planner Agent', 'Builds best, base and worst case scenarios from your financial and market inputs.'),
+      pilot('capital-allocation-advisor', 'Capital Allocation Advisor', 'Recommends where to deploy capital across competing initiatives.'),
     ],
   },
   {
@@ -54,7 +56,7 @@ export const AREAS: FunctionArea[] = [
     purpose: 'Lead generation through collections: the full revenue cycle.',
     agents: [
       soon('lead-to-quote-assistant', 'Lead-to-Quote Assistant', 'Qualifies inbound leads and drafts quotes from your price book.'),
-      soon('pricing-optimizer', 'Pricing Optimizer Agent', 'Recommends price points using margin, demand, and competitor signals.'),
+      pilot('pricing-optimizer', 'Pricing Optimizer Agent', 'Recommends price points using margin, demand, and competitor signals.'),
       soon('collections-follow-up-agent', 'Collections Follow-up Agent', 'Drafts and sequences overdue-invoice follow-ups by risk tier.'),
     ],
   },
@@ -62,7 +64,7 @@ export const AREAS: FunctionArea[] = [
     id: 'scm', code: 'SCM', name: 'Forecast to Deliver', flow: 'Forecast → Deliver',
     purpose: 'Demand planning, production, and fulfilment.',
     agents: [
-      soon('demand-forecaster', 'Demand Forecaster Agent', 'Projects short-term demand from sales history and seasonality.'),
+      pilot('demand-forecaster', 'Demand Forecaster Agent', 'Projects short-term demand from sales history and seasonality.'),
       soon('production-scheduler', 'Production Scheduler Agent', 'Sequences production runs against capacity and order priority.'),
       soon('otif-tracker', 'OTIF Tracker Agent', 'Monitors on-time-in-full delivery performance and flags at-risk orders.'),
     ],

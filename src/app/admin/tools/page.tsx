@@ -40,6 +40,8 @@ export default function AdminToolsPage() {
   const [extracting, setExtracting] = useState<"list" | "source" | null>(null);
   const [hubMsg, setHubMsg] = useState<string | null>(null);
   const [hubBusy, setHubBusy] = useState(false);
+  const [pilotMsg, setPilotMsg] = useState<string | null>(null);
+  const [pilotBusy, setPilotBusy] = useState(false);
   const [text, setText] = useState("");
   const [oneName, setOneName] = useState("");
   const [oneGroup, setOneGroup] = useState("");
@@ -162,6 +164,15 @@ export default function AdminToolsPage() {
     await fetch(`/api/admin/tools/jobs/${run.job.id}`, { method: "DELETE" });
     try { localStorage.removeItem(RUN_KEY); } catch { /* ignore */ }
     setRun(null); setRunNote(null);
+  }
+
+  async function installPilotTools() {
+    setPilotBusy(true); setPilotMsg(null);
+    const r = await fetch("/api/admin/agents/pilots", { method: "POST" });
+    const d = await readJson(r);
+    setPilotBusy(false);
+    if (!r.ok) return setPilotMsg(d.error ?? "Could not add them.");
+    setPilotMsg(`${d.added.length} added, ${d.skipped.length} were already there.${d.refused.length ? ` Held back by the quality check: ${d.refused.map((x: { slug: string }) => x.slug).join(", ")}.` : ""}`);
   }
 
   async function seedHub() {
@@ -365,6 +376,21 @@ export default function AdminToolsPage() {
             {hubBusy ? <Loader2 className="inline h-4 w-4 animate-spin" /> : `Add the Strategy Hub tools to the library (${rows.filter((r) => r.source === "strategy-hub").length} of 36 added)`}
           </button>
           {hubMsg && <span className="text-sm text-ink-mid">{hubMsg}</span>}
+        </div>
+      </section>
+
+      {/* Pilot agents */}
+      <section className="mt-6 rounded bg-white p-5 shadow-sm">
+        <h2 className="font-medium text-eccellere-ink">Pilot agents</h2>
+        <p className="mt-1 text-sm text-ink-mid">
+          The four pilot agents of the Agent Marketplace (Scenario Planner, Pricing Optimizer, Demand Forecaster, Capital Allocation Advisor), built on fixed formulas.
+          Adding them puts each in the tools list as &quot;needs review&quot;. Nothing is shown to clients until you review and publish each one.
+        </p>
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <button className="bg-eccellere-ink px-4 py-2 text-xs text-white hover:opacity-90 disabled:opacity-40" disabled={pilotBusy} onClick={installPilotTools}>
+            {pilotBusy ? <Loader2 className="inline h-4 w-4 animate-spin" /> : "Add the pilot agents to the tools list"}
+          </button>
+          {pilotMsg && <span className="text-sm text-ink-mid">{pilotMsg}</span>}
         </div>
       </section>
 
