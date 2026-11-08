@@ -213,7 +213,7 @@ export default function RegisterPage() {
                   I&apos;m a Business Owner
                 </h3>
                 <p className="mt-2 text-sm text-ink-light">
-                  Get expert consulting, access frameworks, and scale your MSME with Eccellere&apos;s specialist network.
+                  Get expert consulting, access frameworks, and scale your organisation with Eccellere+&apos;s specialist network.
                 </p>
                 <span className="mt-4 inline-block text-sm font-medium text-eccellere-gold group-hover:underline">
                   Register as Client →

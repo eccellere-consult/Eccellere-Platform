@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 const articles = [
   {
     category: "Agentic AI",
-    title: "Why Indian MSMEs Should Adopt Agentic AI Before Their Competitors Do",
+    title: "Why Indian Organisations Should Adopt Agentic AI Before Their Competitors Do",
     teaser:
       "The window of advantage is narrow. Here's how early movers are gaining 30% efficiency improvements.",
     author: "Eccellere Research",
@@ -17,7 +17,7 @@ const articles = [
   },
   {
     category: "Strategy",
-    title: "5 Growth Frameworks Every MSME Founder Should Know",
+    title: "5 Growth Frameworks Every Founder Should Know",
     teaser: "From Ansoff to Blue Ocean — applied to the Indian context.",
     author: "Eccellere Editorial",
     date: "Dec 2024",

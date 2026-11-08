@@ -7,7 +7,7 @@ import Link from "next/link";
 export const metadata: Metadata = {
   title: "About Eccellere",
   description:
-    "India's premier consulting platform built to serve MSMEs and startups with strategy, AI, and 200+ business frameworks.",
+    "Eccellere+ serves India's aspiring and growing organisations with industry and function specific strategy and operations assets, AI, and 200+ business frameworks.",
 };
 
 const values = [
@@ -53,9 +53,9 @@ export default function AboutPage() {
               <span className="italic">for India&apos;s growth businesses</span>
             </h1>
             <p className="mt-6 max-w-2xl text-lg font-light text-white/50">
-              Eccellere is India&apos;s premier consulting platform, purpose-built
-              to bring world-class strategy, AI, and business transformation
-              capabilities to MSMEs and startups.
+              Eccellere+ is built for India&apos;s aspiring and growing organisations:
+              world-class strategy, AI, and business transformation
+              capabilities, deep in your industry and your function.
             </p>
           </div>
         </section>
@@ -71,7 +71,8 @@ export default function AboutPage() {
                 <p>
                   India has 63 million MSMEs. They contribute 30% of GDP and
                   employ 110 million people. Yet fewer than 2% have ever engaged
-                  a management consultant.
+                  a management consultant, and the same gap is felt by many
+                  growing mid-size organisations.
                 </p>
                 <p>
                   The reason? Traditional consulting is priced for enterprises,

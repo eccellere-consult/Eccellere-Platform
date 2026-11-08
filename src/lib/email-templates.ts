@@ -60,10 +60,10 @@ export function renderWelcomeEmail({ recipientName, assessmentUrl }: WelcomeEmai
   <div style="${header}"><span style="${logo}">ECCELLERĒ<span style="color:#B8913A;">+</span></span></div>
   <div style="${body}">
     <h1 style="${h1}">Welcome to Eccellere, ${sanitize(recipientName)}</h1>
-    <p style="${paragraph}">You've joined India's premier consulting and AI platform for MSMEs and startups. Here's how to get the most out of Eccellere:</p>
+    <p style="${paragraph}">You've joined Eccellere+, the platform for India's aspiring and growing organisations. Here's how to get the most out of it:</p>
     <p style="${paragraph}"><strong>1. Take your AI Readiness Assessment</strong> — 5 questions, 2 minutes, personalised score with sector benchmarks.</p>
     <p style="${paragraph}"><strong>2. Browse the Marketplace</strong> — 200+ strategy frameworks, AI toolkits, and business playbooks designed for Indian businesses.</p>
-    <p style="${paragraph}"><strong>3. Explore Perspectives</strong> — In-depth articles on strategy, AI, and transformation for MSMEs.</p>
+    <p style="${paragraph}"><strong>3. Explore Perspectives</strong> — In-depth articles on strategy, AI, and transformation for growing organisations.</p>
     <div style="text-align:center;margin:32px 0;">
       <a href="${sanitize(assessmentUrl)}" style="${cta}">Start Your Assessment →</a>
     </div>

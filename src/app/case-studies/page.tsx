@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 export const metadata: Metadata = {
   title: "Case Studies | Eccellere",
   description:
-    "Real-world results: how Eccellere helped MSMEs and startups transform with strategy, AI, and structured frameworks.",
+    "Real-world results: how Eccellere helped aspiring and growing organisations transform with strategy, AI, and structured frameworks.",
 };
 
 const placeholderCases = [
@@ -49,7 +49,7 @@ export default function CaseStudiesPage() {
               Results That Speak
             </h1>
             <p className="max-w-2xl text-lg text-white/70">
-              Real impact delivered to MSMEs and growth-stage companies across
+              Real impact delivered to aspiring and growing organisations across
               Manufacturing, Retail, Consumer Products, and Logistics.
             </p>
           </div>

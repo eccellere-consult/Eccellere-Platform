@@ -266,7 +266,7 @@ export default async function ArticleDetailPage({ params }: { params: Promise<{ 
 
               {/* Newsletter */}
               <div className="rounded-lg bg-white p-5 shadow-sm">
-                <p className="text-sm font-medium text-eccellere-ink">Weekly MSME insights</p>
+                <p className="text-sm font-medium text-eccellere-ink">Weekly insights</p>
                 <p className="mt-1 text-xs text-ink-light">
                   Strategy, AI, and transformation perspectives — every Monday.
                 </p>

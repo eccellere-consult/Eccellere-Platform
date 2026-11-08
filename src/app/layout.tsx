@@ -82,6 +82,7 @@ export const metadata: Metadata = {
     "Eccellere+ is the advanced solution for deeper industry and function specific strategic planning and operations assets: frameworks, toolkits and tools for Manufacturing, Retail, Consumer Products, Logistics and more.",
   keywords: [
     "MSME consulting",
+    "consulting for growing organisations",
     "Agentic AI",
     "strategy consulting India",
     "manufacturing consulting",
