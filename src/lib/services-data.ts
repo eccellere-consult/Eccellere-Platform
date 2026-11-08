@@ -45,7 +45,7 @@ export const servicesData: ServiceData[] = [
     heroDescription:
       "From AI readiness assessments to full agentic workflow implementation — we help you identify exactly where AI fits in your business, build the ROI case, and deploy working AI solutions your teams actually use. No vendors pushing products. No bloated proposals. Just AI that delivers measurable outcomes.",
     heroCtaLabel: "Book a Free AI Diagnostic",
-    startingPrice: "₹75,000",
+    startingPrice: "",
     featured: true,
     sectors: ["Manufacturing", "Retail", "Consumer Products", "Logistics"],
     painPoints: [
@@ -149,7 +149,7 @@ export const servicesData: ServiceData[] = [
     heroDescription:
       "Rigorous strategy work doesn't have to take 6 months or cost ₹50 Lacs. We bring Big 4 methodology adapted for the speed, scale, and operating context of India's MSMEs and growth-stage startups. From market entry analysis to 3-year growth plans — built to execute, not to sit on a shelf.",
     heroCtaLabel: "Book a Strategy Discovery Call",
-    startingPrice: "₹1,50,000",
+    startingPrice: "",
     sectors: ["All Sectors"],
     painPoints: [
       {
@@ -237,7 +237,7 @@ export const servicesData: ServiceData[] = [
     heroDescription:
       "Lean manufacturing, supply chain optimisation, quality management systems, and operational excellence — we redesign your processes from the ground up. We implement global methodologies adapted for Indian operating conditions: mixed product lines, seasonal workforces, constrained capital, and the reality of imperfect data.",
     heroCtaLabel: "Get a Free Process Diagnostic",
-    startingPrice: "₹1,20,000",
+    startingPrice: "",
     sectors: ["Manufacturing", "Retail", "Logistics"],
     painPoints: [
       {
@@ -325,7 +325,7 @@ export const servicesData: ServiceData[] = [
     heroDescription:
       "From ERP selection to e-commerce launch, from data analytics architecture to CRM design — we help you build and execute a digital roadmap that delivers measurable business outcomes. We're technology agnostic and vendor neutral: we recommend what's right for your business, not what earns us a commission.",
     heroCtaLabel: "Get a Digital Maturity Assessment",
-    startingPrice: "₹90,000",
+    startingPrice: "",
     sectors: ["Retail", "Consumer Products", "Manufacturing", "Logistics"],
     painPoints: [
       {
@@ -413,7 +413,7 @@ export const servicesData: ServiceData[] = [
     heroDescription:
       "Scale demands new structures, new skills, and new ways of working. We help you build the organisation that your strategy requires — from org design and talent frameworks to leadership development and culture transformation. We work at the intersection of strategy and people, because execution depends on both.",
     heroCtaLabel: "Book an Organisation Health Check",
-    startingPrice: "₹1,25,000",
+    startingPrice: "",
     sectors: ["All Sectors"],
     painPoints: [
       {

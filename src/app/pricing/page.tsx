@@ -19,8 +19,8 @@ const plans = [
     tagline: "For micro enterprises (turnover up to ₹5 Cr)",
     monthlyPrice: null,
     annualPrice: 19999,
-    priceLabel: "₹19,999",
-    priceSub: "per year, GST inclusive",
+    priceLabel: "TBD",
+    priceSub: "pricing to be announced",
     cta: "Get started",
     ctaHref: "/register?plan=micro",
     featured: false,
@@ -43,8 +43,8 @@ const plans = [
     tagline: "For small enterprises (turnover ₹5–75 Cr)",
     monthlyPrice: null,
     annualPrice: 149999,
-    priceLabel: "₹1,49,999",
-    priceSub: "per year, GST inclusive",
+    priceLabel: "TBD",
+    priceSub: "pricing to be announced",
     cta: "Start growing",
     ctaHref: "/register?plan=small",
     featured: true,
@@ -69,8 +69,8 @@ const plans = [
     tagline: "For medium enterprises (turnover ₹75 Cr–500 Cr)",
     monthlyPrice: null,
     annualPrice: 999999,
-    priceLabel: "₹9,99,999",
-    priceSub: "per year, GST inclusive",
+    priceLabel: "TBD",
+    priceSub: "pricing to be announced",
     cta: "Talk to us",
     ctaHref: "/contact?plan=medium",
     featured: false,
@@ -378,8 +378,7 @@ export default function PricingPage() {
             </h2>
             <p className="mb-8 text-base font-light text-eccellere-ink/60 max-w-xl mx-auto">
               Our Strategy, Agentic AI, Process Transformation, Digital, and Organisation
-              Transformation practices are independently scoped. Starting from ₹75,000 for a
-              focused sprint.
+              Transformation practices are independently scoped. Scoped to your needs.
             </p>
             <div className="flex flex-wrap gap-4 justify-center">
               <Button

@@ -39,7 +39,7 @@ export function MobileNav({ links, scrolled }: MobileNavProps) {
   }, [open]);
 
   return (
-    <div className="lg:hidden">
+    <div className="xl:hidden">
       <button
         onClick={() => setOpen(!open)}
         className={cn(
@@ -53,7 +53,7 @@ export function MobileNav({ links, scrolled }: MobileNavProps) {
 
       {mounted && open && createPortal(
         <div
-          className="lg:hidden"
+          className="xl:hidden"
           style={{
             position: "fixed",
             top: 72,
