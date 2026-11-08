@@ -11,34 +11,29 @@ import { NotificationBell } from "@/components/NotificationBell";
 /** The original site: strategy and planning advisor. Shown on its own on wide screens and inside "More" on narrower ones. */
 export const ADVISOR_LINK = { label: "Strategy & Plan Advisor ↗", href: "https://eccellere.in" };
 
-const navLinks: { label: string; href: string; wideOnly?: boolean; children?: { label: string; href: string }[] }[] = [
+const navLinks: { label: string; short?: string; href: string; wideOnly?: boolean; children?: { label: string; href: string }[] }[] = [
   { label: "Home", href: "/" },
-  { ...ADVISOR_LINK, wideOnly: true },
-  { label: "Marketplace", href: "/marketplace" },
-  { label: "Tools", href: "/tools" },
-  { label: "Agentic AI", href: "/agentic-ai" },
-  {
-    label: "Consulting",
-    href: "/services",
-    children: [
-      { label: "Strategy", href: "/services/strategy" },
-      { label: "Process Transformation", href: "/services/process-transformation" },
-      { label: "Digital", href: "/services/digital" },
-      { label: "Organisation Transformation", href: "/services/organisation-transformation" },
-    ],
-  },
+  // the three marketplaces: the focus of the menu
+  { label: "Problem-solving tools", short: "Problem solving", href: "/tools?category=Problem%20solving" },
+  { label: "Strategic frameworks", short: "Frameworks", href: "/tools?category=Strategy" },
+  { label: "Agentic AI agents", short: "AI agents", href: "/agents" },
   {
     label: "More",
     href: "#",
     children: [
-      { ...ADVISOR_LINK, label: "Strategy & Plan Advisor (eccellere.in) ↗" },
-      { label: "Agent Marketplace", href: "/agents" },
+      { label: "Consulting", href: "/services" },
+      { label: "Templates & toolkits", href: "/marketplace" },
+      { label: "All tools", href: "/tools" },
+      { label: "Agentic AI overview", href: "/agentic-ai" },
       { label: "MSME Hub", href: "/msme-hub" },
       { label: "About", href: "/about" },
       { label: "Perspectives", href: "/perspectives" },
       { label: "Pricing", href: "/pricing" },
+      { ...ADVISOR_LINK, label: "Strategy & Plan Advisor (eccellere.in) ↗" },
     ],
   },
+  // the original site, at the right end of the menu
+  { ...ADVISOR_LINK, wideOnly: true },
 ];
 
 export function Header() {
@@ -91,7 +86,14 @@ export function Header() {
                     : "text-white/90 hover:text-eccellere-gold"
                 )}
               >
-                {link.label}
+                {link.short ? (
+                  <>
+                    <span className="xl:hidden">{link.short}</span>
+                    <span className="hidden xl:inline">{link.label}</span>
+                  </>
+                ) : (
+                  link.label
+                )}
                 {link.children && (
                   <span className="ml-1 inline-block text-[10px]">▾</span>
                 )}
@@ -144,7 +146,7 @@ export function Header() {
             variant="ghost"
             size="sm"
             className={cn(
-              "hidden lg:inline-flex",
+              "hidden xl:inline-flex",
               scrolled ? "text-ink-mid" : "text-white/90"
             )}
           >

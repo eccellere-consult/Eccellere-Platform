@@ -12,6 +12,18 @@ const tools: ToolCard[] = [
   { slug: 'okr', name: 'OKR', category: 'Strategy', groupName: null, does: 'Links objectives to measurable key results.', level: null, type: 'aid', areas: ['Strategy', 'People'], sectors: [] },
 ];
 
+describe('menu deep links', () => {
+  it('opens on the section the menu link names (Problem solving, Strategy), and on all tools by default', () => {
+    render(<ToolsBrowser tools={tools} categories={[...MARKET_CATEGORIES]} initialCategory="Problem solving" />);
+    expect(screen.getAllByRole('link')).toHaveLength(1);
+    expect(screen.getByRole('link', { name: /5 Why Analysis/ })).toBeTruthy();
+    cleanup();
+    render(<ToolsBrowser tools={tools} categories={[...MARKET_CATEGORIES]} initialCategory="Strategy" />);
+    expect(screen.getByRole('link', { name: /OKR/ })).toBeTruthy();
+    expect(screen.getAllByRole('link')).toHaveLength(1);
+  });
+});
+
 describe('tools grid', () => {
   it('lists every tool with its section, links each to its page, and only shows sections that have tools', () => {
     render(<ToolsBrowser tools={tools} categories={[...MARKET_CATEGORIES]} />);
