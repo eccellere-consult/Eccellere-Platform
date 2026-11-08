@@ -12,7 +12,7 @@ const footerServices = [
 ];
 
 const footerCompany = [
-  { label: "Strategy & Plan Advisor (eccellere.in)", href: "https://eccellere.in" },
+  { label: "Back to ECCELLERE (eccellere.in)", href: "https://eccellere.in" },
   { label: "About", href: "/about" },
   { label: "For MSMEs", href: "/msme-hub" },
   { label: "Marketplace", href: "/marketplace" },

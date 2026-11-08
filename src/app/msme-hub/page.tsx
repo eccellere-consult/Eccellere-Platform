@@ -29,7 +29,7 @@ const challenges = [
   {
     icon: IndianRupee,
     problem: "Can't afford Big 4 consulting fees",
-    solution: "Modular pricing from ₹999. Pay only for what you use.",
+    solution: "Modular pricing, announced soon. Pay only for what you use.",
   },
   {
     icon: Bot,
@@ -87,8 +87,8 @@ const sectorCards = [
 const packages = [
   {
     name: "Micro",
-    price: "₹19,999",
-    period: "/year",
+    price: "TBD",
+    period: "pricing to be announced",
     description: "For micro enterprises (turnover up to ₹5 Cr) taking their first steps in structured strategy and AI adoption.",
     features: [
       "5 marketplace assets of your choice",
@@ -102,8 +102,8 @@ const packages = [
   },
   {
     name: "Small",
-    price: "₹1,49,999",
-    period: "/year",
+    price: "TBD",
+    period: "pricing to be announced",
     description: "For small enterprises (turnover ₹5–75 Cr) ready to transform operations and unlock sustainable growth.",
     features: [
       "Unlimited marketplace downloads",
@@ -119,8 +119,8 @@ const packages = [
   },
   {
     name: "Medium",
-    price: "₹9,99,999",
-    period: "/year",
+    price: "TBD",
+    period: "pricing to be announced",
     description: "For medium enterprises (turnover ₹75 Cr–500 Cr) scaling fast with dedicated advisory and custom tools.",
     features: [
       "Unlimited marketplace access",

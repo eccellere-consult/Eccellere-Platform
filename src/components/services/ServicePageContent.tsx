@@ -62,18 +62,12 @@ export function ServicePageContent({ service, relatedAssets }: Props) {
               <Link href="/assessment">Take the AI Assessment →</Link>
             </Button>
           </div>
-          {service.startingPrice && (
-            <p className="mt-8 text-sm text-white/40">
-              Engagements starting from{" "}
-              <span className="font-medium text-eccellere-gold">
-                {service.startingPrice}
-              </span>
-              .{" "}
-              <Link href="/contact" className="underline hover:text-white/60">
-                Get a custom quote →
-              </Link>
-            </p>
-          )}
+          <p className="mt-8 text-sm text-white/40">
+            Pricing is scoped to your needs.{" "}
+            <Link href="/contact" className="underline hover:text-white/60">
+              Get a custom quote →
+            </Link>
+          </p>
         </div>
       </section>
 

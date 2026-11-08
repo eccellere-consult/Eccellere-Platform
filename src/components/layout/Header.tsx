@@ -8,32 +8,28 @@ import { MobileNav } from "./MobileNav";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { NotificationBell } from "@/components/NotificationBell";
 
-/** The original site: strategy and planning advisor. Shown on its own on wide screens and inside "More" on narrower ones. */
-export const ADVISOR_LINK = { label: "Strategy & Plan Advisor ↗", href: "https://eccellere.in" };
+/** The original site (eccellere.in): the way back, at the right end of the menu. */
+export const ADVISOR_LINK = { label: "Back to ECCELLERE ↗", href: "https://eccellere.in" };
 
-const navLinks: { label: string; short?: string; href: string; wideOnly?: boolean; children?: { label: string; href: string }[] }[] = [
-  { label: "Home", href: "/" },
-  // the three marketplaces: the focus of the menu
-  { label: "Problem-solving tools", short: "Problem solving", href: "/tools?category=Problem%20solving" },
-  { label: "Strategic frameworks", short: "Frameworks", href: "/tools?category=Strategy" },
-  { label: "Agentic AI agents", short: "AI agents", href: "/agents" },
+interface NavItem { label: string; href: string; blurb?: string; end?: boolean; children?: { label: string; href: string }[] }
+
+const navLinks: NavItem[] = [
+  { label: "Business Toolkits", href: "/tools", blurb: "Including 200+ proven frameworks and business toolkits" },
+  { label: "Strategic Frameworks", href: "/tools?category=Strategy", blurb: "Proven strategy methods as working worksheets" },
+  { label: "Functional Agents", href: "/agents", blurb: "Agents for every function of the business" },
   {
     label: "More",
     href: "#",
     children: [
-      { label: "Consulting", href: "/services" },
-      { label: "Templates & toolkits", href: "/marketplace" },
-      { label: "All tools", href: "/tools" },
       { label: "Agentic AI overview", href: "/agentic-ai" },
+      { label: "Consulting", href: "/services" },
       { label: "MSME Hub", href: "/msme-hub" },
       { label: "About", href: "/about" },
       { label: "Perspectives", href: "/perspectives" },
       { label: "Pricing", href: "/pricing" },
-      { ...ADVISOR_LINK, label: "Strategy & Plan Advisor (eccellere.in) ↗" },
     ],
   },
-  // the original site, at the right end of the menu
-  { ...ADVISOR_LINK, wideOnly: true },
+  { ...ADVISOR_LINK, end: true },
 ];
 
 export function Header() {
@@ -69,41 +65,38 @@ export function Header() {
         </Link>
 
         {/* Desktop Nav */}
-        <nav className="hidden items-center gap-1 lg:flex">
+        <nav className="hidden items-center gap-1 xl:flex">
           {navLinks.map((link) => (
             <div
               key={link.label}
-              className={cn("relative", link.wideOnly && "hidden xl:block")}
-              onMouseEnter={() => link.children && setActiveDropdown(link.label)}
+              className={cn("relative", link.end && "ml-3")}
+              onMouseEnter={() => (link.children || link.blurb) && setActiveDropdown(link.label)}
               onMouseLeave={() => setActiveDropdown(null)}
             >
               <Link
                 href={link.href}
                 className={cn(
-                  "px-3 py-2 text-sm font-medium transition-colors",
-                  scrolled
+                  "whitespace-nowrap px-3 py-2 text-sm font-medium transition-colors",
+                  link.end && (scrolled
+                    ? "border border-gold-deep text-gold-deep hover:bg-gold-deep hover:text-white"
+                    : "border border-eccellere-gold/60 text-eccellere-gold hover:bg-eccellere-gold hover:text-eccellere-ink"),
+                  !link.end && (scrolled
                     ? "text-ink-mid hover:text-eccellere-gold"
-                    : "text-white/90 hover:text-eccellere-gold"
+                    : "text-white/90 hover:text-eccellere-gold")
                 )}
               >
-                {link.short ? (
-                  <>
-                    <span className="xl:hidden">{link.short}</span>
-                    <span className="hidden xl:inline">{link.label}</span>
-                  </>
-                ) : (
-                  link.label
-                )}
+                {link.label}
                 {link.children && (
                   <span className="ml-1 inline-block text-[10px]">▾</span>
                 )}
               </Link>
 
               {/* Dropdown */}
-              {link.children && activeDropdown === link.label && (
+              {(link.children || link.blurb) && activeDropdown === link.label && (
                 <div className="absolute left-0 top-full pt-2">
-                  <div className="min-w-[220px] rounded bg-white p-2 shadow-lg ring-1 ring-black/5">
-                    {link.children.map((child) => (
+                  <div className="min-w-[260px] rounded bg-white p-2 shadow-lg ring-1 ring-black/5">
+                    {link.blurb && <Link href={link.href} className="block rounded px-4 py-2.5 text-sm text-ink-mid hover:bg-gold-pale hover:text-eccellere-gold">{link.blurb} →</Link>}
+                    {link.children?.map((child) => (
                       <Link
                         key={child.href}
                         href={child.href}
@@ -126,7 +119,7 @@ export function Header() {
           <Link
             href="/login"
             className={cn(
-              "hidden text-sm font-medium transition-colors lg:inline-flex",
+              "hidden text-sm font-medium transition-colors xl:inline-flex",
               scrolled
                 ? "text-ink-mid hover:text-eccellere-gold"
                 : "text-white/90 hover:text-eccellere-gold"
@@ -137,7 +130,7 @@ export function Header() {
           <Button
             asChild
             size="sm"
-            className="hidden lg:inline-flex"
+            className="hidden xl:inline-flex"
           >
             <Link href="/register">Get Started</Link>
           </Button>
@@ -146,17 +139,13 @@ export function Header() {
             variant="ghost"
             size="sm"
             className={cn(
-              "hidden xl:inline-flex",
+              "hidden 2xl:inline-flex",
               scrolled ? "text-ink-mid" : "text-white/90"
             )}
           >
             <Link href="/contact">Talk to Us</Link>
           </Button>
-          {/* on phones the advisor link sits at the top level, so it is dropped from the "More" group there */}
-          <MobileNav
-            links={navLinks.map((l) => (l.children ? { ...l, children: l.children.filter((c) => c.href !== ADVISOR_LINK.href) } : l))}
-            scrolled={scrolled}
-          />
+          <MobileNav links={navLinks} scrolled={scrolled} />
         </div>
       </div>
     </header>

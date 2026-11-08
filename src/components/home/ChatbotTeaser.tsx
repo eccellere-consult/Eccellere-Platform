@@ -39,7 +39,7 @@ export function ChatbotTeaser() {
             </div>
             <div className="flex justify-start">
               <div className="max-w-[80%] rounded-r-lg rounded-tl-lg bg-white/10 px-4 py-3 text-sm text-eccellere-cream">
-                The assessment is free. The toolkit starts at ₹2,499. I can
+                The assessment is free. Pricing will be announced soon. I can
                 also connect you with a specialist if you need hands-on support.
               </div>
             </div>
