@@ -5,6 +5,8 @@ import { Footer } from "@/components/layout/Footer";
 import { AREAS, allAgents, pilotCount } from "@/lib/agents/catalogue";
 import NotifyForm from "./NotifyForm";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Agent Marketplace",
   description:
@@ -29,7 +31,7 @@ export default function AgentMarketplacePage() {
               established management methods and fixed formulas, so the same inputs always give the same answer.
             </p>
             <p className="mt-6 text-sm text-white/60">
-              {total} agents in {AREAS.filter((a) => !a.proposed).length} functional areas · {pilots} in pilot · the rest are coming soon
+              {total} agents in {AREAS.filter((a) => !a.proposed).length} functional areas · {pilots} in pilot · the rest are coming soon · {AREAS.filter((a) => a.proposed).length} more areas planned
             </p>
           </div>
         </section>
@@ -41,24 +43,27 @@ export default function AgentMarketplacePage() {
                 <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-b border-eccellere-ink/10 pb-3">
                   <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gold-deep">{area.code}</span>
                   <h2 className="font-display text-2xl text-eccellere-ink">{area.name}</h2>
-                  {area.proposed && <span className="rounded-sm bg-eccellere-ink/5 px-2 py-0.5 text-[10px] uppercase tracking-wider text-ink-mid">Area being added</span>}
+                  {area.proposed && <span className="rounded-sm bg-eccellere-ink/5 px-2 py-0.5 text-[10px] uppercase tracking-wider text-ink-mid">Planned</span>}
                 </div>
                 <p className="mt-2 text-sm text-ink-mid">{area.purpose}</p>
 
+                {area.agents.length === 0 && (
+                  <p className="mt-4 border border-dashed border-eccellere-ink/20 px-4 py-3 text-sm text-ink-mid">Planned: the agents for this area are still to be defined.</p>
+                )}
                 {area.agents.length > 0 && (
                   <ul className="mt-6 grid gap-4 md:grid-cols-3">
                     {area.agents.map((agent) => (
                       <li key={agent.slug} className="flex flex-col border border-eccellere-ink/10 bg-white p-5">
                         <div className="flex items-start justify-between gap-3">
-                          <h3 className="text-base font-semibold text-eccellere-ink">{agent.name}</h3>
+                          <h3 className="text-base font-semibold text-eccellere-ink"><Link href={`/agents/${agent.slug}`} className="hover:underline">{agent.name}</Link></h3>
                           <span className={agent.status === "pilot" ? "shrink-0 rounded-sm bg-eccellere-gold/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-gold-deep" : "shrink-0 rounded-sm bg-eccellere-ink/5 px-2 py-0.5 text-[10px] uppercase tracking-wider text-ink-mid"}>
                             {agent.status === "pilot" ? "Pilot" : "Coming soon"}
                           </span>
                         </div>
                         <p className="mt-2 flex-1 text-sm leading-relaxed text-ink-mid">{agent.does}</p>
-                        {agent.status === "pilot" && agent.tool && (
-                          <Link href={`/tools/${agent.tool}`} className="mt-4 text-sm font-medium text-gold-deep underline underline-offset-2">Open the pilot →</Link>
-                        )}
+                        <Link href={`/agents/${agent.slug}`} className="mt-4 text-sm font-medium text-gold-deep underline underline-offset-2">
+                          {agent.status === "pilot" ? "Inputs, SIPOC and outputs →" : "What it will do →"}
+                        </Link>
                       </li>
                     ))}
                   </ul>
