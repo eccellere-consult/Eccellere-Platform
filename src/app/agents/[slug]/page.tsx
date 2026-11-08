@@ -6,6 +6,7 @@ import { Footer } from "@/components/layout/Footer";
 import { AREAS, allAgents } from "@/lib/agents/catalogue";
 import { pilotByAgent } from "@/lib/agents/pilots";
 import { inputsOf, outputsOf } from "@/lib/agents/sipoc";
+import { flowOf } from "@/lib/agents/flow";
 import { prismaRepo } from "@/lib/tools/prismaRepo";
 import { getPublishedTool } from "@/lib/tools/service";
 import { loadEdits, sipocWithEdit } from "@/lib/agents/overrides";
@@ -93,6 +94,27 @@ export default async function AgentPage({ params }: Props) {
                       <p className="text-[11px] font-semibold uppercase tracking-wider text-gold-deep">Stage {i + 1} of 5</p>
                       <a href={t.href} className="mt-1 block text-sm font-semibold text-eccellere-ink underline-offset-2 hover:underline">{t.title}</a>
                       <p className="mt-1 text-xs leading-relaxed text-ink-mid">{t.text}</p>
+                    </li>
+                  ))}
+                </ol>
+              </section>
+
+              {/* Flow: perceive to learn */}
+              <section id="flow" aria-label="How the agent works, step by step">
+                <h2 className="font-display text-2xl text-eccellere-ink">How it works, step by step</h2>
+                <p className="mt-2 max-w-2xl text-sm text-ink-mid">Six steps, top to bottom. What each box says comes from this agent&apos;s own inputs, method and results.</p>
+                <ol className="mx-auto mt-6 max-w-3xl">
+                  {flowOf(sipoc!, inputs, outputs).map((s, i, all) => (
+                    <li key={s.name}>
+                      <div className="flex gap-4 border border-eccellere-ink bg-white">
+                        <div className="flex w-14 shrink-0 items-center justify-center bg-eccellere-ink font-display text-2xl text-eccellere-gold" aria-hidden="true">{s.n}</div>
+                        <div className="py-4 pr-4">
+                          <h3 className="text-sm font-semibold text-eccellere-ink"><span className="sr-only">Step {s.n}: </span>{s.name}</h3>
+                          <p className="mt-0.5 text-xs text-gold-deep">{s.meaning}</p>
+                          <ul className="mt-2 list-disc space-y-1 pl-4 text-sm text-ink-mid">{s.points.map((p) => <li key={p}>{p}</li>)}</ul>
+                        </div>
+                      </div>
+                      {i < all.length - 1 && <div className="mx-auto h-6 w-px bg-eccellere-gold" aria-hidden="true" />}
                     </li>
                   ))}
                 </ol>

@@ -14,7 +14,7 @@ export const ADVISOR_LINK = { label: "Back to ECCELLĒRE ↗", href: "https://ec
 interface NavItem { label: string; href: string; blurb?: string; end?: boolean; children?: { label: string; href: string }[] }
 
 const navLinks: NavItem[] = [
-  { label: "Business Toolkits", href: "/tools", blurb: "Including 200+ proven frameworks and business toolkits" },
+  { label: "Business Toolkits", href: "/marketplace", blurb: "Including 200+ proven frameworks and business toolkits" },
   { label: "Strategic Frameworks", href: "/tools?category=Strategy", blurb: "Proven strategy methods as working worksheets" },
   { label: "Functional Agents", href: "/agents", blurb: "Agents for every function of the business" },
   {
