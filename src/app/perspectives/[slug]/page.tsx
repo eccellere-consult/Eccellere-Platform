@@ -257,7 +257,7 @@ export default async function ArticleDetailPage({ params }: { params: Promise<{ 
                   Related resources
                 </p>
                 <p className="mt-2 text-sm text-ink-mid">
-                  Download frameworks and toolkits related to this topic from the Eccellere Marketplace.
+                  Download frameworks and toolkits related to this topic from the Eccellere+ Marketplace.
                 </p>
                 <Button asChild size="sm" className="mt-4 w-full">
                   <Link href="/marketplace">Browse Marketplace</Link>

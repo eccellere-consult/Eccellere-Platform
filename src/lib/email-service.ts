@@ -157,7 +157,7 @@ export async function sendPasswordReset(
 <body style="margin:0;padding:0;">
 <div style="font-family:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:600px;margin:0 auto;background:#FAF8F4;color:#0E0E0D;">
   <div style="background:#1A1428;padding:32px 40px;text-align:center;">
-    <span style="font-family:'Cormorant Garamond',Georgia,serif;color:#FFFFFF;font-size:24px;font-weight:600;letter-spacing:0.05em;">ECCELLERĒ</span>
+    <span style="font-family:'Cormorant Garamond',Georgia,serif;color:#FFFFFF;font-size:24px;font-weight:600;letter-spacing:0.05em;">ECCELLERĒ<span style="color:#B8913A;">+</span></span>
   </div>
   <div style="padding:40px;">
     <h1 style="font-family:'Cormorant Garamond',Georgia,serif;font-size:28px;font-weight:300;color:#0E0E0D;margin:0 0 16px 0;">Reset Your Password</h1>

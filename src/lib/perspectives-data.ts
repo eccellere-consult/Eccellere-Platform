@@ -146,7 +146,7 @@ export const articles: Article[] = [
       },
       {
         type: "callout",
-        text: "All five frameworks are available as India-contextualised templates in the Eccellere Marketplace. You can work through any of them in a half-day workshop.",
+        text: "All five frameworks are available as India-contextualised templates in the Eccellere+ Marketplace. You can work through any of them in a half-day workshop.",
       },
     ],
     tags: ["Strategy", "Growth", "Frameworks", "MSME"],

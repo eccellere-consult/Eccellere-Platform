@@ -68,7 +68,7 @@ export function Header() {
               scrolled ? "text-eccellere-ink" : "text-white"
             )}
           >
-            ECCELLERĒ
+            ECCELLERĒ<span className="text-eccellere-gold">+</span>
           </span>
         </Link>
 

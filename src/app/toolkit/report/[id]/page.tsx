@@ -191,7 +191,7 @@ export default function ReportPage({ params }: { params: Promise<{ id: string }>
 
       {/* Cover */}
       <section className="cover">
-        <div className="brandmark">ECCELLERĒ</div>
+        <div className="brandmark">ECCELLERĒ+</div>
         <p className="kicker">{KIT_LABEL[bp.type]}</p>
         <h1>{data.title}</h1>
         <p className="sub">{KIT_PURPOSE[bp.type]}</p>
