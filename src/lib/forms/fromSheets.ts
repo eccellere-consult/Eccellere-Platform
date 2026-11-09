@@ -20,25 +20,25 @@ export interface FaithfulResult {
   assumptions: string[];
 }
 
-const snake = (s: string): string => {
+export const snake = (s: string): string => {
   const k = s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40).replace(/_+$/g, '');
   return /^[a-z]/.test(k) ? k : `k_${k || 'item'}`;
 };
-const unique = (base: string, used: Set<string>): string => {
+export const unique = (base: string, used: Set<string>): string => {
   let k = base || 'item';
   for (let n = 2; used.has(k); n++) k = `${base}_${n}`.slice(0, 44);
   used.add(k);
   return k;
 };
-const tidy = (s: string) => s.replace(/\s+/g, ' ').trim();
-const cut = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s);
-const stripLead = (s: string) => tidy(s.replace(/^\s*(?:q(?:uestion)?\.?\s*)?\d{1,3}[.):]\s+/i, '').replace(/^\s*(?:[☐☑☒□■○◯●◻]|\[\s?[xX ]?\s?\]|[-–•*·]|[a-hA-H][.)])\s*/, ''));
+export const tidy = (s: string) => s.replace(/\s+/g, ' ').trim();
+export const cut = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s);
+export const stripLead = (s: string) => tidy(s.replace(/^\s*(?:q(?:uestion)?\.?\s*)?\d{1,3}[.):]\s+/i, '').replace(/^\s*(?:[☐☑☒□■○◯●◻]|\[\s?[xX ]?\s?\]|[-–•*·]|[a-hA-H][.)])\s*/, ''));
 const isNumber = (s: string) => s.trim() !== '' && !Number.isNaN(Number(s.replace(/[,%₹$\s]/g, '')));
-const helpFor = (what: string, where: string) => cut(`Fill in “${what}” as it is asked in ${where}. Use a short, plain answer.`, 200);
-const pad = (s: string) => (s.length >= 40 ? s : `${s} Keep it short and specific.`.slice(0, 200));
+export const helpFor = (what: string, where: string) => cut(`Fill in “${what}” as it is asked in ${where}. Use a short, plain answer.`, 200);
+export const pad = (s: string) => (s.length >= 40 ? s : `${s} Keep it short and specific.`.slice(0, 200));
 
 type Part = Record<string, unknown>;
-type Map1 = { element: string; target: string; note?: string };
+export type Map1 = { element: string; target: string; note?: string };
 
 export function faithfulForm(readings: readonly SourceReading[], opts: { name?: string; category: ToolCategory }): FaithfulResult | null {
   const pages = sourcePages(readings);
@@ -154,6 +154,26 @@ export function faithfulForm(readings: readonly SourceReading[], opts: { name?: 
     sections.push({ key: sKey, title: cut(title, 80), summary: cut(bits.join(' ') || `Taken from ${where} of the uploaded file.`, 300), parts });
   }
 
+  return finishForm({ name, category: opts.category, readings, sections, derived, sampleValues, sampleTables, map, approximations, firstField });
+}
+
+export interface FinishArgs {
+  name: string;
+  category: ToolCategory;
+  readings: readonly SourceReading[];
+  sections: Record<string, unknown>[];
+  derived: Record<string, unknown>[];
+  sampleValues: Record<string, string>;
+  sampleTables: Record<string, Record<string, string>[]>;
+  map: Map1[];
+  approximations: string[];
+  firstField: { key: string; label: string } | null;
+}
+
+/** The plain furniture every form gets around the sections built from a file: a context section, an action plan, a diagram, a summary result, a labelled sample. Shared by both file readers. */
+export function finishForm(a: FinishArgs): FaithfulResult {
+  const { name, readings, sections, derived, sampleValues, sampleTables, map, approximations, firstField } = a;
+  const opts = { category: a.category };
   const context = {
     key: 'context', title: 'About this form', summary: 'Say who is filling this in and why. This section was added; it is not in the uploaded file.',
     parts: [
