@@ -123,7 +123,7 @@ export function structuredForm(readings: readonly SourceReading[], opts: { name?
   const reference = (e: SourceElement, note = 'Reading in the document, not a question') => {
     const s = current();
     s.reference += 1; referenceRows += 1;
-    map.push({ element: e.id, target: `section:${s.key}`, note });
+    map.push({ element: e.id, target: 'left-out:reading', note });
   };
 
   for (let i = 0; i < all.length; i++) {
@@ -227,6 +227,9 @@ export function structuredForm(readings: readonly SourceReading[], opts: { name?
 
   const real = steps.filter((x) => x.parts.length > 0);
   const readingOnly = steps.length - real.length;
+  // Headings, table headings and intro lines of the dropped reading-only parts point at steps that are not in the form: list them as reading left out.
+  const dropped = new Set(steps.filter((x) => x.parts.length === 0).map((x) => `section:${x.key}`));
+  for (const m of map) if (dropped.has(m.target)) { m.note = m.note ?? 'Heading of a part with no questions (reading only)'; m.target = 'left-out:reading'; }
   if (readingOnly) approximations.push(`${readingOnly} part${readingOnly === 1 ? '' : 's'} of the document had no questions (reading only) and ${readingOnly === 1 ? 'is' : 'are'} not steps in the form.`);
   if (referenceRows) approximations.push(`${referenceRows} reading item${referenceRows === 1 ? '' : 's'} (advice tables, benchmarks, contents) ${referenceRows === 1 ? 'was' : 'were'} not turned into questions. They stay in the original document.`);
   // a step whose summary came from a long title keeps its title short; the first step of a document titled by its cover headings is "Details"
