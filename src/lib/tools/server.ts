@@ -13,8 +13,9 @@ import { SKILL_KEYS, checkSkillText, defaultSkill, skillOrDefault, type SkillKin
 import type { ToolRecord } from './repo';
 import type { AiDeps, AiTool } from './ai';
 
-export const readAuth = () => requirePermission('admin:content:read');
-export const writeAuth = () => requirePermission('admin:content:write');
+// Marketplace admins build and review the online versions of their own toolkits, so they may use these routes too.
+export const readAuth = () => requirePermission('admin:content:read', 'admin:assets:read');
+export const writeAuth = () => requirePermission('admin:content:write', 'admin:assets:write');
 
 const STATUS_FOR: Record<string, number> = {
   NOT_FOUND: 404, JOB_NOT_FOUND: 404, NOTHING_TO_DRAFT: 400, WRONG_STATE: 409, VERSION_CONFLICT: 409,
