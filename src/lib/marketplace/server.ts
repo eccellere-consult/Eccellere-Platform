@@ -6,16 +6,14 @@ import { suggestPractice } from "@/lib/tools/practice";
 import { loadSkills, realFormBuilder } from "@/lib/forms/server";
 import { readSource } from "@/lib/forms/source";
 import { resolveUploadPath } from "@/lib/uploads";
-import { makeOnlineVersion, type MakeOnlineResult, type ToolkitAsset } from "@/lib/marketplace/makeOnline";
+import { estimateOnline, makeOnlineVersion, type EstimateResult, type MakeOnlineResult, type ToolkitAsset } from "@/lib/marketplace/makeOnline";
+import { promptSize } from "@/lib/forms/build";
 
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
 
-/** Server glue for "make online": reads the toolkit's first file from the uploads folder, builds the draft (no AI) and saves it for review. */
-export async function makeOnlineForAsset(asset: ToolkitAsset & { fileUrls: unknown }): Promise<MakeOnlineResult> {
-  const skills = await loadSkills();
-  const builder = realFormBuilder();
+function depsFor(asset: ToolkitAsset & { fileUrls: unknown }) {
   const text = `${asset.title} ${asset.description}`;
-  return makeOnlineVersion(asset, {
+  return {
     readFile: async () => {
       const url = (Array.isArray(asset.fileUrls) ? (asset.fileUrls as string[]) : [])[0];
       if (!url || !url.startsWith("/uploads/")) return null;
@@ -27,15 +25,30 @@ export async function makeOnlineForAsset(asset: ToolkitAsset & { fileUrls: unkno
     },
     readSource,
     // Only an unreviewed draft made by the document reader may be rebuilt; reviewed, published, archived or hand-made tools are never touched.
-    toolState: async (slug) => {
+    toolState: async (slug: string) => {
       const t = await prismaRepo.getToolBySlug(slug);
       if (!t) return null;
       const by = (t.provenance as { draftedBy?: string } | null)?.draftedBy;
       return { replaceable: (t.status === "DRAFT" || t.status === "NEEDS_REVIEW") && by === "rules" };
     },
-    build: (req) => builder({ ...req, ...skills }),
-    save: (t) => prismaRepo.saveTool(t),
     category: suggestCategory(text),
     practice: suggestPractice(text),
+  };
+}
+
+/** Server glue for "make online": reads the toolkit's first file from the uploads folder, builds the draft and saves it for review. No AI unless asked (it costs money). */
+export async function makeOnlineForAsset(asset: ToolkitAsset & { fileUrls: unknown }, opts: { useAi?: boolean } = {}): Promise<MakeOnlineResult> {
+  const skills = await loadSkills();
+  const builder = realFormBuilder();
+  return makeOnlineVersion(asset, {
+    ...depsFor(asset),
+    build: (req) => builder({ ...req, ...skills }),
+    save: (t) => prismaRepo.saveTool(t),
+    useAi: opts.useAi,
   });
+}
+
+/** How much text an AI build would send for this toolkit (nothing is built, no AI is called, nothing costs money). */
+export async function estimateForAsset(asset: ToolkitAsset & { fileUrls: unknown }): Promise<EstimateResult> {
+  return estimateOnline(asset, { ...depsFor(asset), promptSize });
 }

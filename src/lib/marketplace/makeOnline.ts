@@ -20,6 +20,8 @@ export interface MakeOnlineDeps {
   save: (tool: ToolInput) => Promise<{ slug: string; name: string; status: string }>;
   category: BuildRequest['category'];
   practice: BuildRequest['practice'];
+  /** true = let the AI (strongest model) improve the draft; costs money. Default: no AI at all. */
+  useAi?: boolean;
 }
 
 export type MakeOnlineResult =
@@ -46,7 +48,7 @@ export async function makeOnlineVersion(asset: ToolkitAsset, deps: MakeOnlineDep
     practice: deps.practice,
     assetType: 'toolkit',
     readings: [reading],
-    noAi: true,
+    noAi: !deps.useAi,
   });
   if (out.kind === 'ai_down') return { kind: 'ai_down', reason: out.reason };
   if (out.kind === 'failed') return { kind: 'failed', reason: out.reason };
@@ -54,4 +56,19 @@ export async function makeOnlineVersion(asset: ToolkitAsset, deps: MakeOnlineDep
   // Same slug as the toolkit is the link. Always a draft for review, whatever the builder returned.
   const saved = await deps.save({ ...out.tool, slug: asset.slug, status: 'NEEDS_REVIEW' });
   return { kind: 'ok', slug: saved.slug, name: saved.name, status: saved.status, notes: out.notes };
+}
+
+export type EstimateResult = { kind: 'estimate'; chars: number } | { kind: 'no_file' } | { kind: 'unreadable'; reason: string } | { kind: 'exists'; slug: string };
+
+/** The size of what an AI build would send, with nothing built and no AI called. */
+export async function estimateOnline(asset: ToolkitAsset, deps: Pick<MakeOnlineDeps, 'readFile' | 'readSource' | 'toolState' | 'category' | 'practice'> & { promptSize: (req: BuildRequest) => number }): Promise<EstimateResult> {
+  const state = await deps.toolState(asset.slug);
+  if (state && !state.replaceable) return { kind: 'exists', slug: asset.slug };
+  const file = await deps.readFile();
+  if (!file) return { kind: 'no_file' };
+  let reading: SourceReading;
+  try { reading = await deps.readSource(file.name, file.data); }
+  catch (e) { return { kind: 'unreadable', reason: e instanceof Error && e.message ? e.message : 'That file could not be read.' }; }
+  const chars = deps.promptSize({ request: `Make a fill-online version of the downloadable toolkit "${asset.title}". ${asset.description}`.slice(0, 4000), name: asset.title, category: deps.category, practice: deps.practice, assetType: 'toolkit', readings: [reading] });
+  return { kind: 'estimate', chars };
 }
