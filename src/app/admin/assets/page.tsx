@@ -179,6 +179,7 @@ export default function AdminAssets() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [resubmitTarget, setResubmitTarget] = useState<{ id: string; title: string } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
+  const [batch, setBatch] = useState<{ state: "idle" | "working" | "done" | "error"; text: string; rows?: { slug: string; title: string; kind: string; detail: string }[]; counts?: Record<string, number> }>({ state: "idle", text: "" });
   const [online, setOnline] = useState<{ kind: "working" | "ok" | "warn"; text: string; href?: string } | null>(null);
 
   const fetchAssets = useCallback(async () => {
@@ -216,6 +217,27 @@ export default function AdminAssets() {
       }
       setOnline({ kind: "warn", text: "This is taking longer than expected. Check Admin > Tools in a few minutes before trying again." });
     } catch { setOnline({ kind: "warn", text: "No connection. Please try again." }); }
+  }
+
+  /** One run over every published toolkit: a free (no AI) fill-online draft for each one that has a readable file and no online version yet. */
+  async function makeAllOnline() {
+    if (batch.state === "working") return;
+    if (!window.confirm("Make fill-online drafts for every published item that has a readable file and no online version yet? No AI is used and nothing is published: each result is a draft for you to review in Admin > Tools.")) return;
+    setBatch({ state: "working", text: "Starting…" });
+    try {
+      const start = await fetch("/api/admin/assets/make-online-all", { method: "POST" });
+      const first = await start.json().catch(() => ({}));
+      if (start.status !== 202 || !first.jobId) return setBatch({ state: "error", text: first.error ?? "Could not start the run." });
+      for (let i = 0; i < 400; i++) {
+        await new Promise((r) => setTimeout(r, 3000));
+        const res = await fetch(`/api/admin/assets/make-online-all?job=${first.jobId}`);
+        const body = await res.json().catch(() => ({}));
+        if (res.status === 202) { setBatch({ state: "working", text: `Working… ${body.done ?? 0} of ${body.total ?? "?"} done.` }); continue; }
+        if (res.ok) return setBatch({ state: "done", text: `Finished: ${body.summary.counts.ok} draft${body.summary.counts.ok === 1 ? "" : "s"} saved out of ${body.summary.total}.`, rows: body.summary.rows, counts: body.summary.counts });
+        return setBatch({ state: "error", text: body.error ?? "The run did not finish." });
+      }
+      setBatch({ state: "error", text: "This is taking longer than expected. Check Admin > Tools in a few minutes before trying again." });
+    } catch { setBatch({ state: "error", text: "No connection. Please try again." }); }
   }
 
   async function handleAction(dbId: string, action: "approve" | "reject") {
@@ -333,6 +355,30 @@ export default function AdminAssets() {
       </header>
 
       <main className="mx-auto max-w-[1280px] px-6 py-8">
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <button onClick={makeAllOnline} disabled={batch.state === "working"} className="rounded border border-eccellere-gold px-3 py-1.5 text-xs font-medium text-eccellere-gold hover:bg-eccellere-gold/10 disabled:opacity-50">
+            {batch.state === "working" ? "Making drafts…" : "Make all online (no AI)"}
+          </button>
+          <span className="text-xs text-ink-light">Free. Builds a draft for each toolkit that has a readable file and no online version. Nothing is published.</span>
+        </div>
+        {batch.state !== "idle" && (
+          <div role="status" className={cn("mb-4 rounded-md border px-4 py-3 text-sm", batch.state === "error" ? "border-amber-200 bg-amber-50 text-amber-800" : "border-eccellere-ink/10 bg-white text-ink-mid")}>
+            {batch.state === "working" && <Loader2 className="mr-2 inline h-4 w-4 animate-spin" />}
+            {batch.text}{" "}
+            {batch.state === "done" && <Link href="/admin/tools" className="font-medium underline">Open Admin &gt; Tools to review</Link>}
+            {batch.rows && (
+              <ul className="mt-3 max-h-72 overflow-auto text-xs">
+                {batch.rows.map((r) => (
+                  <li key={r.slug} className="flex gap-3 border-t border-eccellere-ink/5 py-1">
+                    <span className={cn("w-24 shrink-0 font-medium", r.kind === "ok" ? "text-eccellere-teal" : r.kind === "exists" ? "text-ink-light" : "text-amber-700")}>{r.kind === "ok" ? "Draft saved" : r.kind === "exists" ? "Skipped" : "Needs a look"}</span>
+                    <span className="flex-1"><strong className="text-eccellere-ink">{r.title}</strong>: {r.detail}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {batch.state !== "working" && <button onClick={() => setBatch({ state: "idle", text: "" })} className="mt-2 underline">Dismiss</button>}
+          </div>
+        )}
         {online && (
           <div role="status" className={cn("mb-4 rounded-md border px-4 py-3 text-sm", online.kind === "ok" ? "border-eccellere-gold bg-eccellere-gold/10 text-eccellere-ink" : online.kind === "warn" ? "border-amber-200 bg-amber-50 text-amber-800" : "border-eccellere-ink/10 bg-white text-ink-mid")}>
             {online.kind === "working" && <Loader2 className="mr-2 inline h-4 w-4 animate-spin" />}

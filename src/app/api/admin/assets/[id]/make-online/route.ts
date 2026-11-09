@@ -1,23 +1,15 @@
 import { randomUUID } from "node:crypto";
-import fs from "fs";
-import path from "path";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { prismaRepo } from "@/lib/tools/prismaRepo";
-import { suggestCategory } from "@/lib/tools/service";
-import { suggestPractice } from "@/lib/tools/practice";
 import { audit, toolsGuard, writeAuth } from "@/lib/tools/server";
-import { loadSkills, realFormBuilder } from "@/lib/forms/server";
-import { readSource } from "@/lib/forms/source";
-import { resolveUploadPath } from "@/lib/uploads";
-import { makeOnlineVersion, type MakeOnlineResult } from "@/lib/marketplace/makeOnline";
+import type { MakeOnlineResult } from "@/lib/marketplace/makeOnline";
+import { makeOnlineForAsset } from "@/lib/marketplace/server";
 import { rateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 const limiter = rateLimit({ limit: 20, windowSeconds: 3600 });
-const MAX_FILE_BYTES = 25 * 1024 * 1024;
 
 type Done = { status: number; body: Record<string, unknown> };
 type Job = { owner: string; startedAt: number; done?: Done };
@@ -35,25 +27,7 @@ const WORDS: Record<Exclude<MakeOnlineResult["kind"], "ok">, { status: number; t
 async function run(userId: string, assetId: string): Promise<Done> {
   const asset = await prisma.asset.findUnique({ where: { id: assetId }, select: { slug: true, title: true, description: true, fileUrls: true } });
   if (!asset) return { status: 404, body: { error: "Toolkit not found." } };
-  const skills = await loadSkills();
-  const builder = realFormBuilder();
-  const r = await makeOnlineVersion(asset, {
-    readFile: async () => {
-      const url = (Array.isArray(asset.fileUrls) ? (asset.fileUrls as string[]) : [])[0];
-      if (!url || !url.startsWith("/uploads/")) return null;
-      try {
-        const abs = resolveUploadPath(url);
-        if (!fs.existsSync(abs) || fs.statSync(abs).size > MAX_FILE_BYTES) return null;
-        return { name: path.basename(abs), data: fs.readFileSync(abs) };
-      } catch { return null; }
-    },
-    readSource,
-    toolExists: async (slug) => !!(await prismaRepo.getToolBySlug(slug)),
-    build: (req) => builder({ ...req, ...skills }),
-    save: (t) => prismaRepo.saveTool(t),
-    category: suggestCategory(`${asset.title} ${asset.description}`),
-    practice: suggestPractice(`${asset.title} ${asset.description}`),
-  });
+  const r = await makeOnlineForAsset(asset);
   if (r.kind === "ok") {
     await audit(userId, "toolkit_made_online", r.slug, { assetId });
     return { status: 200, body: { slug: r.slug, name: r.name, status: r.status, notes: r.notes } };
