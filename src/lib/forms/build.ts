@@ -138,6 +138,13 @@ export function buildFormPrompt(req: BuildRequest, compact = false): { system: s
 
 const clip = (v: unknown, n: number) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, n) : '');
 
+/** How many characters the AI would be sent for this request (no AI call is made). Used to show the cost before a "Build with AI" run. */
+export function promptSize(req: BuildRequest): number {
+  const rule = req.readings?.length ? (structuredForm(req.readings, { name: req.name, category: declarativeCategory(req.category) }) ?? faithfulForm(req.readings, { name: req.name, category: declarativeCategory(req.category) })) : null;
+  const { system, user } = buildFormPrompt(rule ? { ...req, baseline: rule.form } : req, false);
+  return system.length + user.length;
+}
+
 export function makeFormBuilder(deps: BuilderDeps) {
   const now = deps.now ?? (() => new Date());
 

@@ -200,11 +200,20 @@ export default function AdminAssets() {
   useEffect(() => { fetchAssets(); }, [fetchAssets]);
 
   /** Builds a fill-online DRAFT from the toolkit's own file (a few minutes). Nothing is published; it waits for review in Admin > Tools. */
-  async function makeOnline(dbId: string, title: string) {
+  async function makeOnline(dbId: string, title: string, withAi = false) {
     if (online?.kind === "working") return;
-    setOnline({ kind: "working", text: `Reading "${title}" and drafting its online version. This can take a few minutes; please keep this page open.` });
+    setOnline({ kind: "working", text: withAi ? `Working out the cost of building "${title}" with AI…` : `Reading "${title}" and drafting its online version. This can take a few minutes; please keep this page open.` });
     try {
-      const start = await fetch(`/api/admin/assets/${dbId}/make-online`, { method: "POST" });
+      if (withAi) {
+        // The cost is shown first; the AI is used only after a clear yes.
+        const est = await fetch(`/api/admin/assets/${dbId}/make-online`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estimate: true }) });
+        const e = await est.json().catch(() => ({}));
+        if (!est.ok) return setOnline({ kind: "warn", text: e.error ?? "Could not work out the cost." });
+        const ok = window.confirm(`Build "${title}" with the best AI model?\n\n${e.text}\n\n${e.cost?.basis ?? ""}\n\nThe real bill comes from your AI provider and may differ. The AI only drafts wording and guidance; it never writes scores. The result is a draft for your review, not live.`);
+        if (!ok) return setOnline(null);
+        setOnline({ kind: "working", text: `Building "${title}" with AI. This can take several minutes; please keep this page open.` });
+      }
+      const start = await fetch(`/api/admin/assets/${dbId}/make-online`, withAi ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ useAi: true, acceptedCost: true }) } : { method: "POST" });
       const first = await start.json().catch(() => ({}));
       if (start.status !== 202 || !first.jobId) return setOnline({ kind: "warn", text: first.error ?? "Could not start the build." });
       for (let i = 0; i < 150; i++) {
@@ -518,6 +527,14 @@ export default function AdminAssets() {
                               className="rounded border border-eccellere-gold px-2 py-1 text-[10px] font-medium text-eccellere-gold hover:bg-eccellere-gold/10 disabled:opacity-50"
                             >
                               Make online
+                            </button>
+                            <button
+                              title="Build this toolkit's online version with the best AI model. The cost is shown first and nothing is spent until you confirm."
+                              disabled={actionLoading !== null || online?.kind === "working"}
+                              onClick={() => makeOnline(asset.dbId!, asset.title, true)}
+                              className="rounded border border-eccellere-gold bg-eccellere-gold/10 px-2 py-1 text-[10px] font-medium text-eccellere-gold hover:bg-eccellere-gold/20 disabled:opacity-50"
+                            >
+                              Build with AI
                             </button>
                             {asset.canAct && (
                               <Button

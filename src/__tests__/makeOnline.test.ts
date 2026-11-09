@@ -39,6 +39,13 @@ describe('make a fill-online version of a toolkit', () => {
     expect(req.name).toBe('Change Readiness Kit');
     expect(req.readings).toEqual([reading]);
   });
+  it('uses no AI unless asked, and asks the builder to use it when asked', async () => {
+    const build = vi.fn(deps().build);
+    await makeOnlineVersion(asset, deps({ build }));
+    await makeOnlineVersion(asset, deps({ build, useAi: true }));
+    expect(build.mock.calls[0][0].noAi).toBe(true);
+    expect(build.mock.calls[1][0].noAi).toBe(false);
+  });
   it('does nothing when an online version already exists', async () => {
     const build = vi.fn();
     const r = await makeOnlineVersion(asset, deps({ toolState: async () => ({ replaceable: false }), build }));
