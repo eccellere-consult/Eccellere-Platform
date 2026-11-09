@@ -168,6 +168,8 @@ export interface FinishArgs {
   map: Map1[];
   approximations: string[];
   firstField: { key: string; label: string } | null;
+  /** results added after the summary (counts and scores worked out from the answers) */
+  extraOutputs?: Record<string, unknown>[];
 }
 
 /** The plain furniture every form gets around the sections built from a file: a context section, an action plan, a diagram, a summary result, a labelled sample. Shared by both file readers. */
@@ -218,7 +220,7 @@ export function finishForm(a: FinishArgs): FaithfulResult {
     diagram: { template: 'steps', title: cut(name, 60), steps: (stepNames.length >= 3 ? stepNames : [...stepNames, 'Decide']).slice(0, 8).map((n) => ({ name: cut(n, 30) })) },
     sections: allSections,
     ...(derived.length ? { derived } : {}),
-    outputs: [{ key: 'summary', label: 'Summary of your entry', rule: { op: 'template', text: `${first.label}: {${first.key}}` } }],
+    outputs: [{ key: 'summary', label: 'Summary of your entry', rule: { op: 'template', text: `${first.label}: {${first.key}}` } }, ...(a.extraOutputs ?? [])],
     analysisGuide: `Start with the sections in the order shown: ${stepList}. Look first for blanks and for answers that disagree with each other, because they usually point to a misunderstanding of the question rather than a real difference. Where totals are shown, check that they match what you expect from your own records before relying on them. Then pick the two or three findings that matter most for the decision this form supports, and write them as actions in the action plan, each with an owner (a role), a measure of success and a start window. Share the completed form with the people who answered so they can confirm it reads correctly.`,
     sample: { scenario: 'A fictional example, not real data, to show what a completed form can look like.', values: sampleValues, tables: sampleTables },
     sourceMap: map,

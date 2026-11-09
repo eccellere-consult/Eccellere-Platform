@@ -49,6 +49,13 @@ export type Rule =
    * Capital rationing: from a table of projects, pick those to fund within a budget. Projects are ranked by value per unit of cost (profitability index);
    * a project is funded when its value is positive and it still fits in what is left of the budget. `show` chooses the list of names, the total cost or the total value.
    */
+  /**
+   * A summary of a list of answer fields, for questionnaires and worksheets. `progress`: how many were answered. `yes`: how many of the answered Yes/No
+   * items are Yes. `score`: an ordinal answer such as "Not at all / Somewhat / To a large Extent" turned into points (`points`), left-out answers
+   * (`exclude`, for example N/A) ignored, shown as a percentage of the best possible and, when `bands` are given, the band it falls in.
+   * Plain counting and the points written in the rule: no AI, nothing invented.
+   */
+  | { op: 'answers'; fields: string[]; show: 'progress' | 'yes' | 'score'; points?: Record<string, number>; exclude?: string[]; bands?: { min: number; label: string }[] }
   | { op: 'ration'; table: string; name: string; cost: string; value: string; budget: string; show: 'names' | 'cost' | 'value' };
 
 // ── The declarative tool ─────────────────────────────────────────────────────────────────────────────────────────────
@@ -206,6 +213,24 @@ export function ruleFn(rule: Rule, cm?: ComputedMap): (row: Row | undefined, v: 
           const rs = rowsOf(v, rule.table).map((r) => ({ a: toNum(colText(r, rule.table, rule.value, v, cm)), w: toNum(colText(r, rule.table, rule.weight, v, cm)) })).filter((x): x is { a: number; w: number } => x.a !== null && x.w !== null);
           const w = rs.reduce((s, x) => s + x.w, 0);
           return rs.length && w !== 0 ? show(rs.reduce((s, x) => s + x.a * x.w, 0) / w, rule.format ?? 'dp1') : null;
+        }
+        case 'answers': {
+          const vals = rule.fields.map((k) => (v.fields[k] ?? '').trim()).filter(Boolean);
+          const pct = (a: number, b: number) => fmtNum((a / b) * 100, 0);
+          if (rule.show === 'progress') return `${vals.length} of ${rule.fields.length} answered (${pct(vals.length, rule.fields.length)}%)`;
+          if (rule.show === 'yes') {
+            const yn = vals.filter((x) => /^(yes|no)$/i.test(x));
+            return yn.length ? `${yn.filter((x) => /^yes$/i.test(x)).length} of ${yn.length} answered Yes (${pct(yn.filter((x) => /^yes$/i.test(x)).length, yn.length)}%)` : null;
+          }
+          const pts = rule.points ?? {};
+          const lower: Record<string, number> = Object.fromEntries(Object.entries(pts).map(([k, n]) => [k.toLowerCase(), n]));
+          const skip = new Set((rule.exclude ?? []).map((x) => x.toLowerCase()));
+          const scored = vals.map((x) => x.toLowerCase()).filter((x) => !skip.has(x) && x in lower).map((x) => lower[x]);
+          const best = Math.max(...Object.values(pts), 0);
+          if (!scored.length || best <= 0) return null;
+          const p = (scored.reduce((a, b) => a + b, 0) / (scored.length * best)) * 100;
+          const band = [...(rule.bands ?? [])].sort((a, b) => b.min - a.min).find((b) => p >= b.min);
+          return `${fmtNum(p, 0)}% from ${scored.length} scored answer${scored.length === 1 ? '' : 's'}${band ? ` (${band.label})` : ''}`;
         }
         case 'top': {
           const rs = rowsOf(v, rule.table).map((r) => ({ n: toNum(colText(r, rule.table, rule.by, v, cm)), l: colText(r, rule.table, rule.label, v, cm).trim() })).filter((x): x is { n: number; l: string } => x.n !== null && x.l !== '');
@@ -432,6 +457,13 @@ export function validateDeclarative(raw: unknown): Issue[] {
         if (!cols) { err(path, `unknown table ${r.table}`); break; }
         for (const c of [r.name, r.cost, r.value]) if (!cols.has(c)) err(path, `unknown column ${c} in ${r.table}`);
         if (!fieldKeys.has(r.budget)) err(path, `unknown field ${r.budget}`);
+        break;
+      }
+      case 'answers': {
+        if (!Array.isArray(r.fields) || !r.fields.length) err(path, 'answers needs at least one field');
+        for (const f of r.fields ?? []) if (!fieldKeys.has(f)) err(path, `unknown field ${f}`);
+        if (r.show === 'score' && !Object.keys(r.points ?? {}).length) err(path, 'a score needs points for the answers');
+        if (!['progress', 'yes', 'score'].includes(r.show)) err(path, 'show must be progress, yes or score');
         break;
       }
       case 'template': for (const m of r.text.matchAll(/\{([a-z0-9_]+)\}/g)) if (!fieldKeys.has(m[1])) err(path, `unknown field {${m[1]}}`); break;
