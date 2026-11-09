@@ -2,7 +2,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { structuredForm } from '@/lib/forms/structured';
 import { makeFormBuilder } from '@/lib/forms/build';
-import { normaliseDeclarative, qualityGate } from '@/lib/strategyModels/declarative';
+import { interpret, normaliseDeclarative, qualityGate } from '@/lib/strategyModels/declarative';
+import type { ModelValues } from '@/lib/strategyModels/types';
 import type { ElementKind, SourceElement, SourceReading } from '@/lib/forms/source';
 
 /** A small Word-like document: cover details, a module with a question table, a worksheet table, a checklist, repeated generic headings. */
@@ -97,5 +98,40 @@ describe('the Form Builder with no AI', () => {
       const fields = (out.tool.definition as { sections: { parts: unknown[] }[] }).sections.flatMap((s) => s.parts);
       expect(fields.length).toBeGreaterThan(8);
     }
+  });
+});
+
+describe('results worked out from the answers', () => {
+  const rows: [ElementKind, string][] = [['heading', 'Practices']];
+  ['Do you use total quality management?', 'Do you use statistical process control?', 'Do you trace every batch?', 'Do you run source inspections?', 'Do you measure the cost of quality?'].forEach((q) => {
+    rows.push(['question', q], ['option', 'Not at all'], ['option', 'Somewhat'], ['option', 'To a large Extent'], ['option', 'N/A']);
+  });
+  const built = structuredForm([doc(rows)], { name: 'Practice check', category: 'strategy' as never })!;
+  const { tool } = normaliseDeclarative(built.form);
+  const def = interpret(tool!);
+  const keys = tool!.sections.flatMap((x) => x.parts).filter((p) => p.kind === 'field' && (p as { options?: string[] }).options?.includes('Somewhat')).map((p) => p.key);
+  const out = (key: string, fields: Record<string, string>) => def.outputs!.find((o) => o.key === key)!.compute({ fields, tables: {} } as ModelValues);
+
+  it('passes the quality check with its results', () => { expect(qualityGate(tool).ok).toBe(true); expect(keys).toHaveLength(5); });
+  it('counts how much is answered', () => {
+    expect(out('answered', { [keys[0]]: 'Somewhat', [keys[1]]: 'Not at all' })).toMatch(/^2 of \d+ answered \(\d+%\)$/);
+  });
+  it('turns the agreed order into a percentage and a band, ignoring N/A and unanswered', () => {
+    // 2 + 0 + 1 over 3 scored answers with a best of 2 each = 3/6 = 50%
+    expect(out('practice_maturity', { [keys[0]]: 'To a large Extent', [keys[1]]: 'Not at all', [keys[2]]: 'Somewhat', [keys[3]]: 'N/A' })).toBe('50% from 3 scored answers (Developing)');
+    expect(out('practice_maturity', { [keys[0]]: 'To a large Extent', [keys[1]]: 'To a large Extent' })).toBe('100% from 2 scored answers (Strong)');
+    expect(out('practice_maturity', { [keys[0]]: 'N/A' })).toBeNull();
+  });
+  it('counts Yes answers on a checklist', () => {
+    const d = doc([
+      ['heading', 'Checklist'], ['row', 'Name | ____'], ['row', 'City | ____'], ['row', 'Role | ____'],
+      ['tablehead', 'Activity Area | Key Activities | Tools'],
+      ['row', 'SETUP | • Set up company email • Register the trademark • Open a bank account | x'],
+    ]);
+    const t = normaliseDeclarative(structuredForm([d], { name: 'Check list', category: 'strategy' as never })!.form).tool!;
+    const y = t.sections.flatMap((x) => x.parts).filter((p) => (p as { options?: string[] }).options?.join('/') === 'Yes/No').map((p) => p.key);
+    expect(y).toHaveLength(3);
+    const res = interpret(t).outputs!.find((o) => o.key === 'checklist_yes')!.compute({ fields: { [y[0]]: 'Yes', [y[1]]: 'Yes', [y[2]]: 'No' }, tables: {} } as ModelValues);
+    expect(res).toBe('2 of 3 answered Yes (67%)');
   });
 });
