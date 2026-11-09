@@ -44,6 +44,7 @@ export async function makeOnlineVersion(asset: ToolkitAsset, deps: MakeOnlineDep
     practice: deps.practice,
     assetType: 'toolkit',
     readings: [reading],
+    noAi: true,
   });
   if (out.kind === 'ai_down') return { kind: 'ai_down', reason: out.reason };
   if (out.kind === 'failed') return { kind: 'failed', reason: out.reason };

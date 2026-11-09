@@ -339,10 +339,13 @@ export function validateDeclarative(raw: unknown): Issue[] {
   else for (const m of diagramIssues(t.diagram)) err('diagram', m);
   if (!t.sample) warn('sample', 'No worked example');
 
-  const fieldKeys = new Set<string>(), tableCols = new Map<string, Set<string>>(), keys = new Set<string>(), labels = new Set<string>();
+  const fieldKeys = new Set<string>(), tableCols = new Map<string, Set<string>>(), keys = new Set<string>();
+  // Two questions may read the same in different steps (a toolkit can ask "Notes" in every step); within one step they must differ.
+  let labels = new Set<string>();
   if (!Array.isArray(t.sections) || !t.sections.length) err('sections', 'at least one section is required');
   (t.sections ?? []).forEach((s, si) => {
     const sp = `sections[${si}]`;
+    labels = new Set<string>();
     if (!s.title?.trim()) err(`${sp}.title`, 'title is required');
     if (!Array.isArray(s.parts) || !s.parts.length) err(`${sp}.parts`, 'a section needs at least one part');
     (s.parts ?? []).forEach((p, pi) => {

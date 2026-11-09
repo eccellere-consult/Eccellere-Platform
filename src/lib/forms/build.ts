@@ -25,6 +25,7 @@ import { depthOf } from '@/lib/tools/depth';
 import { assetTypeLabel, cleanClassification, suggestClassification, shapeOf, type AssetTypeId, type Classification } from '@/lib/tools/taxonomy';
 import { slideHash } from '@/lib/import/author';
 import { faithfulForm } from './fromSheets';
+import { structuredForm } from './structured';
 
 export interface BuildRequest {
   /** what the administrator wants, in their own words (may be empty when a document is supplied) */
@@ -40,6 +41,8 @@ export interface BuildRequest {
   base?: { slug: string; name: string; tool: DeclarativeTool } | null;
   /** the form already built from the uploaded file without AI; the AI is asked to improve it (set by the builder, not by callers) */
   baseline?: Record<string, unknown>;
+  /** build only from the file, with no AI call at all: free, fast and repeatable (used for the one-click and batch paths) */
+  noAi?: boolean;
   /** edited skill texts; defaults are used when absent */
   formSkill?: string;
   draftSkill?: string;
@@ -168,7 +171,7 @@ export function makeFormBuilder(deps: BuilderDeps) {
 
     let suggestion = readSuggestion(r.originatorSuggestion);
     const need = { diagram: !tool.diagram, sample: !tool.sample, originator: !suggestion };
-    if (need.diagram || need.sample || need.originator) {
+    if (!req.noAi && (need.diagram || need.sample || need.originator)) {
       calls.n += 1;
       const done = await completePage(deps.generate, tool, need);
       tool = done.tool;
@@ -227,7 +230,9 @@ export function makeFormBuilder(deps: BuilderDeps) {
     const diag: string[] = [];
     const calls = { n: 0 };
     // An upload first becomes a working form with no AI, so there is always a valid result; the AI then improves it.
-    const rule = req.readings?.length ? faithfulForm(req.readings, { name: req.name, category: declarativeCategory(req.category) }) : null;
+    // Documents (Word, PDF, text) are read step by step; sheets and anything the document reader cannot make sense of use the sheet reader.
+    const readOpts = { name: req.name, category: declarativeCategory(req.category) };
+    const rule = req.readings?.length ? (structuredForm(req.readings, readOpts) ?? faithfulForm(req.readings, readOpts)) : null;
     if (rule) req = { ...req, baseline: rule.form };
     let problem = '';
     let compact = false;
@@ -250,6 +255,10 @@ export function makeFormBuilder(deps: BuilderDeps) {
       if (pick === ruled && ruled.input.provenance) { const pv = ruled.input.provenance as Record<string, unknown>; pv.draftedBy = 'rules'; pv.provider = 'rules'; pv.model = 'built from your file'; }
       return { kind: 'ok', tool: pick.input, coverage: pick.coverage, notes };
     };
+    if (req.noAi) {
+      const only = await settle(null, 'Built directly from your file with no AI, as requested. Use “Modify with AI” to improve it.');
+      return only ?? { kind: 'failed', reason: 'Nothing in that file could be turned into questions without the AI.' };
+    }
     // At most two attempts. The second happens when the first was cut off (asks for a shorter form) or the quality check found
     // errors (lists them for the AI to fix), the same way the marketplace's own drafting works.
     for (let attempt = 1; attempt <= 2; attempt++) {
