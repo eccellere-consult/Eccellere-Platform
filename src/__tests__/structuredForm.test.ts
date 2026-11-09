@@ -146,3 +146,26 @@ describe('results worked out from the answers', () => {
     expect(res).toBe('2 of 3 answered Yes (67%)');
   });
 });
+
+describe('forms from sheets pass the quality check', () => {
+  it('numbers repeated labels in one step and keeps a long title within the name and address limits', async () => {
+    const { finishForm } = await import('@/lib/forms/fromSheets');
+    const table = (key: string) => ({ kind: 'table', key, label: 'Summary table', help: 'Fill in the rows of the summary table.', rowLabel: 'Row', minRows: 1, columns: [{ key: 'item', header: 'Item', help: 'What the row is about.', type: 'text' }, { key: 'note', header: 'Note', help: 'A short note on the item.', type: 'text' }] });
+    const field = (key: string, label: string) => ({ kind: 'field', key, label, type: 'text', help: `Fill in “${label}”.`, example: 'Example answer' });
+    const longTitle = 'The Complete Operations Excellence Diagnostic and Improvement Toolkit for Growing Manufacturing Businesses in India and Abroad';
+    const r = finishForm({
+      name: longTitle, category: 'strategy' as never, readings: [{ fileName: 'kit.xlsx', kind: 'excel', elements: [], warnings: [], truncated: false }] as never,
+      sections: [{ key: 'one', title: 'Summary', summary: 'The summary.', parts: [field('a', 'Company'), field('b', 'Sector'), table('t1'), table('t2')] }],
+      derived: [], sampleValues: { a: 'Sample answer', b: 'Sample answer' }, sampleTables: { t1: [{ item: 'One', note: 'Two' }], t2: [{ item: 'One', note: 'Two' }] },
+      map: [], approximations: [], firstField: { key: 'a', label: 'Company' },
+    });
+    const { tool } = normaliseDeclarative(r.form);
+    expect(tool).toBeTruthy();
+    const labels = tool!.sections[1].parts.map((p) => p.label);
+    expect(labels).toContain('Summary table');
+    expect(labels).toContain('Summary table (2)');
+    expect((r.form.name as string).length).toBeLessThanOrEqual(80);
+    expect((r.form.slug as string).length).toBeLessThanOrEqual(60);
+    expect(qualityGate(tool).ok).toBe(true);
+  });
+});

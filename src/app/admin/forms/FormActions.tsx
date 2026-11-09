@@ -56,8 +56,8 @@ export default function FormActions({ slug, status, onChanged, onDeleted, aiRead
       {msg && <p className={`mt-2 text-xs ${msg.ok ? "text-emerald-800" : "text-red-700"}`} role="status">{msg.text}</p>}
       {preview && (
         <div className="mt-3 border border-eccellere-border bg-white">
-          <p className="border-b border-eccellere-border px-3 py-1.5 text-xs text-ink-mid">Preview. Nothing you type here is saved. <a className="underline" href={`/consulting/library/${encodeURIComponent(slug)}`} target="_blank" rel="noreferrer">Open in a new tab</a></p>
-          <iframe key={version} title="Preview of the form" src={`/consulting/library/${encodeURIComponent(slug)}`} className="h-[720px] w-full" />
+          <p className="border-b border-eccellere-border px-3 py-1.5 text-xs text-ink-mid">Preview. Nothing you type here is saved. <a className="underline" href={`/consulting/library/${encodeURIComponent(slug)}?preview=1`} target="_blank" rel="noreferrer">Open in a new tab</a></p>
+          <iframe key={version} title="Preview of the form" src={`/consulting/library/${encodeURIComponent(slug)}?preview=1`} className="h-[720px] w-full" />
         </div>
       )}
     </div>

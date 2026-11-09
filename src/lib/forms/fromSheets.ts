@@ -174,7 +174,20 @@ export interface FinishArgs {
 
 /** The plain furniture every form gets around the sections built from a file: a context section, an action plan, a diagram, a summary result, a labelled sample. Shared by both file readers. */
 export function finishForm(a: FinishArgs): FaithfulResult {
-  const { name, readings, sections, derived, sampleValues, sampleTables, map, approximations, firstField } = a;
+  const { readings, sections, derived, sampleValues, sampleTables, map, approximations, firstField } = a;
+  // A title can be long; the form's name must be 2 to 80 characters and its address (slug) at most 60.
+  const name = cut(a.name, 80);
+  // Two parts with the same label in one step (for example two tables called "Summary table") fail the quality check: number the repeats.
+  for (const sec of sections) {
+    const seen = new Set<string>();
+    for (const part of ((sec.parts as Record<string, unknown>[] | undefined) ?? [])) {
+      const base = String(part.label ?? '');
+      let label = base;
+      for (let n = 2; seen.has(label.trim().toLowerCase()); n++) label = `${base} (${n})`;
+      seen.add(label.trim().toLowerCase());
+      part.label = label;
+    }
+  }
   const opts = { category: a.category };
   const context = {
     key: 'context', title: 'About this form', summary: 'Say who is filling this in and why. This section was added; it is not in the uploaded file.',
@@ -204,7 +217,7 @@ export function finishForm(a: FinishArgs): FaithfulResult {
 
   const form: Record<string, unknown> = {
     schema: 1,
-    slug: snake(name).replace(/_/g, '-'),
+    slug: snake(name).replace(/_/g, '-').slice(0, 60).replace(/-+$/, ''),
     name,
     category: opts.category,
     does: cut(`Collects the same information as the uploaded file “${readings[0]?.fileName ?? name}”, in the same order, and ends with an action plan.`, 300),
