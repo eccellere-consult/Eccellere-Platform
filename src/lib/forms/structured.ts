@@ -57,7 +57,7 @@ function headerOf(cells: string[]): Header | null {
 const ORDINAL: { options: string[]; points: Record<string, number>; exclude: string[] }[] = [
   { options: ['not at all', 'somewhat', 'to a large extent'], points: { 'Not at all': 0, Somewhat: 1, 'To a large Extent': 2 }, exclude: ['N/A'] },
 ];
-/** Placeholder band edges on a 0 to 100 scale. They are shown in the result's help and need the owner's approval. */
+/** Band edges on a 0 to 100 scale, approved by the owner on 2026-11-09: Low under 34, Developing 34 to 66, Strong 67 and over. */
 const BANDS = [{ min: 0, label: 'Low' }, { min: 34, label: 'Developing' }, { min: 67, label: 'Strong' }];
 
 /** The results a converted form gets: how much is answered, how many checklist items are Yes, and a maturity percentage where the answers have an agreed order. */
@@ -69,7 +69,7 @@ function resultsFor(sections: { parts: Part[] }[]): Record<string, unknown>[] {
   if (yn.length >= 3) out.push({ key: 'checklist_yes', label: 'Checklist items answered Yes', rule: { op: 'answers', show: 'yes', fields: yn.map((f) => String(f.key)) } });
   for (const o of ORDINAL) {
     const group = fields.filter((f) => Array.isArray(f.options) && (f.options as string[]).map((x) => x.toLowerCase()).filter((x) => !o.exclude.map((e) => e.toLowerCase()).includes(x)).join('|') === o.options.join('|'));
-    if (group.length >= 5) out.push({ key: 'practice_maturity', label: 'Practice maturity (placeholder bands, to be approved)', rule: { op: 'answers', show: 'score', fields: group.map((f) => String(f.key)), points: o.points, exclude: o.exclude, bands: BANDS } });
+    if (group.length >= 5) out.push({ key: 'practice_maturity', label: 'Practice maturity', rule: { op: 'answers', show: 'score', fields: group.map((f) => String(f.key)), points: o.points, exclude: o.exclude, bands: BANDS } });
   }
   return out;
 }
