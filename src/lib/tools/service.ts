@@ -316,6 +316,12 @@ export async function getLibraryTool(repo: ToolsRepo, slug: string): Promise<Too
   return tool && (tool.status === 'REVIEWED' || tool.status === 'PUBLISHED') ? tool : null;
 }
 
+/** What the Eccellere team may look at while a form is still being built: any tool that is not archived, drafts included. Never offered to clients. */
+export async function getPreviewTool(repo: ToolsRepo, slug: string): Promise<ToolRecord | null> {
+  const tool = await repo.getToolBySlug(slug);
+  return tool && tool.status !== 'ARCHIVED' ? tool : null;
+}
+
 /** Move a tool to another consulting practice (the library drop-down). */
 export async function setToolPractice(repo: ToolsRepo, slug: string, practice: string): Promise<ToolRecord> {
   const p = asPractice(practice);
