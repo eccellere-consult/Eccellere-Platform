@@ -14,7 +14,7 @@ function deps(over: Partial<MakeOnlineDeps> = {}): MakeOnlineDeps & { saved: Too
     saved,
     readFile: async () => ({ name: 'kit.xlsx', data: Buffer.from('x') }),
     readSource: async () => reading,
-    toolExists: async () => false,
+    toolState: async () => null,
     build: async () => ({ kind: 'ok', tool, coverage: null, notes: ['n1'] }),
     save: async (t) => { saved.push(t); return { slug: t.slug, name: t.name, status: String(t.status) }; },
     category: 'Strategy' as never,
@@ -41,9 +41,15 @@ describe('make a fill-online version of a toolkit', () => {
   });
   it('does nothing when an online version already exists', async () => {
     const build = vi.fn();
-    const r = await makeOnlineVersion(asset, deps({ toolExists: async () => true, build }));
+    const r = await makeOnlineVersion(asset, deps({ toolState: async () => ({ replaceable: false }), build }));
     expect(r).toEqual({ kind: 'exists', slug: 'change-readiness-kit' });
     expect(build).not.toHaveBeenCalled();
+  });
+  it('rebuilds an unreviewed draft made by the document reader, over the same slug', async () => {
+    const d = deps({ toolState: async () => ({ replaceable: true }) });
+    const r = await makeOnlineVersion(asset, d);
+    expect(r.kind).toBe('ok');
+    expect(d.saved[0].slug).toBe('change-readiness-kit');
   });
   it('says so when no file is attached, and does not call the AI', async () => {
     const build = vi.fn();

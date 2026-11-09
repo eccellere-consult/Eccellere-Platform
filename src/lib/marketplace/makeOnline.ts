@@ -14,7 +14,8 @@ export interface MakeOnlineDeps {
   /** the toolkit's first downloadable file, or null when none is attached or it is not on this server */
   readFile: () => Promise<{ name: string; data: Buffer } | null>;
   readSource: (name: string, data: Buffer) => Promise<SourceReading>;
-  toolExists: (slug: string) => Promise<boolean>;
+  /** null when no tool has this slug; otherwise whether it is an unreviewed draft the document reader made, which a fresh build may replace */
+  toolState: (slug: string) => Promise<{ replaceable: boolean } | null>;
   build: (req: BuildRequest) => Promise<BuildOutcome>;
   save: (tool: ToolInput) => Promise<{ slug: string; name: string; status: string }>;
   category: BuildRequest['category'];
@@ -30,7 +31,8 @@ export type MakeOnlineResult =
   | { kind: 'failed'; reason: string };
 
 export async function makeOnlineVersion(asset: ToolkitAsset, deps: MakeOnlineDeps): Promise<MakeOnlineResult> {
-  if (await deps.toolExists(asset.slug)) return { kind: 'exists', slug: asset.slug };
+  const state = await deps.toolState(asset.slug);
+  if (state && !state.replaceable) return { kind: 'exists', slug: asset.slug };
   const file = await deps.readFile();
   if (!file) return { kind: 'no_file' };
   let reading: SourceReading;

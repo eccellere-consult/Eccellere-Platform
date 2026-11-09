@@ -26,7 +26,13 @@ export async function makeOnlineForAsset(asset: ToolkitAsset & { fileUrls: unkno
       } catch { return null; }
     },
     readSource,
-    toolExists: async (slug) => !!(await prismaRepo.getToolBySlug(slug)),
+    // Only an unreviewed draft made by the document reader may be rebuilt; reviewed, published, archived or hand-made tools are never touched.
+    toolState: async (slug) => {
+      const t = await prismaRepo.getToolBySlug(slug);
+      if (!t) return null;
+      const by = (t.provenance as { draftedBy?: string } | null)?.draftedBy;
+      return { replaceable: (t.status === "DRAFT" || t.status === "NEEDS_REVIEW") && by === "rules" };
+    },
     build: (req) => builder({ ...req, ...skills }),
     save: (t) => prismaRepo.saveTool(t),
     category: suggestCategory(text),

@@ -122,6 +122,8 @@ export function reconcile(
     const m = byId.get(e.id);
     if (unsent.has(e.id)) return { ...base, status: SUBSTANTIVE.includes(e.kind) ? 'not-sent' : 'structure', note: 'Too long to send to the AI in one go.' };
     if (!SUBSTANTIVE.includes(e.kind)) return { ...base, status: 'structure', target: m?.target };
+    // Reading the document reader recognised as not a question (advice, benchmarks, contents): listed as left out, with the reason, never silent.
+    if (m && /^left-out:reading\b/.test(m.target)) return { ...base, status: 'excluded', target: m.target, note: m.note || 'Reading in the document, not a question; left out by the document reader.' };
     if (m && /^excluded\b/i.test(m.target)) return { ...base, status: 'proposed-exclusion', note: m.note || 'The AI left this out without a reason.' };
     if (m && inv.keys.has(m.target)) return { ...base, status: 'mapped', target: m.target };
     if (matchesForm(e, inv)) return { ...base, status: 'auto', note: m ? 'The AI pointed to something not in the form; the same words were found in it.' : undefined };

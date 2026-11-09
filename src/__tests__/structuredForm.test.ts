@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest';
 import { structuredForm } from '@/lib/forms/structured';
+import { coverageErrors, reconcile } from '@/lib/forms/reconcile';
 import { makeFormBuilder } from '@/lib/forms/build';
 import { interpret, normaliseDeclarative, qualityGate } from '@/lib/strategyModels/declarative';
 import type { ModelValues } from '@/lib/strategyModels/types';
@@ -66,6 +67,16 @@ describe('structured document conversion', () => {
     expect(labels).not.toContain('Y Combinator');
     expect(labels).not.toContain('Sequoia');
     expect(r.approximations.join(' ')).toMatch(/not turned into questions/);
+  });
+  it('lists reading rows as left out by the reader (so they never block "Looks right")', () => {
+    const maps = (r.form as { sourceMap?: { element: string; target: string }[] }).sourceMap ?? [];
+    expect(maps.filter((m) => m.target === 'left-out:reading').length).toBeGreaterThanOrEqual(2);
+    expect(maps.some((m) => m.target.startsWith('section:') && !tool!.sections.some((s) => m.target === `section:${s.key}`))).toBe(false);
+  });
+  it('leaves no source item open, so the draft can be marked reviewed', () => {
+    const cov = reconcile(DOC.elements, r.form as never, tool!);
+    expect(coverageErrors(cov)).toBeNull();
+    expect(cov.counts.excluded).toBeGreaterThanOrEqual(2);
   });
   it('passes the quality check even when the same words appear in different steps', () => {
     expect(qualityGate(tool).ok).toBe(true);
