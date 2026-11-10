@@ -84,6 +84,28 @@ const filled = [
   mine('Options', JSON.stringify([{ option: 'Auto reminders', impact: '4', effort: '2' }, { option: 'New system', impact: '5', effort: '5' }])),
 ];
 
+describe('drafting one section, using the suggested questions', () => {
+  it('sends the suggested questions as context and drafts only the chosen section', async () => {
+    let seen: Parameters<GenerateFn>[0] | undefined;
+    const generate: GenerateFn = async (a) => { seen = a; return reply(fillReply); };
+    const sec = TOOL.def.sections[0];
+    const labels = new Set(sec.parts.map((p) => p.label));
+    const r = await aiFill({ generate, explainDown: down }, { tool: TOOL, current: [], brief: 'We sell to small shops.', questions: [{ question: 'Which channel brings most first orders?', why: '' }], sectionKey: sec.key });
+    if (!r.ok) throw new Error(r.reason);
+    expect(seen!.user).toMatch(/QUESTIONS THE PERSON IS THINKING THROUGH/);
+    expect(seen!.user).toMatch(/Which channel brings most first orders/);
+    // only this section's parts were asked for
+    const asked = TOOL.def.sections.flatMap((x) => x.parts.map((p) => p.label)).filter((l) => seen!.system.includes(`"${l}"`) || seen!.system.includes(l));
+    for (const l of asked) if (!labels.has(l) && TOOL.def.sections.length > 1) expect(seen!.system.split('Elements to draft:')[1]).not.toContain(`"${l}"`);
+  });
+  it('says so when the chosen section is already fully answered', async () => {
+    const sec = TOOL.def.sections[0];
+    const cur = sec.parts.map((p) => mine(p.label, p.kind === 'table' ? JSON.stringify([{ a: '1' }]) : 'done'));
+    const r = await aiFill({ generate: async () => reply(fillReply), explainDown: down }, { tool: TOOL, current: cur, brief: 'x', sectionKey: sec.key });
+    expect(r).toMatchObject({ ok: false, code: 'NOTHING_TO_DO' });
+  });
+});
+
 describe('the analysis', () => {
   it('will not analyse an empty worksheet', async () => {
     const r = await aiAnalyse({ generate: async () => reply(analysisReply), explainDown: down }, { tool: TOOL, fields: [mine('What are we choosing between?', 'x')] });

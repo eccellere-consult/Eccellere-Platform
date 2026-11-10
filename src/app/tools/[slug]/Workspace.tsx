@@ -147,6 +147,7 @@ function WorkspaceInner({ slug, def, toolName, sample }: { slug: string; def: Mo
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [uploadMsg, setUploadMsg] = useState<{ kind: "ok" | "warn"; text: string; notes: string[] } | null>(null);
   const [busy, setBusy] = useState<"fill" | "analyse" | "undo" | "questions" | null>(null);
+  const [busySection, setBusySection] = useState<string | null>(null);
   const [aiMsg, setAiMsg] = useState<{ kind: "ok" | "warn"; text: string } | null>(null);
   const conflictRef = useRef<Saved | null>(null);
 
@@ -261,12 +262,13 @@ function WorkspaceInner({ slug, def, toolName, sample }: { slug: string; def: Mo
     } catch { setUploadMsg({ kind: "warn", text: "That file could not be read. Is it the Excel template from this page?", notes: [] }); }
   }
 
-  async function ai(action: "fill" | "analyse" | "undo" | "questions") {
+  async function ai(action: "fill" | "analyse" | "undo" | "questions", sectionKey?: string) {
     setAiMsg(null);
     setBusy(action);
+    setBusySection(sectionKey ?? null);
     try {
       if (dirty.current) await flush();
-      const r = await fetch(`/api/tools/${slug}/ai`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, brief, expectedVersion: versionRef.current }) });
+      const r = await fetch(`/api/tools/${slug}/ai`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, brief, sectionKey, questions: action === "fill" ? questions : undefined, expectedVersion: versionRef.current }) });
       const d = await readJson(r);
       if (r.status === 409) { conflictRef.current = d.record ?? null; setSaveState("conflict"); return; }
       if (!r.ok) { setAiMsg({ kind: "warn", text: d.error ?? "The AI helper could not do that." }); return; }
@@ -284,7 +286,7 @@ function WorkspaceInner({ slug, def, toolName, sample }: { slug: string; def: Mo
           : action === "analyse" ? "Analysis written. It is based only on what is in the worksheet; check it before you rely on it." : "Your earlier answers are back.",
       });
     } catch { setAiMsg({ kind: "warn", text: "Could not reach the server. Please try again." }); }
-    finally { setBusy(null); }
+    finally { setBusy(null); setBusySection(null); }
   }
 
   if (load === "loading") return <p className="py-10 text-sm text-ink-mid"><Loader2 className="mr-2 inline h-4 w-4 animate-spin" />Opening your worksheet…</p>;
@@ -381,7 +383,7 @@ function WorkspaceInner({ slug, def, toolName, sample }: { slug: string; def: Mo
         <p className="mt-2 text-sm text-ink-mid">Describe your situation in a few sentences. The AI can suggest questions to think through, draft the parts you have not filled in, and write the analysis using that context. Your own answers are never changed. Suggestions are marked and can be undone.</p>
         <textarea className={cn(input, "mt-3")} rows={3} value={brief} onChange={(e) => changeBrief(e.target.value)} placeholder="e.g. we are a 200-person distributor and late customer payments are hurting cash flow…" aria-label="Your situation" />
         <button type="button" disabled={!!busy || (!brief.trim() && nothingYet)} onClick={() => ai("fill")} className={cn(BTN_MAIN, "mt-3 w-full")}>
-          {busy === "fill" ? <><Loader2 className="mr-1 inline h-4 w-4 animate-spin" />Drafting…</> : "Draft the empty parts"}
+          {busy === "fill" && !busySection ? <><Loader2 className="mr-1 inline h-4 w-4 animate-spin" />Drafting…</> : "Draft the empty parts"}
         </button>
         <div className="mt-3 flex flex-wrap gap-2">
           <button type="button" disabled={!!busy || !brief.trim()} onClick={() => ai("questions")} className={cn(BTN_LINE, "inline-flex items-center gap-1 px-3 py-1.5 text-xs")}>
@@ -449,6 +451,12 @@ function WorkspaceInner({ slug, def, toolName, sample }: { slug: string; def: Mo
         <section key={s.key} className={cn(CARD, "break-inside-avoid")} aria-labelledby={`s-${s.key}`}>
           <h3 id={`s-${s.key}`} className={`${LABEL} m-0`}>{s.title}</h3>
           <p className="mt-1.5 text-sm text-ink-mid">{s.summary}</p>
+          <div className="no-print mt-3 flex flex-wrap items-center gap-3">
+            <button type="button" disabled={!!busy || (!brief.trim() && nothingYet)} onClick={() => ai("fill", s.key)} className={cn(BTN_LINE, "inline-flex items-center gap-1 px-3 py-1.5 text-xs")}>
+              {busy === "fill" && busySection === s.key ? <><Loader2 className="mr-1 inline h-3.5 w-3.5 animate-spin" />Drafting this section…</> : <><Sparkles className="h-3.5 w-3.5" /> Draft this section with AI</>}
+            </button>
+            <span className="text-[11px] text-ink-light">{!brief.trim() && nothingYet ? "Describe your situation in AI help (top of the page) first." : questions.length ? "Uses your situation note and the suggested questions. Only empty parts are drafted; your answers are never changed." : "Uses your situation note. Only empty parts are drafted; your answers are never changed."}</span>
+          </div>
           {s.parts.map((p) => renderPart(p))}
         </section>
       ))}

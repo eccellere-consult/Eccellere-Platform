@@ -23,10 +23,13 @@ export const POST = toolsGuard(async (req: NextRequest, ctx: Ctx) => {
   const { slug } = await ctx.params;
   const u = await userTool(slug);
   if ("error" in u) return u.error;
-  let body: { action?: unknown; brief?: unknown; expectedVersion?: unknown };
+  let body: { action?: unknown; brief?: unknown; expectedVersion?: unknown; sectionKey?: unknown; questions?: unknown };
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Invalid request." }, { status: 400 }); }
   const expected = Number.isInteger(body.expectedVersion) ? (body.expectedVersion as number) : null;
   const brief = typeof body.brief === "string" ? body.brief.slice(0, 8000) : "";
+  const sectionKey = typeof body.sectionKey === "string" ? body.sectionKey.slice(0, 80) : undefined;
+  const questions = (Array.isArray(body.questions) ? body.questions : []).slice(0, 8)
+    .map((q) => ({ question: String((q as { question?: unknown })?.question ?? "").slice(0, 400), why: "" })).filter((q) => q.question.trim());
   const current = await getFillin(prismaRepo, u.userId, slug);
 
   try {
@@ -46,7 +49,7 @@ export const POST = toolsGuard(async (req: NextRequest, ctx: Ctx) => {
       return NextResponse.json({ questions: r.questions });
     }
     if (body.action === "fill") {
-      const r = await aiFill(realAiDeps, { tool: u.ai, current: fields, brief });
+      const r = await aiFill(realAiDeps, { tool: u.ai, current: fields, brief, questions, sectionKey });
       if (!r.ok) return NextResponse.json({ error: r.reason, code: r.code }, { status: FAIL_STATUS[r.code] });
       const record = await saveFillin(prismaRepo, u.userId, slug, { fields: r.fields }, { expectedVersion: current ? current.version : 0, snapshotReason: "ai" });
       return NextResponse.json({ record, drafted: r.drafted });
