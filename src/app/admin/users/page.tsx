@@ -1,179 +1,167 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Search, ChevronLeft, Filter, Shield, User, Mail, Calendar, MoreHorizontal } from "lucide-react";
+import { Search, ChevronLeft, Filter, Shield, User, Mail, Calendar, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ASSIGNABLE_ROLES, ROLE_LABEL, groupOf } from "@/lib/admin/userRules";
 
-type UserItem = {
-  id: string;
-  name: string;
-  email: string;
-  role: "admin" | "client" | "specialist";
-  status: "active" | "suspended" | "pending";
-  joined: string;
-  lastLogin: string;
+type UserRow = { id: string; name: string; email: string; role: string; accountStatus: "PENDING" | "APPROVED" | "BLOCKED"; isActive: boolean; createdAt: string; lastLoginAt: string | null };
+
+const GROUP_STYLE = {
+  team: "bg-eccellere-purple/10 text-eccellere-purple",
+  client: "bg-eccellere-gold/10 text-eccellere-gold-deep",
+  specialist: "bg-eccellere-teal/10 text-eccellere-teal",
+} as const;
+const STATUS_STYLE: Record<string, string> = {
+  APPROVED: "bg-eccellere-teal/10 text-eccellere-teal",
+  BLOCKED: "bg-eccellere-error/10 text-eccellere-error",
+  PENDING: "bg-eccellere-gold/10 text-eccellere-gold-deep",
 };
-
-const users: UserItem[] = [
-  { id: "U-001", name: "Admin User", email: "admin@eccellere.in", role: "admin", status: "active", joined: "Jan 2025", lastLogin: "Today" },
-  { id: "U-002", name: "Rajesh Kumar", email: "rajesh@textilesmsme.in", role: "client", status: "active", joined: "Mar 2025", lastLogin: "Today" },
-  { id: "U-003", name: "Vikram Patel", email: "vikram@consultant.in", role: "specialist", status: "active", joined: "Feb 2025", lastLogin: "Yesterday" },
-  { id: "U-004", name: "Priya Sharma", email: "priya@retailchain.in", role: "client", status: "active", joined: "Apr 2025", lastLogin: "Apr 10" },
-  { id: "U-005", name: "Rohit Kapoor", email: "rohit@leanops.com", role: "specialist", status: "active", joined: "Mar 2025", lastLogin: "Apr 8" },
-  { id: "U-006", name: "Meera Rao", email: "meera@digital.co", role: "specialist", status: "active", joined: "May 2025", lastLogin: "Today" },
-  { id: "U-007", name: "Amit Desai", email: "amit@autoparts.in", role: "client", status: "active", joined: "Jun 2025", lastLogin: "Apr 9" },
-  { id: "U-008", name: "Sneha Patel", email: "sneha@foodco.in", role: "client", status: "pending", joined: "Apr 2026", lastLogin: "Never" },
-  { id: "U-009", name: "Ankit Joshi", email: "ankit@logistics.in", role: "client", status: "suspended", joined: "Nov 2025", lastLogin: "Mar 2026" },
-  { id: "U-010", name: "Karan Singh", email: "karan@d2cbrand.in", role: "specialist", status: "pending", joined: "Apr 2026", lastLogin: "Never" },
-  { id: "U-011", name: "Deepak Verma", email: "deepak@hrconsult.in", role: "specialist", status: "suspended", joined: "Jan 2026", lastLogin: "Feb 2026" },
-  { id: "U-012", name: "Neha Gupta", email: "neha@pharma.co.in", role: "client", status: "active", joined: "Sep 2025", lastLogin: "Apr 11" },
-];
-
-const roleConfig: Record<string, { color: string; icon: typeof Shield }> = {
-  admin: { color: "bg-eccellere-purple/10 text-eccellere-purple", icon: Shield },
-  client: { color: "bg-eccellere-gold/10 text-eccellere-gold", icon: User },
-  specialist: { color: "bg-eccellere-teal/10 text-eccellere-teal", icon: User },
-};
-
-const statusStyles: Record<string, string> = {
-  active: "bg-eccellere-teal/10 text-eccellere-teal",
-  suspended: "bg-eccellere-error/10 text-eccellere-error",
-  pending: "bg-eccellere-gold/10 text-eccellere-gold",
-};
+const STATUS_WORD: Record<string, string> = { APPROVED: "active", BLOCKED: "blocked", PENDING: "waiting for approval" };
+const date = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "Never");
 
 export default function AdminUsers() {
+  const [users, setUsers] = useState<UserRow[] | null>(null);
+  const [me, setMe] = useState("");
+  const [canChangeRoles, setCanChangeRoles] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [note, setNote] = useState<{ kind: "ok" | "warn"; text: string } | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [filterRole, setFilterRole] = useState("all");
+  const [group, setGroup] = useState<"all" | "team" | "client" | "specialist">("all");
 
-  const filtered = users.filter((u) => {
-    const matchesSearch = u.name.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase());
-    const matchesRole = filterRole === "all" || u.role === filterRole;
-    return matchesSearch && matchesRole;
+  const load = useCallback(async () => {
+    try {
+      const r = await fetch("/api/admin/users");
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error ?? "Could not load the users.");
+      setUsers(d.users); setMe(d.me); setCanChangeRoles(!!d.canChangeRoles); setError(null);
+    } catch (e) { setError(e instanceof Error ? e.message : "Could not load the users."); }
+  }, []);
+  useEffect(() => { void load(); }, [load]);
+
+  async function change(u: UserRow, body: { role?: string; action?: string }, done: string) {
+    setBusy(u.id); setNote(null);
+    try {
+      const r = await fetch(`/api/admin/users/${encodeURIComponent(u.id)}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { setNote({ kind: "warn", text: d.error ?? "The change could not be saved." }); return; }
+      setNote({ kind: "ok", text: `${u.name}: ${done}.` });
+      await load();
+    } catch { setNote({ kind: "warn", text: "Could not reach the server. Please try again." }); }
+    finally { setBusy(null); }
+  }
+
+  const counts = useMemo(() => {
+    const all = users ?? [];
+    return { total: all.length, team: all.filter((u) => groupOf(u.role) === "team").length, client: all.filter((u) => u.role === "CLIENT").length, specialist: all.filter((u) => u.role === "SPECIALIST").length };
+  }, [users]);
+  const filtered = (users ?? []).filter((u) => {
+    const q = search.trim().toLowerCase();
+    return (!q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)) && (group === "all" || groupOf(u.role) === group);
   });
 
   return (
     <div className="min-h-screen bg-eccellere-cream">
       <header className="border-b border-eccellere-ink/5 bg-white">
         <div className="mx-auto flex h-16 max-w-[1280px] items-center gap-4 px-6">
-          <Link href="/admin" className="text-ink-light hover:text-eccellere-ink">
-            <ChevronLeft className="h-5 w-5" />
-          </Link>
+          <Link href="/admin" className="text-ink-light hover:text-eccellere-ink" aria-label="Back to the dashboard"><ChevronLeft className="h-5 w-5" /></Link>
           <h1 className="text-lg font-medium text-eccellere-ink">Users</h1>
-          <span className="rounded-full bg-eccellere-gold/10 px-2 py-0.5 text-xs text-eccellere-gold">{users.length}</span>
+          {users && <span className="rounded-full bg-eccellere-gold/10 px-2 py-0.5 text-xs text-eccellere-gold-deep">{counts.total}</span>}
         </div>
       </header>
 
       <main className="mx-auto max-w-[1280px] px-6 py-8">
-        {/* Role summary cards */}
-        <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
-          {[
-            { label: "Total Users", value: users.length, color: "text-eccellere-ink" },
-            { label: "Admins", value: users.filter((u) => u.role === "admin").length, color: "text-eccellere-purple" },
-            { label: "Clients", value: users.filter((u) => u.role === "client").length, color: "text-eccellere-gold" },
-            { label: "Specialists", value: users.filter((u) => u.role === "specialist").length, color: "text-eccellere-teal" },
-          ].map((stat) => (
-            <div key={stat.label} className="rounded-lg bg-white p-4 shadow-sm">
-              <p className="text-[10px] uppercase tracking-wider text-ink-light">{stat.label}</p>
-              <p className={cn("mt-1 text-2xl font-light", stat.color)}>{stat.value}</p>
+        {error && <p className="mb-4 rounded bg-red-50 p-4 text-sm text-red-800" role="alert">{error}</p>}
+        {!users && !error && <p className="text-sm text-ink-mid"><Loader2 className="mr-2 inline h-4 w-4 animate-spin" />Loading the users…</p>}
+        {users && (
+          <>
+            <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
+              {[
+                { label: "All logins", value: counts.total, color: "text-eccellere-ink" },
+                { label: "Eccellere team", value: counts.team, color: "text-eccellere-purple" },
+                { label: "Clients", value: counts.client, color: "text-eccellere-gold-deep" },
+                { label: "Specialists", value: counts.specialist, color: "text-eccellere-teal" },
+              ].map((s) => (
+                <div key={s.label} className="rounded-lg bg-white p-4 shadow-sm">
+                  <p className="text-[10px] uppercase tracking-wider text-ink-light">{s.label}</p>
+                  <p className={cn("mt-1 text-2xl font-light", s.color)}>{s.value}</p>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
 
-        {/* Filters */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="relative flex-1 sm:max-w-sm">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-light" />
-            <input
-              type="text"
-              placeholder="Search by name or email..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-md border border-eccellere-ink/10 bg-white py-2.5 pl-10 pr-4 text-sm placeholder:text-ink-light focus:border-eccellere-gold focus:outline-none focus:ring-1 focus:ring-eccellere-gold"
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-ink-light" />
-            {["all", "admin", "client", "specialist"].map((r) => (
-              <button
-                key={r}
-                onClick={() => setFilterRole(r)}
-                className={cn(
-                  "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
-                  filterRole === r ? "bg-eccellere-gold text-white" : "bg-white text-ink-mid hover:bg-eccellere-cream"
-                )}
-              >
-                {r === "all" ? "All" : r.charAt(0).toUpperCase() + r.slice(1) + "s"}
-              </button>
-            ))}
-          </div>
-        </div>
+            {!canChangeRoles && <p className="mb-4 text-xs text-ink-light">Only a Super admin can change a role. You can still approve, block or unblock logins.</p>}
+            {note && <p role="status" className={cn("mb-4 text-sm", note.kind === "ok" ? "text-eccellere-teal" : "text-red-700")}>{note.text}</p>}
 
-        {/* Users Table */}
-        <div className="mt-6 overflow-hidden rounded-lg bg-white shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-eccellere-ink/5">
-                  <th className="px-6 py-3.5 text-left text-[10px] font-medium uppercase tracking-wider text-ink-light">User</th>
-                  <th className="px-6 py-3.5 text-left text-[10px] font-medium uppercase tracking-wider text-ink-light">Role</th>
-                  <th className="px-6 py-3.5 text-left text-[10px] font-medium uppercase tracking-wider text-ink-light">Status</th>
-                  <th className="px-6 py-3.5 text-left text-[10px] font-medium uppercase tracking-wider text-ink-light">Joined</th>
-                  <th className="px-6 py-3.5 text-left text-[10px] font-medium uppercase tracking-wider text-ink-light">Last Login</th>
-                  <th className="w-16" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-eccellere-ink/5">
-                {filtered.map((user) => {
-                  const RoleIcon = roleConfig[user.role].icon;
-                  return (
-                    <tr key={user.id} className="transition-colors hover:bg-eccellere-cream/50">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className={cn("flex h-9 w-9 items-center justify-center rounded-full", roleConfig[user.role].color)}>
-                            <RoleIcon className="h-4 w-4" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-eccellere-ink">{user.name}</p>
-                            <p className="flex items-center gap-1 text-xs text-ink-light">
-                              <Mail className="h-3 w-3" />
-                              {user.email}
-                            </p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={cn("rounded-sm px-2 py-0.5 text-[10px] uppercase tracking-wider", roleConfig[user.role].color)}>
-                          {user.role}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={cn("rounded-sm px-2 py-0.5 text-[10px] uppercase tracking-wider", statusStyles[user.status])}>
-                          {user.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="flex items-center gap-1 text-xs text-ink-mid">
-                          <Calendar className="h-3 w-3" />
-                          {user.joined}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-xs text-ink-mid">{user.lastLogin}</td>
-                      <td className="px-4 py-4">
-                        <button className="rounded p-1 text-ink-light hover:bg-eccellere-cream hover:text-eccellere-ink">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </button>
-                      </td>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="relative flex-1 sm:max-w-sm">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-light" />
+                <input type="text" aria-label="Search users" placeholder="Search by name or email..." value={search} onChange={(e) => setSearch(e.target.value)}
+                  className="w-full rounded-md border border-eccellere-ink/10 bg-white py-2.5 pl-10 pr-4 text-sm placeholder:text-ink-light focus:border-eccellere-gold focus:outline-none focus:ring-1 focus:ring-eccellere-gold" />
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Filter className="h-4 w-4 text-ink-light" />
+                {([["all", "All"], ["team", "Team"], ["client", "Clients"], ["specialist", "Specialists"]] as const).map(([k, label]) => (
+                  <button key={k} onClick={() => setGroup(k)} className={cn("rounded-md px-3 py-1.5 text-xs font-medium transition-colors", group === k ? "bg-eccellere-gold-deep text-white" : "bg-white text-ink-mid hover:bg-eccellere-cream")}>{label}</button>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-6 overflow-hidden rounded-lg bg-white shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-eccellere-ink/5">
+                      {["User", "Role", "Access", "Joined", "Last sign-in", "Actions"].map((h) => <th key={h} className="px-6 py-3.5 text-left text-[10px] font-medium uppercase tracking-wider text-ink-light">{h}</th>)}
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-          {filtered.length === 0 && (
-            <div className="py-12 text-center text-sm text-ink-light">No users match your filters.</div>
-          )}
-        </div>
+                  </thead>
+                  <tbody className="divide-y divide-eccellere-ink/5">
+                    {filtered.map((u) => {
+                      const g = groupOf(u.role);
+                      const mine = u.id === me;
+                      return (
+                        <tr key={u.id} className="hover:bg-eccellere-cream/50">
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-3">
+                              <div className={cn("flex h-9 w-9 items-center justify-center rounded-full", GROUP_STYLE[g])}>{g === "team" ? <Shield className="h-4 w-4" /> : <User className="h-4 w-4" />}</div>
+                              <div>
+                                <p className="text-sm font-medium text-eccellere-ink">{u.name}{mine && <span className="ml-2 text-[10px] text-ink-light">(you)</span>}</p>
+                                <p className="flex items-center gap-1 text-xs text-ink-light"><Mail className="h-3 w-3" />{u.email}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            {canChangeRoles && !mine && u.role !== "SPECIALIST" ? (
+                              <select aria-label={`Role of ${u.name}`} disabled={busy === u.id} value={u.role}
+                                onChange={(e) => { const role = e.target.value; if (role !== u.role && window.confirm(`Change ${u.name} from ${ROLE_LABEL[u.role] ?? u.role} to ${ROLE_LABEL[role]}? This changes what they can open.`)) void change(u, { role }, `role changed to ${ROLE_LABEL[role]}`); }}
+                                className="border border-eccellere-ink/15 bg-white px-2 py-1 text-xs">
+                                {ASSIGNABLE_ROLES.map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
+                              </select>
+                            ) : <span className={cn("rounded-sm px-2 py-0.5 text-[10px] uppercase tracking-wider", GROUP_STYLE[g])}>{ROLE_LABEL[u.role] ?? u.role}</span>}
+                          </td>
+                          <td className="px-6 py-4"><span className={cn("rounded-sm px-2 py-0.5 text-[10px] uppercase tracking-wider", STATUS_STYLE[u.accountStatus])}>{STATUS_WORD[u.accountStatus]}</span></td>
+                          <td className="px-6 py-4"><span className="flex items-center gap-1 text-xs text-ink-mid"><Calendar className="h-3 w-3" />{date(u.createdAt)}</span></td>
+                          <td className="px-6 py-4 text-xs text-ink-mid">{date(u.lastLoginAt)}</td>
+                          <td className="px-6 py-4">
+                            {mine ? <span className="text-xs text-ink-light">—</span> : (
+                              <div className="flex gap-3 text-xs font-medium text-eccellere-gold-deep">
+                                {u.accountStatus === "PENDING" && <button disabled={busy === u.id} className="underline" onClick={() => void change(u, { action: "approve" }, "approved")}>Approve</button>}
+                                {u.accountStatus !== "BLOCKED" && <button disabled={busy === u.id} className="underline" onClick={() => { if (window.confirm(`Block ${u.name}? They will not be able to sign in.`)) void change(u, { action: "block" }, "blocked"); }}>Block</button>}
+                                {u.accountStatus === "BLOCKED" && <button disabled={busy === u.id} className="underline" onClick={() => void change(u, { action: "unblock" }, "unblocked")}>Unblock</button>}
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              {filtered.length === 0 && <div className="py-12 text-center text-sm text-ink-light">No users match your filters.</div>}
+            </div>
+          </>
+        )}
       </main>
     </div>
   );
