@@ -106,6 +106,20 @@ describe('drafting one section, using the suggested questions', () => {
   });
 });
 
+describe('placeholder text is not an answer', () => {
+  it('drafts a part whose saved value is only "Sample answer", and still protects real answers', async () => {
+    const fieldParts = TOOL.def.sections.flatMap((x) => x.parts).filter((p) => p.kind === 'field');
+    const [a, b] = fieldParts;
+    const current = [mine(a.label, 'Sample answer'), mine(b.label, 'My own real answer')];
+    const generate: GenerateFn = async () => reply({ fields: fieldParts.map((p) => ({ label: p.label, value: `Draft for ${p.label}` })) });
+    const r = await aiFill({ generate, explainDown: down }, { tool: TOOL, current, brief: 'We are a small team.' });
+    if (!r.ok) throw new Error(r.reason);
+    const by = new Map(r.fields.map((f) => [f.label, f]));
+    expect(by.get(a.label)).toMatchObject({ source: 'AI' });
+    expect(by.get(b.label)).toMatchObject({ value: 'My own real answer', source: 'Manual' });
+  });
+});
+
 describe('the analysis', () => {
   it('will not analyse an empty worksheet', async () => {
     const r = await aiAnalyse({ generate: async () => reply(analysisReply), explainDown: down }, { tool: TOOL, fields: [mine('What are we choosing between?', 'x')] });
