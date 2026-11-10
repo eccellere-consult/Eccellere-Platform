@@ -179,6 +179,7 @@ export default function AdminAssets() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [resubmitTarget, setResubmitTarget] = useState<{ id: string; title: string } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
+  const [aiBatch, setAiBatch] = useState<{ state: "idle" | "planning" | "ready" | "running" | "done" | "error"; text: string; ticket?: string; plan?: { rows: { slug: string; title: string; lowUsd: number; highUsd: number }[]; skipped: { slug: string; title: string; why: string }[]; leftForLater: number; highUsd: number; lowUsd: number }; rows?: { slug: string; title: string; kind: string; detail: string }[] }>({ state: "idle", text: "" });
   const [batch, setBatch] = useState<{ state: "idle" | "working" | "done" | "error"; text: string; rows?: { slug: string; title: string; kind: string; detail: string }[]; counts?: Record<string, number> }>({ state: "idle", text: "" });
   const [online, setOnline] = useState<{ kind: "working" | "ok" | "warn"; text: string; href?: string } | null>(null);
 
@@ -226,6 +227,47 @@ export default function AdminAssets() {
       }
       setOnline({ kind: "warn", text: "This is taking longer than expected. Check Admin > Tools in a few minutes before trying again." });
     } catch { setOnline({ kind: "warn", text: "No connection. Please try again." }); }
+  }
+
+  /** Step 1 of building several toolkits with AI: a free plan that shows how many will be built and the worst-case total cost. No AI is called. */
+  async function planAiBatch() {
+    if (aiBatch.state === "planning" || aiBatch.state === "running") return;
+    setAiBatch({ state: "planning", text: "Reading the toolkit files to work out the cost… (this costs nothing)" });
+    try {
+      const start = await fetch("/api/admin/assets/make-online-ai-batch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "plan", limit: 10 }) });
+      const first = await start.json().catch(() => ({}));
+      if (start.status !== 202 || !first.jobId) return setAiBatch({ state: "error", text: first.error ?? "Could not start the plan." });
+      for (let i = 0; i < 200; i++) {
+        await new Promise((r) => setTimeout(r, 3000));
+        const res = await fetch(`/api/admin/assets/make-online-ai-batch?job=${first.jobId}`);
+        const body = await res.json().catch(() => ({}));
+        if (res.status === 202) { setAiBatch({ state: "planning", text: `Reading files… ${body.done ?? 0} of ${body.total ?? "?"} checked (free).` }); continue; }
+        if (!res.ok) return setAiBatch({ state: "error", text: body.error ?? "The plan did not finish." });
+        return setAiBatch({ state: "ready", text: body.plan.text, ticket: body.ticket, plan: body.plan });
+      }
+      setAiBatch({ state: "error", text: "This is taking longer than expected. Please try again in a few minutes." });
+    } catch { setAiBatch({ state: "error", text: "No connection. Please try again." }); }
+  }
+
+  /** Step 2: build exactly the planned toolkits with the best AI model, after the person has seen and accepted the top cost figure. */
+  async function runAiBatch() {
+    const plan = aiBatch.plan;
+    if (aiBatch.state !== "ready" || !plan || !aiBatch.ticket) return;
+    setAiBatch({ ...aiBatch, state: "running", text: "Starting…" });
+    try {
+      const start = await fetch("/api/admin/assets/make-online-ai-batch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "run", ticket: aiBatch.ticket, acceptedUsd: plan.highUsd }) });
+      const first = await start.json().catch(() => ({}));
+      if (start.status !== 202 || !first.jobId) return setAiBatch({ state: "error", text: first.error ?? "Could not start the run." });
+      for (let i = 0; i < 400; i++) {
+        await new Promise((r) => setTimeout(r, 4000));
+        const res = await fetch(`/api/admin/assets/make-online-ai-batch?job=${first.jobId}`);
+        const body = await res.json().catch(() => ({}));
+        if (res.status === 202) { setAiBatch({ state: "running", text: `Building with AI… ${body.done ?? 0} of ${body.total ?? "?"} done. Please keep this page open.` }); continue; }
+        if (res.ok) return setAiBatch({ state: "done", text: `Finished: ${body.summary.counts.ok} draft${body.summary.counts.ok === 1 ? "" : "s"} saved out of ${body.summary.total}. Check your AI provider's usage page for the exact bill.`, rows: body.summary.rows });
+        return setAiBatch({ state: "error", text: body.error ?? "The run did not finish. Check Admin > Tools to see what was saved." });
+      }
+      setAiBatch({ state: "error", text: "This is taking longer than expected. Check Admin > Tools in a few minutes before trying again." });
+    } catch { setAiBatch({ state: "error", text: "No connection. Check Admin > Tools to see what was saved before trying again." }); }
   }
 
   /** One run over every published toolkit: a free (no AI) fill-online draft for each one that has a readable file and no online version yet. */
@@ -369,7 +411,42 @@ export default function AdminAssets() {
             {batch.state === "working" ? "Making drafts…" : "Make all online (no AI)"}
           </button>
           <span className="text-xs text-ink-light">Free. Builds a draft for each toolkit that has a readable file and no online version. Nothing is published.</span>
+          <button onClick={planAiBatch} disabled={aiBatch.state === "planning" || aiBatch.state === "running"} className="rounded border border-eccellere-ink px-3 py-1.5 text-xs font-medium text-eccellere-ink hover:bg-eccellere-ink/5 disabled:opacity-50">
+            Build several with AI (cost shown first)
+          </button>
         </div>
+        {aiBatch.state !== "idle" && (
+          <div role="status" className={cn("mb-4 rounded-md border px-4 py-3 text-sm", aiBatch.state === "error" ? "border-amber-200 bg-amber-50 text-amber-800" : "border-eccellere-ink/10 bg-white text-ink-mid")}>
+            {(aiBatch.state === "planning" || aiBatch.state === "running") && <Loader2 className="mr-2 inline h-4 w-4 animate-spin" />}
+            {aiBatch.text}{" "}
+            {aiBatch.state === "ready" && aiBatch.plan && aiBatch.plan.rows.length > 0 && (
+              <div className="mt-3">
+                <ul className="max-h-48 overflow-auto text-xs">
+                  {aiBatch.plan.rows.map((r) => <li key={r.slug} className="flex justify-between gap-3 border-t border-eccellere-ink/5 py-1"><span className="text-eccellere-ink">{r.title}</span><span className="shrink-0 font-mono">US${r.lowUsd.toFixed(2)} to US${r.highUsd.toFixed(2)}</span></li>)}
+                </ul>
+                {aiBatch.plan.leftForLater > 0 && <p className="mt-2 text-xs">{aiBatch.plan.leftForLater} more toolkit{aiBatch.plan.leftForLater === 1 ? "" : "s"} are left for a later run, so you can check the first batch before spending more.</p>}
+                {aiBatch.plan.skipped.length > 0 && <p className="mt-1 text-xs">{aiBatch.plan.skipped.length} skipped (already online, no file, or unreadable); they are not charged.</p>}
+                <p className="mt-2 text-xs">The cost is an estimate from the size of the files, never a promise. The real bill comes from your AI provider.</p>
+                <div className="mt-3 flex gap-3">
+                  <button onClick={runAiBatch} className="rounded bg-eccellere-ink px-4 py-2 text-xs font-medium text-white hover:opacity-90">Build {aiBatch.plan.rows.length} with AI (up to US${aiBatch.plan.highUsd.toFixed(2)})</button>
+                  <button onClick={() => setAiBatch({ state: "idle", text: "" })} className="text-xs underline">Cancel, spend nothing</button>
+                </div>
+              </div>
+            )}
+            {aiBatch.state === "done" && <Link href="/admin/tools" className="font-medium underline">Open Admin &gt; Tools to review</Link>}
+            {aiBatch.rows && (
+              <ul className="mt-3 max-h-72 overflow-auto text-xs">
+                {aiBatch.rows.map((r) => (
+                  <li key={r.slug} className="flex gap-3 border-t border-eccellere-ink/5 py-1">
+                    <span className={cn("w-24 shrink-0 font-medium", r.kind === "ok" ? "text-eccellere-teal" : "text-amber-700")}>{r.kind === "ok" ? "Draft saved" : "Needs a look"}</span>
+                    <span className="flex-1"><strong className="text-eccellere-ink">{r.title}</strong>: {r.detail}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {aiBatch.state !== "running" && aiBatch.state !== "planning" && aiBatch.state !== "ready" && <button onClick={() => setAiBatch({ state: "idle", text: "" })} className="mt-2 underline">Dismiss</button>}
+          </div>
+        )}
         {batch.state !== "idle" && (
           <div role="status" className={cn("mb-4 rounded-md border px-4 py-3 text-sm", batch.state === "error" ? "border-amber-200 bg-amber-50 text-amber-800" : "border-eccellere-ink/10 bg-white text-ink-mid")}>
             {batch.state === "working" && <Loader2 className="mr-2 inline h-4 w-4 animate-spin" />}
