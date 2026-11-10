@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Search, Star, Filter, Eye } from "lucide-react";
@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { type Asset } from "@/lib/marketplace-data";
 import { AssetPreviewModal } from "@/components/marketplace/AssetPreviewModal";
+import { MarketGrid } from "@/components/marketplace/MarketGrid";
+import { buildGrid, sectorColumns } from "@/lib/marketplace/grid";
 
 const categories = [
   "All",
@@ -58,6 +60,16 @@ export default function MarketplacePage() {
 
   // Only show real DB assets — no hardcoded samples
   const allAssets: Asset[] = dbAssets;
+
+  // The function x industry grid and the sector list share one set of columns, built from the real toolkits.
+  const sectorCols = useMemo(() => sectorColumns(allAssets, sectors.filter((x) => x !== "All Sectors")), [allAssets]);
+  const sectorList = useMemo(() => ["All Sectors", ...sectorCols], [sectorCols]);
+  const grid = useMemo(() => buildGrid(allAssets, categories.filter((c) => c !== "All"), sectorCols), [allAssets, sectorCols]);
+  const pickCell = (category: string, sector: string) => {
+    setSelectedCategory(category);
+    setSelectedSector(sector);
+    setTimeout(() => document.getElementById("marketplace-list")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+  };
 
   const filtered = allAssets.filter((a) => {
     const matchCategory = selectedCategory === "All" || a.category === selectedCategory;
@@ -138,8 +150,12 @@ export default function MarketplacePage() {
           </div>
         </section>
 
+        {!dbLoading && allAssets.length > 0 && (
+          <MarketGrid grid={grid} selectedCategory={selectedCategory} selectedSector={selectedSector} onPick={pickCell} />
+        )}
+
         {/* Filters + Grid */}
-        <section className="mx-auto max-w-[1280px] px-6 py-12">
+        <section id="marketplace-list" className="mx-auto max-w-[1280px] px-6 py-12 scroll-mt-20">
           {/* Category tabs */}
           <div className="flex flex-wrap items-center gap-2 border-b border-eccellere-ink/10 pb-4">
             {categories.map((cat) => (
@@ -189,7 +205,7 @@ export default function MarketplacePage() {
                   Sector
                 </h4>
                 <div className="space-y-2">
-                  {sectors.map((s) => (
+                  {sectorList.map((s) => (
                     <button
                       key={s}
                       onClick={() => setSelectedSector(s)}
