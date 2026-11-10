@@ -6,10 +6,10 @@ import { inputsOf, outputsOf } from '@/lib/agents/sipoc';
 import { allAgents } from '@/lib/agents/catalogue';
 
 describe('installPilots', () => {
-  it('adds the four pilots as needs-review, hand-built, and never publishes', async () => {
+  it('adds the pilots as needs-review, hand-built, and never publishes', async () => {
     const repo = createMemoryRepo();
     const r = await installPilots(repo, () => new Date('2026-11-08T00:00:00Z'));
-    expect(r.added.sort()).toEqual(['capital-allocation-advisor', 'demand-forecaster', 'pricing-optimizer', 'scenario-planner']);
+    expect(r.added.sort()).toEqual(['capital-allocation-advisor', 'concept-screener', 'demand-forecaster', 'hire-to-onboard-agent', 'pricing-optimizer', 'product-spec-generator', 'scenario-planner', 'strategy-plan-cascade', 'vendor-onboarding-agent', 'voice-of-customer-synthesizer']);
     expect(r.refused).toEqual([]);
     for (const slug of r.added) {
       const t = (await repo.getToolBySlug(slug))!;
@@ -24,7 +24,7 @@ describe('installPilots', () => {
     await installPilots(repo);
     const again = await installPilots(repo);
     expect(again.added).toEqual([]);
-    expect(again.skipped).toHaveLength(4);
+    expect(again.skipped).toHaveLength(10);
   });
 });
 
