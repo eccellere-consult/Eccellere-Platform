@@ -28,7 +28,6 @@ export interface FunctionArea {
   agents: Agent[];
 }
 
-const soon = (slug: string, name: string, does: string): Agent => ({ slug, name, does, status: 'soon' });
 /** A pilot: a working tool exists, under the same slug in the Tools marketplace. */
 const pilot = (slug: string, name: string, does: string): Agent => ({ slug, name, does, status: 'pilot', tool: slug });
 
@@ -55,9 +54,9 @@ export const AREAS: FunctionArea[] = [
     id: 'sales', code: 'SALES', name: 'Market to Cash', flow: 'Market → Cash',
     purpose: 'Lead generation through collections: the full revenue cycle.',
     agents: [
-      soon('lead-to-quote-assistant', 'Lead-to-Quote Assistant', 'Qualifies inbound leads and drafts quotes from your price book.'),
+      pilot('lead-to-quote-assistant', 'Lead-to-Quote Assistant', 'Qualifies inbound leads and drafts quotes from your price book.'),
       pilot('pricing-optimizer', 'Pricing Optimizer Agent', 'Recommends price points using margin, demand, and competitor signals.'),
-      soon('collections-follow-up-agent', 'Collections Follow-up Agent', 'Drafts and sequences overdue-invoice follow-ups by risk tier.'),
+      pilot('collections-follow-up-agent', 'Collections Follow-up Agent', 'Drafts and sequences overdue-invoice follow-ups by risk tier.'),
     ],
   },
   {
@@ -65,8 +64,8 @@ export const AREAS: FunctionArea[] = [
     purpose: 'Demand planning, production, and fulfilment.',
     agents: [
       pilot('demand-forecaster', 'Demand Forecaster Agent', 'Projects short-term demand from sales history and seasonality.'),
-      soon('production-scheduler', 'Production Scheduler Agent', 'Sequences production runs against capacity and order priority.'),
-      soon('otif-tracker', 'OTIF Tracker Agent', 'Monitors on-time-in-full delivery performance and flags at-risk orders.'),
+      pilot('production-scheduler', 'Production Scheduler Agent', 'Sequences production runs against capacity and order priority.'),
+      pilot('otif-tracker', 'OTIF Tracker Agent', 'Monitors on-time-in-full delivery performance and flags at-risk orders.'),
     ],
   },
   {
@@ -74,17 +73,17 @@ export const AREAS: FunctionArea[] = [
     purpose: 'Sourcing, purchasing, and vendor payments.',
     agents: [
       pilot('vendor-onboarding-agent', 'Vendor Onboarding Agent', 'Runs new-vendor KYC, compliance checks, and onboarding checklists.'),
-      soon('po-invoice-matcher', 'PO-Invoice Matcher', 'Three-way matches purchase orders, goods receipts and invoices, flagging mismatches.'),
-      soon('supplier-risk-monitor', 'Supplier Risk Monitor', 'Tracks supplier financial and delivery risk signals over time.'),
+      pilot('po-invoice-matcher', 'PO-Invoice Matcher', 'Three-way matches purchase orders, goods receipts and invoices, flagging mismatches.'),
+      pilot('supplier-risk-monitor', 'Supplier Risk Monitor', 'Tracks supplier financial and delivery risk signals over time.'),
     ],
   },
   {
     id: 'fin', code: 'FIN', name: 'Account to Report', flow: 'Account → Report',
     purpose: 'Bookkeeping, close, compliance, and management reporting.',
     agents: [
-      soon('close-the-books-agent', 'Close-the-Books Agent', 'Runs month-end close checklists and flags unreconciled entries.'),
-      soon('caro-compliance-checker', 'CARO Compliance Checker', 'Screens financials against CARO reporting requirements.'),
-      soon('mis-report-generator', 'MIS Report Generator', 'Compiles a monthly management information pack from your ledgers.'),
+      pilot('close-the-books-agent', 'Close-the-Books Agent', 'Runs month-end close checklists and flags unreconciled entries.'),
+      pilot('caro-compliance-checker', 'CARO Compliance Checker', 'Screens financials against CARO reporting requirements.'),
+      pilot('mis-report-generator', 'MIS Report Generator', 'Compiles a monthly management information pack from your ledgers.'),
     ],
   },
   {
@@ -92,8 +91,8 @@ export const AREAS: FunctionArea[] = [
     purpose: 'Recruitment through exit: the full employee lifecycle.',
     agents: [
       pilot('hire-to-onboard-agent', 'Hire-to-Onboard Agent', 'Runs structured onboarding checklists for new joiners.'),
-      soon('attendance-payroll-reconciler', 'Attendance-Payroll Reconciler', 'Cross-checks attendance records against payroll runs for discrepancies.'),
-      soon('exit-interview-analyzer', 'Exit Interview Analyzer', 'Synthesises exit interview themes into attrition-risk insights.'),
+      pilot('attendance-payroll-reconciler', 'Attendance-Payroll Reconciler', 'Cross-checks attendance records against payroll runs for discrepancies.'),
+      pilot('exit-interview-analyzer', 'Exit Interview Analyzer', 'Synthesises exit interview themes into attrition-risk insights.'),
     ],
   },
   { id: 'service', code: 'SERVICE', name: 'Customer to Service', flow: 'Customer → Service', proposed: true,

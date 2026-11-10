@@ -9,7 +9,7 @@ describe('installPilots', () => {
   it('adds the pilots as needs-review, hand-built, and never publishes', async () => {
     const repo = createMemoryRepo();
     const r = await installPilots(repo, () => new Date('2026-11-08T00:00:00Z'));
-    expect(r.added.sort()).toEqual(['capital-allocation-advisor', 'concept-screener', 'demand-forecaster', 'hire-to-onboard-agent', 'pricing-optimizer', 'product-spec-generator', 'scenario-planner', 'strategy-plan-cascade', 'vendor-onboarding-agent', 'voice-of-customer-synthesizer']);
+    expect(r.added.sort()).toEqual(['attendance-payroll-reconciler', 'capital-allocation-advisor', 'caro-compliance-checker', 'close-the-books-agent', 'collections-follow-up-agent', 'concept-screener', 'demand-forecaster', 'exit-interview-analyzer', 'hire-to-onboard-agent', 'lead-to-quote-assistant', 'mis-report-generator', 'otif-tracker', 'po-invoice-matcher', 'pricing-optimizer', 'product-spec-generator', 'production-scheduler', 'scenario-planner', 'strategy-plan-cascade', 'supplier-risk-monitor', 'vendor-onboarding-agent', 'voice-of-customer-synthesizer']);
     expect(r.refused).toEqual([]);
     for (const slug of r.added) {
       const t = (await repo.getToolBySlug(slug))!;
@@ -24,7 +24,7 @@ describe('installPilots', () => {
     await installPilots(repo);
     const again = await installPilots(repo);
     expect(again.added).toEqual([]);
-    expect(again.skipped).toHaveLength(10);
+    expect(again.skipped).toHaveLength(21);
   });
 });
 
