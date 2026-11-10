@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { paidGate } from "@/lib/paid";
 import { prisma } from "@/lib/prisma";
 import { requireUserId, unauthorized, guard } from "@/lib/toolkit/server";
 import {
@@ -54,6 +55,7 @@ async function GET_() {
 async function POST_(req: NextRequest) {
   const userId = await requireUserId();
   if (!userId) return unauthorized();
+  { const blocked = await paidGate(userId); if (blocked) return blocked; }
   if (!createLimiter.check(userId).success) {
     return NextResponse.json({ error: "You have created several kits recently. Please try again later." }, { status: 429 });
   }

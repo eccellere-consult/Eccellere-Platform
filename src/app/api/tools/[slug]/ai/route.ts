@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { paidGate } from "@/lib/paid";
 import { prismaRepo } from "@/lib/tools/prismaRepo";
 import { VersionConflict, getFillin, saveFillin, undoFieldChange } from "@/lib/tools/service";
 import { realAiDeps, toolsGuard, userTool } from "@/lib/tools/server";
@@ -23,6 +24,7 @@ export const POST = toolsGuard(async (req: NextRequest, ctx: Ctx) => {
   const { slug } = await ctx.params;
   const u = await userTool(slug);
   if ("error" in u) return u.error;
+  { const blocked = await paidGate(u.userId, u.role); if (blocked) return blocked; }
   let body: { action?: unknown; brief?: unknown; expectedVersion?: unknown; sectionKey?: unknown; questions?: unknown };
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Invalid request." }, { status: 400 }); }
   const expected = Number.isInteger(body.expectedVersion) ? (body.expectedVersion as number) : null;
