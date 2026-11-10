@@ -148,6 +148,7 @@ function WorkspaceInner({ slug, def, toolName, sample }: { slug: string; def: Mo
   const [uploadMsg, setUploadMsg] = useState<{ kind: "ok" | "warn"; text: string; notes: string[] } | null>(null);
   const [busy, setBusy] = useState<"fill" | "analyse" | "undo" | "questions" | null>(null);
   const [busySection, setBusySection] = useState<string | null>(null);
+  const [secMsg, setSecMsg] = useState<{ key: string; kind: "ok" | "warn"; text: string } | null>(null);
   const [aiMsg, setAiMsg] = useState<{ kind: "ok" | "warn"; text: string } | null>(null);
   const conflictRef = useRef<Saved | null>(null);
 
@@ -263,7 +264,8 @@ function WorkspaceInner({ slug, def, toolName, sample }: { slug: string; def: Mo
   }
 
   async function ai(action: "fill" | "analyse" | "undo" | "questions", sectionKey?: string) {
-    setAiMsg(null);
+    const say = (m: { kind: "ok" | "warn"; text: string } | null) => { if (sectionKey && m) setSecMsg({ ...m, key: sectionKey }); else setAiMsg(m); };
+    setAiMsg(null); setSecMsg(null);
     setBusy(action);
     setBusySection(sectionKey ?? null);
     try {
@@ -271,21 +273,21 @@ function WorkspaceInner({ slug, def, toolName, sample }: { slug: string; def: Mo
       const r = await fetch(`/api/tools/${slug}/ai`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, brief, sectionKey, questions: action === "fill" ? questions : undefined, expectedVersion: versionRef.current }) });
       const d = await readJson(r);
       if (r.status === 409) { conflictRef.current = d.record ?? null; setSaveState("conflict"); return; }
-      if (!r.ok) { setAiMsg({ kind: "warn", text: d.error ?? "The AI helper could not do that." }); return; }
+      if (!r.ok) { say({ kind: "warn", text: d.error ?? "The AI helper could not do that." }); return; }
       if (action === "questions") {
         setQuestions(d.questions);
         try { localStorage.setItem(questionsKey, JSON.stringify(d.questions)); } catch { /* ignore */ }
-        setAiMsg({ kind: "ok", text: `${d.questions.length} questions for your situation are below. They are not saved into the worksheet; use them to prepare your answers.` });
+        say({ kind: "ok", text: `${d.questions.length} questions for your situation are below. They are not saved into the worksheet; use them to prepare your answers.` });
         return;
       }
       apply(d.record);
       setSaveState("saved");
-      setAiMsg({
+      say({
         kind: "ok",
         text: action === "fill" ? `The AI drafted ${d.drafted} part${d.drafted === 1 ? "" : "s"}. They are marked AI-suggested: read them, edit anything, or undo.`
           : action === "analyse" ? "Analysis written. It is based only on what is in the worksheet; check it before you rely on it." : "Your earlier answers are back.",
       });
-    } catch { setAiMsg({ kind: "warn", text: "Could not reach the server. Please try again." }); }
+    } catch { say({ kind: "warn", text: "Could not reach the server. Please try again." }); }
     finally { setBusy(null); setBusySection(null); }
   }
 
@@ -457,6 +459,7 @@ function WorkspaceInner({ slug, def, toolName, sample }: { slug: string; def: Mo
             </button>
             <span className="text-[11px] text-ink-light">{!brief.trim() && nothingYet ? "Describe your situation in AI help (top of the page) first." : questions.length ? "Uses your situation note and the suggested questions. Only empty parts are drafted; your answers are never changed." : "Uses your situation note. Only empty parts are drafted; your answers are never changed."}</span>
           </div>
+          {secMsg?.key === s.key && <p role="status" className={cn("no-print mt-3 text-sm", secMsg.kind === "ok" ? "text-eccellere-teal" : "text-red-700")}>{secMsg.text}</p>}
           {s.parts.map((p) => renderPart(p))}
         </section>
       ))}
