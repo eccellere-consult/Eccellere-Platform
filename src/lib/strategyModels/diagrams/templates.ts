@@ -7,7 +7,7 @@
  * real <text> (selectable and testable), nothing smaller than 9.5 px, sharp corners, the brand palette, and the same output for the same input.
  * A tool that fits no template simply has no diagram: the page shows its reference card only.
  */
-import { C, badge, box, caption, line, rect, svg, text, wrap } from './svg';
+import { C, box, caption, elbow, line, numberTag, rect, svg, text, wrap } from './svg';
 
 export interface Axis { label: string; low: string; high: string }
 export type Tone4 = 'good' | 'warn' | 'bad' | 'neutral';
@@ -125,17 +125,21 @@ function steps(d: Extract<DiagramSpec, { template: 'steps' }>): string {
   let body = '';
   d.steps.forEach((s, i) => {
     const r = Math.floor(i / perRow), c = i % perRow, x = 24 + c * (bw + gap), y = top + r * (bh + 44);
-    body += box(x, y, bw, bh, s.name, s.hint ? [cut(s.hint, 80)] : [], { fill: i === n - 1 ? C.goldPale : C.cream, stroke: i === n - 1 ? C.gold : C.border, valign: 'top' });
-    body += badge(x + 14, y + 14, String(i + 1), C.gold, 9.5);
+    body += box(x, y, bw, bh, s.name, s.hint ? [cut(s.hint, 80)] : [], { fill: i === n - 1 ? C.goldPale : C.cream, stroke: i === n - 1 ? C.gold : C.border, valign: 'middle', padTop: 8 });
+    body += numberTag(x - 6, y - 6, String(i + 1));
     if (c < perRow - 1 && i < n - 1) body += line(x + bw + 3, y + bh / 2, x + bw + gap - 3, y + bh / 2, { arrow: 'end' });
-    if (c === perRow - 1 && r < rows - 1) body += line(x + bw / 2, y + bh + 3, x + bw / 2, y + bh + 41, { arrow: 'end', dash: '4 3' });
+    // At the end of a row the arrow runs down, back along the gap to the FIRST box of the next row, and into its top edge (never to the box directly below).
+    if (c === perRow - 1 && r < rows - 1) {
+      const firstX = 24 + bw / 2, mid = y + bh + 22;
+      body += elbow([[x + bw / 2, y + bh + 2], [x + bw / 2, mid], [firstX, mid], [firstX, y + bh + 44 - 3]], { dash: '4 3' });
+    }
   });
   body += cap(d);
   return svg({ title: d.title, desc: `A sequence of ${n} steps, read from the first to the last: ${d.steps.map((s, i) => `${i + 1}, ${s.name}`).join('; ')}.` }, body);
 }
 
 function cycle(d: Extract<DiagramSpec, { template: 'cycle' }>): string {
-  const n = d.steps.length, cx = 360, cy = 214, rx = 236, ry = 150, bw = 164, bh = 66;
+  const n = d.steps.length, cx = 360, cy = 214, rx = 236, ry = 150, bw = 164, bh = 76;
   const pos = d.steps.map((_, i) => { const a = (-90 + (i * 360) / n) * (Math.PI / 180); return { x: cx + rx * Math.cos(a), y: cy + ry * Math.sin(a) }; });
   let body = '';
   pos.forEach((p, i) => {
@@ -145,7 +149,7 @@ function cycle(d: Extract<DiagramSpec, { template: 'cycle' }>): string {
   });
   d.steps.forEach((s, i) => {
     body += box(pos[i].x - bw / 2, pos[i].y - bh / 2, bw, bh, s.name, s.hint ? [cut(s.hint, 44)] : [], { fill: C.cream, stroke: C.border, titleSize: 12.5, bodySize: 10 });
-    body += badge(pos[i].x - bw / 2 + 12, pos[i].y - bh / 2 + 12, String(i + 1), C.gold, 9.5);
+    body += numberTag(pos[i].x - bw / 2 - 6, pos[i].y - bh / 2 - 6, String(i + 1));
   });
   body += cap(d);
   return svg({ title: d.title, desc: `A cycle of ${n} steps that repeats: ${d.steps.map((s, i) => `${i + 1}, ${s.name}`).join('; ')}; after the last step the cycle returns to the first.` }, body);
@@ -168,6 +172,7 @@ function scale(d: Extract<DiagramSpec, { template: 'scale' }>): string {
     const y = 330 - i * (240 / (n - 1));
     body += box(x0 + i * w + 2, y, w - 4, bh, s.name, s.hint ? [cut(s.hint, 52)] : [], { fill: i === n - 1 ? C.tealPale : i === 0 ? C.brickPale : C.cream, stroke: i === n - 1 ? C.teal : i === 0 ? C.brick : C.border, valign: 'top', titleSize: 12.5, bodySize: 10 });
     body += rect(x0 + i * w + 2, y + bh, w - 4, 420 - (y + bh), { fill: C.cream, stroke: C.border, sw: 0.8, opacity: 0.6 });
+    body += numberTag(x0 + i * w - 4, y - 6, String(i + 1));
   });
   body += line(x0 + 8, 406, x0 + 648 - 8, 406, { arrow: 'end', gold: true, sw: 1.6 }) + cap(d, 430);
   return svg({ title: d.title, desc: `A scale of ${n} levels rising from the lowest to the highest: ${d.levels.map((s, i) => `${i + 1}, ${s.name}`).join('; ')}.` }, body);
