@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { paidGate } from "@/lib/paid";
 import { prisma } from "@/lib/prisma";
 import { requireUserId, unauthorized, loadOwnedKit, asBlueprint, guard } from "@/lib/toolkit/server";
 import {
@@ -48,6 +49,7 @@ const groundingOf = (i: Awaited<ReturnType<typeof loadInputs>>) =>
 async function POST_(req: NextRequest, { params }: Ctx) {
   const userId = await requireUserId();
   if (!userId) return unauthorized();
+  { const blocked = await paidGate(userId); if (blocked) return blocked; }
   const { id } = await params;
   const kit = await loadOwnedKit(id, userId);
   if (!kit) return NextResponse.json({ error: "Not found" }, { status: 404 });

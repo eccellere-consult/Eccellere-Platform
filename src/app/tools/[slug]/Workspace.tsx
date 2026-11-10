@@ -198,6 +198,8 @@ function WorkspaceInner({ slug, def, toolName, sample }: { slug: string; def: Mo
       const r = await fetch(`/api/tools/${slug}/fillin`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ fields, expectedVersion: versionRef.current }) });
       const d = await readJson(r);
       if (r.status === 409) { conflictRef.current = d.record ?? null; setSaveState("conflict"); return false; }
+      // 402: not on a paid plan. Retrying cannot help, so do not keep the change queued (that would retry every few seconds).
+      if (r.status === 402) { setSaveErr(d.error ?? "Saving your own work needs a paid plan."); setSaveState("error"); return false; }
       if (!r.ok) { dirty.current = true; setSaveErr(d.error ?? "Could not save."); setSaveState("error"); return false; }
       versionRef.current = d.record.version;
       setSaved((s) => (s ? { ...s, ...d.record } : d.record));
