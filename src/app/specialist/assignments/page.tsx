@@ -1,66 +1,57 @@
 "use client";
 
-import { ClipboardList, Clock, CheckCircle } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { useEffect, useState } from "react";
+import { CheckCircle, Clock, Loader2 } from "lucide-react";
+import { inr } from "@/lib/admin/stats";
 
-const assignments = [
-  { client: "Arjun Textiles Pvt Ltd", project: "Process Transformation Assessment", status: "in-progress", dueDate: "Apr 28, 2026", value: "₹75,000" },
-  { client: "FreshBasket D2C", project: "Omnichannel Strategy Workshop", status: "in-progress", dueDate: "May 5, 2026", value: "₹45,000" },
-  { client: "SwiftShip Logistics", project: "AI Readiness Deep Dive", status: "in-progress", dueDate: "May 12, 2026", value: "₹60,000" },
-  { client: "Precision Auto Components", project: "Lean Manufacturing Audit", status: "completed", dueDate: "Mar 15, 2026", value: "₹90,000" },
-  { client: "GreenLeaf Organics", project: "Market Entry Strategy for North India", status: "completed", dueDate: "Feb 20, 2026", value: "₹55,000" },
-];
+interface Row { id: string; title: string; status: string; dueDate: string | null; agreedFee: number | null; clientName: string }
+interface Data { active: Row[]; completed: Row[]; activeValue: number }
+
+const LABEL: Record<string, string> = { MATCHED: "Matched", ACCEPTED: "Accepted", IN_PROGRESS: "In progress", DELIVERED: "Delivered", UNDER_REVIEW: "Under review" };
+const day = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }) : "no date set");
 
 export default function SpecialistAssignmentsPage() {
-  const active = assignments.filter((a) => a.status === "in-progress");
-  const completed = assignments.filter((a) => a.status === "completed");
+  const [d, setD] = useState<Data | null>(null);
+  const [err, setErr] = useState("");
+  useEffect(() => {
+    fetch("/api/specialist/assignments").then(async (r) => { const j = await r.json(); if (!r.ok) throw new Error(j.error); setD(j); }).catch((e) => setErr(e.message || "Could not load."));
+  }, []);
+  if (err) return <p className="rounded bg-red-50 p-4 text-sm text-red-800">{err}</p>;
+  if (!d) return <p className="py-10 text-sm text-ink-mid"><Loader2 className="mr-2 inline h-4 w-4 animate-spin" />Loading your assignments…</p>;
 
   return (
     <div className="mx-auto max-w-[1280px]">
-      <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-eccellere-gold">Assignments</p>
+      <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-eccellere-gold-deep">Assignments</p>
       <h1 className="mt-2 font-display text-3xl font-light text-eccellere-ink">My Assignments</h1>
+      <p className="mt-1 text-sm text-ink-mid">{d.active.length} active, worth {inr(d.activeValue)} in agreed fees.</p>
 
-      {/* Active */}
       <div className="mt-8">
-        <h2 className="text-sm font-medium text-eccellere-ink">Active ({active.length})</h2>
+        <h2 className="text-sm font-medium text-eccellere-ink">Active ({d.active.length})</h2>
         <div className="mt-3 space-y-3">
-          {active.map((a) => (
-            <div key={a.project} className="flex flex-col gap-3 rounded-lg bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm font-medium text-eccellere-ink">{a.project}</p>
-                <p className="mt-0.5 text-xs text-ink-light">{a.client}</p>
-              </div>
+          {d.active.length === 0 && <p className="rounded-lg bg-white p-5 text-sm text-ink-mid shadow-sm">No active assignments. When the Eccellere team matches you with a client, it appears here.</p>}
+          {d.active.map((a) => (
+            <div key={a.id} className="flex flex-col gap-3 rounded-lg bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+              <div><p className="text-sm font-medium text-eccellere-ink">{a.title}</p><p className="mt-0.5 text-xs text-ink-light">{a.clientName}</p></div>
               <div className="flex items-center gap-6">
-                <span className="rounded-sm bg-eccellere-info/10 px-2 py-0.5 text-[10px] uppercase tracking-wider text-eccellere-info">
-                  {a.status}
-                </span>
-                <div className="flex items-center gap-1 text-xs text-ink-light">
-                  <Clock className="h-3 w-3" />
-                  Due {a.dueDate}
-                </div>
-                <span className="font-mono text-sm text-eccellere-gold">{a.value}</span>
+                <span className="rounded-sm bg-eccellere-cream px-2 py-0.5 text-[10px] uppercase tracking-wider text-eccellere-gold-deep">{LABEL[a.status] ?? a.status}</span>
+                <div className="flex items-center gap-1 text-xs text-ink-light"><Clock className="h-3 w-3" />Due {day(a.dueDate)}</div>
+                <span className="font-mono text-sm text-eccellere-gold-deep">{a.agreedFee !== null ? inr(a.agreedFee) : "Fee not set"}</span>
               </div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Completed */}
       <div className="mt-10">
-        <h2 className="text-sm font-medium text-eccellere-ink">Completed ({completed.length})</h2>
+        <h2 className="text-sm font-medium text-eccellere-ink">Completed ({d.completed.length})</h2>
         <div className="mt-3 space-y-3">
-          {completed.map((a) => (
-            <div key={a.project} className="flex flex-col gap-3 rounded-lg bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm font-medium text-eccellere-ink">{a.project}</p>
-                <p className="mt-0.5 text-xs text-ink-light">{a.client}</p>
-              </div>
+          {d.completed.length === 0 && <p className="rounded-lg bg-white p-5 text-sm text-ink-mid shadow-sm">Nothing completed yet.</p>}
+          {d.completed.map((a) => (
+            <div key={a.id} className="flex flex-col gap-3 rounded-lg bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+              <div><p className="text-sm font-medium text-eccellere-ink">{a.title}</p><p className="mt-0.5 text-xs text-ink-light">{a.clientName}</p></div>
               <div className="flex items-center gap-6">
-                <span className="flex items-center gap-1 rounded-sm bg-eccellere-teal/10 px-2 py-0.5 text-[10px] uppercase tracking-wider text-eccellere-teal">
-                  <CheckCircle className="h-3 w-3" />
-                  completed
-                </span>
-                <span className="font-mono text-sm text-eccellere-gold">{a.value}</span>
+                <span className="flex items-center gap-1 rounded-sm bg-eccellere-cream px-2 py-0.5 text-[10px] uppercase tracking-wider text-eccellere-gold-deep"><CheckCircle className="h-3 w-3" />Completed</span>
+                <span className="font-mono text-sm text-eccellere-gold-deep">{a.agreedFee !== null ? inr(a.agreedFee) : "Fee not set"}</span>
               </div>
             </div>
           ))}
