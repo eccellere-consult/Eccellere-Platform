@@ -83,9 +83,23 @@ export function buildFillMessages(args: { tool: AiTool; structure: Structure; fi
 
 export type FillResult = { ok: true; fields: FrameworkField[]; drafted: number } | AiFailure;
 
+/**
+ * A saved value that is only the part's own example ("Sample answer", or exactly the e.g. text shown under it) is not an answer
+ * the person gave, so it counts as blank: the AI may draft it. (Their own words are never touched.)
+ */
+export function withoutPlaceholders(structure: Structure, current: ClientField[]): ClientField[] {
+  const example = new Map(partsOf(structure).filter((p) => p.kind === 'field').map((p) => [norm(p.label), norm((p as { example?: string }).example ?? '')]));
+  return current.map((f) => {
+    const v = norm(f.value);
+    return v && (v === 'sample answer' || (example.get(norm(f.label)) && v === example.get(norm(f.label)))) ? { ...f, value: '' } : f;
+  });
+}
+
 export async function aiFill(deps: AiDeps, args: { tool: AiTool; current: ClientField[]; brief: string; questions?: AiQuestion[]; sectionKey?: string }): Promise<FillResult> {
   const structure = args.tool.def;
   const catalogue = { fields: flattenStructure(structure) };
+  const original = args.current;
+  args = { ...args, current: withoutPlaceholders(structure, args.current) };
   let fillable = fillableLabels(catalogue as never, args.current, structure);
   // One section only (the "Draft this section" button): keep just the empty parts that belong to it.
   if (args.sectionKey) {
@@ -107,7 +121,7 @@ export async function aiFill(deps: AiDeps, args: { tool: AiTool; current: Client
   let generated: Map<string, string>;
   try { generated = parseGenerated(res.text, fillable, structure); } catch { return { ok: false, code: 'UNUSABLE', reason: 'The AI did not return a readable draft, so nothing was saved. Please try again.' }; }
   if (generated.size === 0) return { ok: false, code: 'UNUSABLE', reason: 'The AI did not produce usable answers, so nothing was saved. Add a little more about your situation and try again.' };
-  const fields = mergeGenerated(catalogue as never, args.current, fillable, generated, structure);
+  const fields = mergeGenerated(catalogue as never, original, fillable, generated, structure);
   return { ok: true, fields, drafted: generated.size };
 }
 
