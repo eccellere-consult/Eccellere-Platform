@@ -163,7 +163,7 @@ let _storage: StorageProvider | null = null;
 export function getStorage(): StorageProvider {
   if (_storage) return _storage;
 
-  if (process.env.STORAGE_PROVIDER === "s3") {
+  if (process.env.STORAGE_MODE === "s3") {
     _storage = new S3Storage();
   } else {
     _storage = new LocalStorage();

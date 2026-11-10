@@ -184,6 +184,10 @@ model Asset {
   isFeatured      Boolean       @default(false)
   licenceType     String        @default("single-use")
   exclusivity     String        @default("exclusive")
+  downloadEnabled Boolean       @default(true)
+  aboutResource   String? @db.Text
+  whatIncluded    Json?
+  contentsPreview Json?
 
   authorId String
   author   SpecialistProfile @relation(fields: [authorId], references: [id])
