@@ -140,6 +140,10 @@ export default function AdminChatbot() {
       </header>
 
       <main className="mx-auto max-w-[1280px] px-6 py-8">
+        <p role="note" className="mb-6 rounded border border-eccellere-gold/40 bg-eccellere-gold/10 p-4 text-sm text-eccellere-ink">
+          <strong>Preview only.</strong> The website chatbot does not save conversations yet, so the figures, conversations and replies on this screen are
+          examples, and the prompt below is not sent anywhere. They are not real customer data.
+        </p>
         {/* Stats */}
         <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
           {stats.map((s) => (
