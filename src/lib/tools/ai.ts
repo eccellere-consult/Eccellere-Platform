@@ -46,7 +46,7 @@ const norm = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
 
 // ── drafting answers ─────────────────────────────────────────────────────────────────────────────────────────────
 
-export function buildFillMessages(args: { tool: AiTool; structure: Structure; fillable: string[]; current: ClientField[]; brief: string; skill?: string }): { system: string; user: string } {
+export function buildFillMessages(args: { tool: AiTool; structure: Structure; fillable: string[]; current: ClientField[]; brief: string; questions?: AiQuestion[]; skill?: string }): { system: string; user: string } {
   const { tool, structure, fillable, current, brief } = args;
   const parts = new Map(partsOf(structure).map((p) => [norm(p.label), p]));
   const list = fillable.map((label, i) => {
@@ -72,21 +72,33 @@ export function buildFillMessages(args: { tool: AiTool; structure: Structure; fi
   const answered = given.length
     ? renderValuesForPrompt(structure, valuesFromFields(structure, given as FrameworkField[]).values, { skipBlank: true })
     : '';
-  const user = [brief.trim() ? `THE PERSON'S SITUATION (their words):\n${brief.trim()}` : '', answered.trim() ? `ANSWERS ALREADY GIVEN (fixed; context only):\n${answered}` : ''].filter(Boolean).join('\n\n');
+  const asked = (args.questions ?? []).filter((q) => q.question.trim()).slice(0, 8).map((q, i) => `${i + 1}. ${q.question.trim()}`).join('\n');
+  const user = [
+    brief.trim() ? `THE PERSON'S SITUATION (their words):\n${brief.trim()}` : '',
+    asked ? `QUESTIONS THE PERSON IS THINKING THROUGH (context only; use them to decide what matters, never answer them with invented facts):\n${asked}` : '',
+    answered.trim() ? `ANSWERS ALREADY GIVEN (fixed; context only):\n${answered}` : '',
+  ].filter(Boolean).join('\n\n');
   return { system, user };
 }
 
 export type FillResult = { ok: true; fields: FrameworkField[]; drafted: number } | AiFailure;
 
-export async function aiFill(deps: AiDeps, args: { tool: AiTool; current: ClientField[]; brief: string }): Promise<FillResult> {
+export async function aiFill(deps: AiDeps, args: { tool: AiTool; current: ClientField[]; brief: string; questions?: AiQuestion[]; sectionKey?: string }): Promise<FillResult> {
   const structure = args.tool.def;
   const catalogue = { fields: flattenStructure(structure) };
-  const fillable = fillableLabels(catalogue as never, args.current, structure);
+  let fillable = fillableLabels(catalogue as never, args.current, structure);
+  // One section only (the "Draft this section" button): keep just the empty parts that belong to it.
+  if (args.sectionKey) {
+    const sec = structure.sections.find((x) => x.key === args.sectionKey);
+    const inSection = new Set(partsOf({ ...structure, sections: sec ? [sec] : [] }).map((p) => norm(p.label)));
+    fillable = fillable.filter((l) => inSection.has(norm(l)));
+    if (fillable.length === 0) return { ok: false, code: 'NOTHING_TO_DO', reason: 'Every part of this section already has your answer, so there is nothing for the AI to draft.' };
+  }
   if (fillable.length === 0) return { ok: false, code: 'NOTHING_TO_DO', reason: 'Every part already has your answer, so there is nothing for the AI to draft.' };
   const hasAnswers = args.current.some((f) => f.value.trim() && f.source !== 'AI');
   if (!args.brief.trim() && !hasAnswers) return { ok: false, code: 'NOTHING_TO_DO', reason: 'Describe your situation in a few sentences first, so the draft is about your case and not a generic one.' };
 
-  const { system, user } = buildFillMessages({ tool: args.tool, structure, fillable, current: args.current, brief: args.brief, skill: await skillOf(deps) });
+  const { system, user } = buildFillMessages({ tool: args.tool, structure, fillable, current: args.current, brief: args.brief, questions: args.questions, skill: await skillOf(deps) });
   const diag: string[] = [];
   const finish: { reason?: string } = {};
   const res = await deps.generate({ system, user, maxTokens: 6000, timeoutMs: 90_000, json: true, finish, diag });
