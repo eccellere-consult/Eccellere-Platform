@@ -156,6 +156,8 @@ export interface BoxOptions {
   dash?: string;
   /** Vertical anchoring of the text block. */
   valign?: 'top' | 'middle';
+  /** Space kept free at the top of the box, for a number tag. */
+  padTop?: number;
 }
 
 /**
@@ -171,8 +173,14 @@ export function box(x: number, y: number, w: number, h: number, title: string, b
   const titleLines = wrap(title, Math.max(8, Math.floor((w - 16) / (tSize * 0.56))));
   const bodyLines = body.flatMap((b) => wrap(b, wrapAt));
   const tLead = Math.round(tSize * 1.25), bLead = Math.round(bSize * 1.4);
-  const blockH = titleLines.length * tLead + (bodyLines.length ? 6 + bodyLines.length * bLead : 0);
-  const top = (o.valign ?? 'middle') === 'middle' ? y + (h - blockH) / 2 + tSize * 0.85 : y + 10 + tSize * 0.85;
+  // Keep the words inside the box: drop body lines (ending the last one with …) and, if still too tall, title lines, until the block fits.
+  const room = h - 16 - (o.padTop ?? 0);
+  const heightOf = () => titleLines.length * tLead + (bodyLines.length ? 6 + bodyLines.length * bLead : 0);
+  const ellipsise = (rows: string[]) => { rows[rows.length - 1] = rows[rows.length - 1].replace(/[….,;:\s]+$/, '') + '…'; };
+  while (heightOf() > room && bodyLines.length > 0) { bodyLines.pop(); if (bodyLines.length) ellipsise(bodyLines); }
+  while (heightOf() > room && titleLines.length > 1) { titleLines.pop(); ellipsise(titleLines); }
+  const blockH = heightOf();
+  const top = (o.valign ?? 'middle') === 'middle' ? y + (o.padTop ?? 0) + (h - (o.padTop ?? 0) - blockH) / 2 + tSize * 0.85 : y + 10 + (o.padTop ?? 0) + tSize * 0.85;
   let out = rect(x, y, w, h, { fill: o.fill ?? C.cream, stroke: o.stroke ?? C.border, sw: o.sw ?? 1, dash: o.dash });
   out += lines(tx, top, titleLines, { size: tSize, weight: 700, fill: o.titleFill ?? C.ink, anchor: align, leading: tLead });
   if (bodyLines.length) out += lines(tx, top + (titleLines.length - 1) * tLead + 6 + bLead * 0.85, bodyLines, { size: bSize, fill: o.bodyFill ?? C.inkMid, anchor: align, leading: bLead });
@@ -182,6 +190,17 @@ export function box(x: number, y: number, w: number, h: number, title: string, b
 /** A small caption line, e.g. an axis label. */
 export const caption = (x: number, y: number, s: string, anchor: 'start' | 'middle' | 'end' = 'middle', rotate = 0): string =>
   text(x, y, s, { size: 10, fill: C.inkLight, anchor, spacing: 0.6, upper: true, weight: 600, rotate });
+
+/** A small white square with a gold edge and a number, sitting on the top-left corner of a box (x, y is the corner of the tag). */
+export const numberTag = (x: number, y: number, label: string): string =>
+  rect(x, y, 22, 22, { fill: C.white, stroke: C.gold, sw: 1.2, rx: 0 }) + text(x + 11, y + 15.5, label, { size: 12, weight: 700, fill: '#7F611A', anchor: 'middle' });
+
+/** A connector made of straight segments (for example down, across, down) ending in an arrow head. */
+export function elbow(points: [number, number][], s: LineStyle = {}): string {
+  const marker = s.gold ? 'dg-arrow-gold' : 'dg-arrow';
+  return `<polyline points="${points.map(([x, y]) => `${r1(x)},${r1(y)}`).join(' ')}" fill="none" stroke="${s.stroke ?? C.inkMid}" stroke-width="${s.sw ?? 1.2}"` +
+    (s.dash ? ` stroke-dasharray="${s.dash}"` : '') + ` stroke-linejoin="round" marker-end="url(#${marker})"/>`;
+}
 
 /** A gold numbered/lettered badge. */
 export const badge = (cx: number, cy: number, label: string, fill: string = C.gold, size = 11): string =>

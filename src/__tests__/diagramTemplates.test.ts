@@ -67,4 +67,18 @@ describe('what a template will not draw', () => {
   it('is checked by the quality gate through the same function', () => {
     expect(diagramIssues(SPECS[0].spec)).toEqual([]);
   });
+  it('wraps a two-row sequence back to the FIRST box of the next row, with a white numbered tag on every box', () => {
+    const out = renderDiagram({ template: 'steps', title: 't', steps: ['A', 'B', 'C', 'D', 'E'].map((name) => ({ name })) });
+    const m = /<polyline points="([^"]+)"/.exec(out);
+    expect(m).not.toBeNull();
+    const pts = (m as RegExpExecArray)[1].split(' ').map((p) => p.split(',').map(Number));
+    const first = pts[pts.length - 1][0], start = pts[0][0];
+    expect(first).toBeLessThan(start); // it travels back to the left, to the first box, not straight down
+    expect(out.match(/fill="#FFFFFF" stroke="#B8913A"/g)?.length).toBe(5);
+  });
+  it('keeps long words inside a box instead of overflowing it', () => {
+    const long = 'word '.repeat(60);
+    const out = renderDiagram({ template: 'steps', title: 't', steps: [{ name: 'A', hint: long }, { name: 'B' }, { name: 'C' }] });
+    expect(out).toContain('…');
+  });
 });
