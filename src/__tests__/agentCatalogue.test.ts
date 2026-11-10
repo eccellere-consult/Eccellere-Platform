@@ -26,7 +26,7 @@ describe('Agent Marketplace catalogue', () => {
   });
   it('has exactly the built pilots, each with the same slug as its tool', () => {
     const pilots = allAgents().filter((a) => a.status === 'pilot');
-    expect(pilots.map((a) => a.slug).sort()).toEqual(['capital-allocation-advisor', 'concept-screener', 'demand-forecaster', 'hire-to-onboard-agent', 'pricing-optimizer', 'product-spec-generator', 'scenario-planner', 'strategy-plan-cascade', 'vendor-onboarding-agent', 'voice-of-customer-synthesizer']);
+    expect(pilots.map((a) => a.slug).sort()).toEqual(['attendance-payroll-reconciler', 'capital-allocation-advisor', 'caro-compliance-checker', 'close-the-books-agent', 'collections-follow-up-agent', 'concept-screener', 'demand-forecaster', 'exit-interview-analyzer', 'hire-to-onboard-agent', 'lead-to-quote-assistant', 'mis-report-generator', 'otif-tracker', 'po-invoice-matcher', 'pricing-optimizer', 'product-spec-generator', 'production-scheduler', 'scenario-planner', 'strategy-plan-cascade', 'supplier-risk-monitor', 'vendor-onboarding-agent', 'voice-of-customer-synthesizer']);
     for (const a of pilots) expect(a.tool).toBe(a.slug);
   });
 });
