@@ -37,7 +37,7 @@ export const AREAS: FunctionArea[] = [
     id: 'plan', code: 'PLAN', name: 'Strategy to Plan', flow: 'Strategy → Plan',
     purpose: 'Corporate strategy, planning cadence, and capital allocation.',
     agents: [
-      soon('strategy-plan-cascade', 'Strategy Cascade Agent', 'Turns board-level strategy into OKRs and quarterly plans.'),
+      pilot('strategy-plan-cascade', 'Strategy Cascade Agent', 'Turns board-level strategy into OKRs and quarterly plans.'),
       pilot('scenario-planner', 'Scenario Planner Agent', 'Builds best, base and worst case scenarios from your financial and market inputs.'),
       pilot('capital-allocation-advisor', 'Capital Allocation Advisor', 'Recommends where to deploy capital across competing initiatives.'),
     ],
@@ -46,9 +46,9 @@ export const AREAS: FunctionArea[] = [
     id: 'product', code: 'PRODUCT', name: 'Concept to Product', flow: 'Concept → Product',
     purpose: 'Idea screening, product definition, and portfolio decisions.',
     agents: [
-      soon('concept-screener', 'Concept Screener Agent', 'Scores and ranks new product and service ideas against strategic fit.'),
-      soon('product-spec-generator', 'Product Spec Generator', 'Drafts a structured product requirements document from a concept brief.'),
-      soon('voice-of-customer-synthesizer', 'Voice of Customer Agent', 'Synthesises customer feedback into prioritised product themes.'),
+      pilot('concept-screener', 'Concept Screener Agent', 'Scores and ranks new product and service ideas against strategic fit.'),
+      pilot('product-spec-generator', 'Product Spec Generator', 'Drafts a structured product requirements document from a concept brief.'),
+      pilot('voice-of-customer-synthesizer', 'Voice of Customer Agent', 'Synthesises customer feedback into prioritised product themes.'),
     ],
   },
   {
@@ -73,7 +73,7 @@ export const AREAS: FunctionArea[] = [
     id: 'procure', code: 'PROCURE', name: 'Procure to Pay', flow: 'Procure → Pay',
     purpose: 'Sourcing, purchasing, and vendor payments.',
     agents: [
-      soon('vendor-onboarding-agent', 'Vendor Onboarding Agent', 'Runs new-vendor KYC, compliance checks, and onboarding checklists.'),
+      pilot('vendor-onboarding-agent', 'Vendor Onboarding Agent', 'Runs new-vendor KYC, compliance checks, and onboarding checklists.'),
       soon('po-invoice-matcher', 'PO-Invoice Matcher', 'Three-way matches purchase orders, goods receipts and invoices, flagging mismatches.'),
       soon('supplier-risk-monitor', 'Supplier Risk Monitor', 'Tracks supplier financial and delivery risk signals over time.'),
     ],
@@ -91,7 +91,7 @@ export const AREAS: FunctionArea[] = [
     id: 'hr', code: 'HR', name: 'Hire to Retire', flow: 'Hire → Retire',
     purpose: 'Recruitment through exit: the full employee lifecycle.',
     agents: [
-      soon('hire-to-onboard-agent', 'Hire-to-Onboard Agent', 'Runs structured onboarding checklists for new joiners.'),
+      pilot('hire-to-onboard-agent', 'Hire-to-Onboard Agent', 'Runs structured onboarding checklists for new joiners.'),
       soon('attendance-payroll-reconciler', 'Attendance-Payroll Reconciler', 'Cross-checks attendance records against payroll runs for discrepancies.'),
       soon('exit-interview-analyzer', 'Exit Interview Analyzer', 'Synthesises exit interview themes into attrition-risk insights.'),
     ],

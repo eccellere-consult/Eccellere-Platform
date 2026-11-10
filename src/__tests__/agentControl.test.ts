@@ -77,7 +77,7 @@ describe('the admin list', () => {
     await repo.save('demand-forecaster', ok('demand-forecaster', { does: 'Edited' }), 'a');
     const rows = await listAgents(repo);
     expect(rows).toHaveLength(21);
-    expect(rows.filter((r) => r.sipocEditable).map((r) => r.slug).sort()).toEqual(['capital-allocation-advisor', 'demand-forecaster', 'pricing-optimizer', 'scenario-planner']);
+    expect(rows.filter((r) => r.sipocEditable).map((r) => r.slug).sort()).toEqual(['capital-allocation-advisor', 'concept-screener', 'demand-forecaster', 'hire-to-onboard-agent', 'pricing-optimizer', 'product-spec-generator', 'scenario-planner', 'strategy-plan-cascade', 'vendor-onboarding-agent', 'voice-of-customer-synthesizer']);
     const d = rows.find((r) => r.slug === 'demand-forecaster')!;
     expect(d.edit?.does).toBe('Edited');
     expect(d.defaults?.does).toMatch(/demand/i);

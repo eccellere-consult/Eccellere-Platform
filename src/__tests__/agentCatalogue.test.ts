@@ -24,9 +24,9 @@ describe('Agent Marketplace catalogue', () => {
     for (const a of allAgents()) expect(a.status === 'pilot').toBe(!!a.tool);
     expect(pilotCount()).toBe(allAgents().filter((a) => a.tool).length);
   });
-  it('has exactly the four built pilots, each with the same slug as its tool', () => {
+  it('has exactly the built pilots, each with the same slug as its tool', () => {
     const pilots = allAgents().filter((a) => a.status === 'pilot');
-    expect(pilots.map((a) => a.slug).sort()).toEqual(['capital-allocation-advisor', 'demand-forecaster', 'pricing-optimizer', 'scenario-planner']);
+    expect(pilots.map((a) => a.slug).sort()).toEqual(['capital-allocation-advisor', 'concept-screener', 'demand-forecaster', 'hire-to-onboard-agent', 'pricing-optimizer', 'product-spec-generator', 'scenario-planner', 'strategy-plan-cascade', 'vendor-onboarding-agent', 'voice-of-customer-synthesizer']);
     for (const a of pilots) expect(a.tool).toBe(a.slug);
   });
 });

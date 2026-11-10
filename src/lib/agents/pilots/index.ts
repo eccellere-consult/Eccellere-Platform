@@ -7,6 +7,12 @@ import { SCENARIO_PLANNER } from './scenarioPlanner';
 import { PRICING_OPTIMIZER } from './pricingOptimizer';
 import { DEMAND_FORECASTER } from './demandForecaster';
 import { CAPITAL_ALLOCATION } from './capitalAllocation';
+import { CONCEPT_SCREENER } from './conceptScreener';
+import { VENDOR_ONBOARDING } from './vendorOnboarding';
+import { HIRE_TO_ONBOARD } from './hireToOnboard';
+import { PRODUCT_SPEC } from './productSpec';
+import { STRATEGY_CASCADE } from './strategyCascade';
+import { VOICE_OF_CUSTOMER } from './voiceOfCustomer';
 
 /** A pilot: the catalogue agent, the working tool that backs it, where that tool sits in the marketplace, and its SIPOC (a draft for the owner to confirm). */
 export interface Pilot {
@@ -54,6 +60,60 @@ export const PILOTS: Pilot[] = [
       process: ['List every project with outlay and cash flows', 'Discount at the hurdle rate to get NPV and profitability index', 'Work out IRR, MIRR and payback', 'Fund projects in order of profitability index within the budget', 'Review actual cash flows against plan'],
       customers: ['Investment committee or board', 'Project controllers who track delivery'],
       refresh: 'Rerun each budget round, and again when the hurdle rate or a project’s cash flows change.',
+    },
+  },
+  {
+    agent: 'strategy-plan-cascade', tool: STRATEGY_CASCADE, marketCategory: 'Strategy', group: 'Strategy execution', practice: 'Strategy',
+    sipoc: {
+      suppliers: ['Leadership team (the strategy and objectives)', 'Function heads (key results, baselines and targets)', 'Finance and MIS (current values)'],
+      process: ['State the strategy and period', 'List objectives with an owner by role', 'Set key results with baseline, target and weight', 'Enter current values each review', 'Work out progress per result and overall'],
+      customers: ['Chief executive and leadership team', 'Function heads who own the results'],
+      refresh: 'Update the current values every month and revisit objectives and weights at each quarterly review.',
+    },
+  },
+  {
+    agent: 'concept-screener', tool: CONCEPT_SCREENER, marketCategory: 'Decision Models', group: 'Product and innovation', practice: 'Strategy',
+    sipoc: {
+      suppliers: ['Product and innovation teams (the concepts)', 'Leadership (criteria and weights)', 'Market and finance teams (evidence for scores)'],
+      process: ['Frame the decision and its limit', 'Name five criteria and weight them', 'Score each concept 1 to 5 on every criterion', 'Work out weighted and equal-weights scores', 'Compare with the cut-off and list actions'],
+      customers: ['Leadership team choosing what to pursue', 'Product managers who build the business cases'],
+      refresh: 'Rescreen when new concepts arrive or the weights change, and at each planning cycle.',
+    },
+  },
+  {
+    agent: 'product-spec-generator', tool: PRODUCT_SPEC, marketCategory: 'Business analysis', group: 'Product and innovation', practice: 'Digital',
+    sipoc: {
+      suppliers: ['Product owner (concept, user, problem)', 'Builders (effort estimates)', 'Customers (needs and feedback)'],
+      process: ['Describe the user, problem and success measure', 'List requirements', 'Rate importance and estimate effort', 'Rank by value per day', 'Check the spec is complete and agree release 1'],
+      customers: ['Design and development teams', 'Leadership who approves the build'],
+      refresh: 'Update after every customer test and before each release is planned.',
+    },
+  },
+  {
+    agent: 'voice-of-customer-synthesizer', tool: VOICE_OF_CUSTOMER, marketCategory: 'Business analysis', group: 'Customer insight', practice: 'Process',
+    sipoc: {
+      suppliers: ['Support and sales teams (complaints and call notes)', 'Marketing (surveys and reviews)', 'Customers (the feedback itself)'],
+      process: ['Gather feedback from each channel', 'Group comments into themes', 'Count mentions and rate severity', 'Work out priority and share of feedback', 'Agree actions for the top themes'],
+      customers: ['Product and service owners', 'Customer experience leads'],
+      refresh: 'Repeat each quarter with fresh feedback and compare themes with the last round.',
+    },
+  },
+  {
+    agent: 'vendor-onboarding-agent', tool: VENDOR_ONBOARDING, marketCategory: 'Others', group: 'Procurement and payables', practice: 'Process',
+    sipoc: {
+      suppliers: ['The vendor (documents)', 'Procurement (contract, references)', 'Finance (bank and tax checks)'],
+      process: ['Record the vendor and what they supply', 'Collect seven standard documents', 'Mark each as received and checked', 'Answer four risk questions', 'Close the gaps before first payment'],
+      customers: ['Accounts payable, which releases payment', 'Procurement and the budget holder'],
+      refresh: 'Rerun when a vendor changes bank account or name, and review vendor files every year.',
+    },
+  },
+  {
+    agent: 'hire-to-onboard-agent', tool: HIRE_TO_ONBOARD, marketCategory: 'Others', group: 'People operations', practice: 'Organisation',
+    sipoc: {
+      suppliers: ['The new joiner (documents)', 'HR (contract, checks, payroll forms)', 'IT and facilities (equipment, access, seat)'],
+      process: ['Record the role and days to joining', 'Set the status of eight onboarding steps', 'Work out readiness for day one', 'Flag time pressure', 'Assign owners to open steps'],
+      customers: ['The reporting manager', 'The new joiner'],
+      refresh: 'Review a week before joining and again on the joining day, then improve the checklist from joiner feedback.',
     },
   },
 ];
