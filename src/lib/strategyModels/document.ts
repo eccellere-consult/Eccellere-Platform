@@ -15,7 +15,7 @@ export interface DocRun { t: string; b?: 1; i?: 1; u?: 1; c?: string; z?: number
 
 /** Where a blank in the document is answered: a field of the form, or one cell (row name, column key) of one of its tables. */
 export type DocBind =
-  | { f: string; kind: 'text' | 'long' }
+  | { f: string; kind: 'text' | 'long' | 'tick' }
   | { t: string; r: string; c: string; kind: 'text' | 'long' | 'rating' | 'choice' | 'tick' };
 
 export interface DocPara {
@@ -86,7 +86,7 @@ const put = <T extends object>(o: T, k: string, v: unknown): void => { if (v !==
 function cleanBind(x: unknown): DocBind | undefined {
   if (!x || typeof x !== 'object') return undefined;
   const o = x as Record<string, unknown>;
-  if (typeof o.f === 'string' && KEY.test(o.f)) return { f: o.f, kind: o.kind === 'long' ? 'long' : 'text' };
+  if (typeof o.f === 'string' && KEY.test(o.f)) return { f: o.f, kind: o.kind === 'long' ? 'long' : o.kind === 'tick' ? 'tick' : 'text' };
   if (typeof o.t === 'string' && KEY.test(o.t) && typeof o.c === 'string' && KEY.test(o.c) && typeof o.r === 'string' && o.r.trim()) {
     const kind = (['text', 'long', 'rating', 'choice', 'tick'] as const).find((k) => k === o.kind) ?? 'text';
     return { t: o.t, r: o.r.slice(0, 400), c: o.c, kind };

@@ -10,7 +10,7 @@ import type { Column, FieldPart, ModelDefinition, ModelValues, Part, ReadingBloc
 import { loadModelDefinition } from "@/lib/strategyModels/groups";
 import { BTN_LINE, BTN_MAIN, CARD, FIELD, LABEL } from "../styles";
 import DocumentView, { PAPER_CSS } from "./DocumentView";
-import type { DocBlock } from "@/lib/strategyModels/document";
+import { documentBinds, type DocBlock } from "@/lib/strategyModels/document";
 import { worksheetText } from "@/lib/tools/worksheetText";
 import { fingerprintFields, type StrategyActionable, type StrategyAnalysis, type StrategyRecommendation } from "@/lib/strategyFillinTypes";
 import type { FrameworkField } from "@/lib/strategyFrameworks";
@@ -582,6 +582,7 @@ function WorkspaceInner({ slug, def, toolName, sample, doc, paper }: { slug: str
     );
   };
 
+  const boundKeys = new Set(documentBinds(paper ?? []).map((b) => ("f" in b ? b.f : b.t)));
   const a = saved?.analysis ?? null;
   const saveText = saveState === "pending" ? "Unsaved changes…" : saveState === "saving" ? "Saving…" : saveState === "saved" ? "Saved" : saveState === "error" ? saveErr : saved ? "All saved" : "Your work saves as you type.";
 
@@ -675,7 +676,9 @@ function WorkspaceInner({ slug, def, toolName, sample, doc, paper }: { slug: str
           draftHint={!brief.trim() && nothingYet ? "Describe your situation in AI help (top of the page) first." : "Only empty parts are drafted; your answers are never changed."}
           message={secMsg}
         />
-      ) : def.sections.map((s) => (
+      ) : null}
+      {/* Parts of the form that have no place in the document (added later, for example with "Modify with AI") are drawn after it, so nothing in the form is hidden. */}
+      {(paper?.length ? def.sections.map((s) => ({ ...s, reading: undefined, parts: s.parts.filter((p) => !boundKeys.has(p.key)) })).filter((s) => s.parts.length) : def.sections).map((s) => (
         <div key={s.key}>
         <ReadingPanels blocks={(s.reading ?? []).filter((b) => b.place === "above")} />
         <section className={cn(CARD, !doc && "break-inside-avoid")} aria-labelledby={`s-${s.key}`}>

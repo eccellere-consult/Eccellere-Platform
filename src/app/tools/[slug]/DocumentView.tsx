@@ -91,6 +91,7 @@ export default function DocumentView({ document, def, values, setField, setCell,
     if ("f" in b) {
       const v = values.fields[b.f] ?? "";
       const name = labels.get(b.f) ?? "Answer";
+      if (b.kind === "tick") return <input type="checkbox" aria-label={name} className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-eccellere-gold-deep" checked={v === "Yes"} onChange={(e) => setField(b.f, e.target.checked ? "Yes" : "")} />;
       return b.kind === "long"
         ? written(<textarea aria-label={name} className="ws-in" rows={4} value={v} onChange={(e) => setField(b.f, e.target.value)} />, v, 4)
         : written(<input aria-label={name} className="ws-in" value={v} onChange={(e) => setField(b.f, e.target.value)} />, v, 1);
@@ -116,7 +117,7 @@ export default function DocumentView({ document, def, values, setField, setCell,
     );
     if (b.kind === "tick") return <input type="checkbox" aria-label={name} className="h-4 w-4 accent-eccellere-gold-deep" checked={v === "Yes"} onChange={(e) => set(e.target.checked ? "Yes" : "")} />;
     return b.kind === "long"
-      ? written(<textarea aria-label={name} className="ws-in" rows={2} value={v} onChange={(e) => set(e.target.value)} />, v, 2)
+      ? written(<textarea aria-label={name} className="ws-in" rows={2} placeholder={col.header} value={v} onChange={(e) => set(e.target.value)} />, v, 2)
       : written(<input aria-label={name} className="ws-in" value={v} onChange={(e) => set(e.target.value)} />, v, 1);
   };
 
@@ -132,6 +133,11 @@ export default function DocumentView({ document, def, values, setField, setCell,
     if (p.li) style.marginLeft = `${2.4 + (p.lv ?? 0) * 1.6}em`;
     if (!p.r.length && !p.bb && !p.in) style.minHeight = inCell ? "0.9em" : Math.max(6, p.sa ?? 0);
     const cls = [p.li ? "ws-li" : "", p.pb ? "ws-pagestart" : ""].filter(Boolean).join(" ") || undefined;
+    if (p.in && "f" in p.in && p.in.kind === "tick") {
+      // a checklist item: its bullet gives way to a tick box, its words stay as printed
+      const runs = p.r.map((r, i) => (i === 0 ? { ...r, t: r.t.replace(/^\s*[•●▪◦]\s*/, "") } : r)).filter((r) => r.t);
+      return <label key={key} className={p.pb ? "ws-pagestart" : undefined} style={{ ...style, marginLeft: undefined, display: "flex", gap: 6, alignItems: "flex-start", cursor: "pointer", whiteSpace: "pre-wrap" }}>{input(p.in)}<span><Runs runs={runs} /></span></label>;
+    }
     if (p.in) {
       // the line's own blank ("Name: ______") gives way to the box; the words before it stay as printed
       const runs = p.r.map((r) => ({ ...r, t: r.t.replace(/[:：]?\s*_{3,}\s*$/, "") })).filter((r) => r.t);

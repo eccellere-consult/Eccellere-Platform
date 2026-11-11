@@ -92,3 +92,15 @@ Not carried over from a Word file, and reported when present: page headers and f
 Colours: the page chrome keeps the Eccellere+ colours; inside the sheet the document's own colours are shown, because they are the document.
 
 **Verified:** unit tests; the Founder Playbook file read end to end (6 cover blanks, 2 rating tables, Annexure B and C; nothing else bound), drawn in Chromium at desktop and phone width through a temporary preview page with the save API faked, and compared by eye with the Word pages. **Not verified:** the real database, login and host build; Safari; print on paper; a real AI call; any other toolkit file.
+
+### 8.1 What the document asks can be answered in place (11 Nov 2026, same day)
+
+Section 8 as first merged bound only printed blanks. On the Founder Playbook that left about 40 inputs where the original converter had 464, so most of the toolkit could no longer be worked through or drafted with AI. Corrected:
+
+- a table whose heading row has a question column ("Diagnostic Question", "Questions to Resolve") gets a box under each row ("Your answer");
+- a worksheet table (a column headed activities, actions, tasks, KPIs, targets, outcomes and the like) gets a box under each row ("Your notes");
+- three or more bullets inside a table cell are a checklist: each bullet is a tick box.
+
+Each added box is a row of its own across the table, so the printed cells stay as they were. The rule reads a table's HEADINGS, never the wording of a sentence, so an advice table with question-like sentences stays reading. On the Founder Playbook this gives 476 answerable items (6 cover blanks, 110 table rows, 360 checklist ticks).
+
+A part of the form with no place in the document (added later with "Modify with AI") is drawn after the document, so AI edits to the form always show.

@@ -122,6 +122,35 @@ describe('the online version of a designed Word document', () => {
     expect(advice.rows[0].c[0]).toMatchObject({ s: 3, sh: 'B03A2E' });
   });
 
+  it('lets what the document ASKS be answered in place: a box under each question row and each worksheet row, and a tick for each checklist bullet', async () => {
+    const reading = await readSource('Kit.docx', await docxOf([
+      h1('MODULE B — TEAM'),
+      tableOf([['Alignment Dimension', 'Questions to Resolve Before Starting', 'Common Failure Points'], ['EQUITY SPLIT', 'What is the equity split?', 'Equal split with no vesting.'], ['WORKING STYLE', 'How do we decide when we disagree?', 'Conflict avoidance.']]),
+      tableOf([['KPI', 'Definition', 'Target'], ['Activation Rate', 'Share of sign-ups who reach value', 'Above 40 percent']]),
+      tableOf([['Source', 'Core Insight', 'Application'], ['Sequoia', 'Build on an insight. Is it non-obvious?', 'Write it in one sentence.']]),
+      `<w:tbl><w:tblGrid><w:gridCol w:w="2000"/><w:gridCol w:w="6000"/></w:tblGrid><w:tr>${cellOf('TRACK')}${cellOf('STAGE 1')}</w:tr><w:tr>${cellOf('FINANCE')}<w:tc><w:tcPr/>${['• Assess personal runway', '• Track burn weekly', '• Validate unit economics'].map((x) => p(x)).join('')}</w:tc></w:tr></w:tbl>`,
+    ]));
+    const built = documentForm([reading], { name: 'Kit', category: 'strategy' as never })!;
+    const tool = normaliseDeclarative(built.form).tool!;
+    const parts = tool.sections.flatMap((s) => s.parts);
+    const tables = parts.filter((x): x is DeclTable => x.kind === 'table');
+    expect(tables.map((t) => [t.label, t.fixedRows, t.columns.map((c) => c.header)])).toEqual([
+      ['MODULE B — TEAM: Your answer', ['What is the equity split?', 'How do we decide when we disagree?'], ['Questions to Resolve Before Starting', 'Your answer']],
+      ['MODULE B — TEAM: Your notes', ['Activation Rate'], ['KPI', 'Your notes']],
+    ]);
+    // the advice table has no question or worksheet heading, so it stays reading however its sentences are worded
+    expect(parts.map((x) => x.label).join(' | ')).not.toMatch(/Sequoia|non-obvious/);
+    const ticks = parts.filter((x) => x.kind === 'field');
+    expect(ticks.map((x) => [x.label, x.kind === 'field' && x.display])).toEqual([['Assess personal runway', 'tick'], ['Track burn weekly', 'tick'], ['Validate unit economics', 'tick']]);
+    // each answer box is a row of its own under the printed row, across the table; the printed cells are untouched
+    const asked = (tool.document as DocBlock[]).find((b): b is DocTable => b.k === 't' && JSON.stringify(b).includes('Questions to Resolve'))!;
+    expect(asked.rows.map((r) => r.c.length)).toEqual([3, 3, 1, 3, 1]);
+    expect(asked.rows[2].c[0]).toEqual({ p: [], s: 3, in: { t: tables[0].key, r: 'What is the equity split?', c: 'your_answer', kind: 'long' } });
+    expect(asked.rows[1].c.every((c) => !c.in)).toBe(true);
+    expect(qualityGate(tool).blockers).toEqual([]);
+    expect(assess(tool).errors).toEqual([]);
+  });
+
   it('makes "1 2 3 4 5" a rating, an empty column a box for each row, and RAG a choice of Red, Amber or Green', async () => {
     const tool = await formOf();
     const [rating, answers] = tool.sections.flatMap((s) => s.parts).filter((x): x is DeclTable => x.kind === 'table');
@@ -239,6 +268,37 @@ describe('the document on the page', () => {
     // clicking the chosen rating again clears it
     fireEvent.click(within(scale).getByRole('radio', { name: '4' }));
     expect(within(scale).getByRole('radio', { name: '4' }).getAttribute('aria-checked')).toBe('false');
+  });
+
+  it('draws a part the document has no place for (added later with "Modify with AI") after the document, so it is never hidden', async () => {
+    const tool = await formOf();
+    tool.sections[0].parts.push({ kind: 'field', key: 'biggest_risk', label: 'What is your biggest risk this quarter?', type: 'longtext', help: 'Name the one risk that would hurt most and why it matters now.' });
+    const view = render(<Workspace slug="founder-playbook" definition={tool} toolName="Founder Playbook" />);
+    await screen.findByText(/parts answered/);
+    const paper = view.container.querySelector('.ws-paper') as HTMLElement;
+    expect(within(paper).queryByLabelText('What is your biggest risk this quarter?')).toBeNull();
+    const box = screen.getByLabelText('What is your biggest risk this quarter?');
+    expect(paper.compareDocumentPosition(box) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    fireEvent.change(box, { target: { value: 'Runway under six months' } });
+    await settle();
+    expect(saved.find((f) => f.label === 'What is your biggest risk this quarter?')!.value).toBe('Runway under six months');
+    // parts that have their place in the document are not drawn twice
+    expect(screen.getAllByLabelText('Founder / CEO Name')).toHaveLength(1);
+  });
+
+  it('ticks a checklist bullet inside a table cell and counts it', async () => {
+    const reading = await readSource('Kit.docx', await docxOf([h1('ANNEXURE A — ACTIVITIES'), `<w:tbl><w:tblGrid><w:gridCol w:w="2000"/><w:gridCol w:w="6000"/></w:tblGrid><w:tr>${cellOf('TRACK')}${cellOf('STAGE 1')}</w:tr><w:tr>${cellOf('FINANCE')}<w:tc><w:tcPr/>${['• Assess personal runway', '• Track burn weekly', '• Validate unit economics'].map((x) => p(x)).join('')}</w:tc></w:tr></w:tbl>`]));
+    const tool = normaliseDeclarative(documentForm([reading], { name: 'Kit', category: 'strategy' as never })!.form).tool!;
+    render(<Workspace slug="kit" definition={tool} toolName="Kit" />);
+    await screen.findByText(/parts answered/);
+    const box = screen.getByLabelText('Track burn weekly') as HTMLInputElement;
+    expect(box.type).toBe('checkbox');
+    expect(box.closest('label')!.textContent).toBe('Track burn weekly');
+    fireEvent.click(box);
+    await settle();
+    expect(saved.find((f) => f.label === 'Track burn weekly')!.value).toBe('Yes');
+    // 1 of 3 = 33%
+    expect(screen.getByText('Checklist items ticked').parentElement!.textContent).toContain('1 of 3 ticked (33%)');
   });
 
   it('keeps AI help: one "Draft this part with AI" for each part of the form, and every other worksheet feature', async () => {
