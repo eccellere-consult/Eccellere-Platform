@@ -9,6 +9,8 @@ import { cleanTable, completeness, computeDerived, computeOutputs, evalColumn, e
 import type { Column, FieldPart, ModelDefinition, ModelValues, Part, ReadingBlock, Row, Section, TablePart } from "@/lib/strategyModels/types";
 import { loadModelDefinition } from "@/lib/strategyModels/groups";
 import { BTN_LINE, BTN_MAIN, CARD, FIELD, LABEL } from "../styles";
+import DocumentView, { PAPER_CSS } from "./DocumentView";
+import type { DocBlock } from "@/lib/strategyModels/document";
 import { worksheetText } from "@/lib/tools/worksheetText";
 import { fingerprintFields, type StrategyActionable, type StrategyAnalysis, type StrategyRecommendation } from "@/lib/strategyFillinTypes";
 import type { FrameworkField } from "@/lib/strategyFrameworks";
@@ -145,7 +147,7 @@ export default function Workspace({ slug, definition, toolId, toolName, sample }
   }, [def, toolId]);
   if (defErr) return <p className="my-6 rounded bg-red-50 p-4 text-sm text-red-800">This worksheet could not be loaded. Please reload the page.</p>;
   if (!def) return <p className="py-10 text-sm text-ink-mid"><Loader2 className="mr-2 inline h-4 w-4 animate-spin" />Opening your worksheet…</p>;
-  return <WorkspaceInner slug={slug} toolName={toolName} def={def} sample={sample ?? null} doc={definition?.layout === "document"} />;
+  return <WorkspaceInner slug={slug} toolName={toolName} def={def} sample={sample ?? null} doc={definition?.layout === "document"} paper={definition?.document ?? null} />;
 }
 
 /** The fictional worked example, laid out with the page's own labels. Read-only: it never touches the person's answers. */
@@ -190,7 +192,7 @@ function ExamplePanel({ def, sample, onClose }: { def: ModelDefinition; sample: 
   );
 }
 
-function WorkspaceInner({ slug, def, toolName, sample, doc }: { slug: string; def: ModelDefinition; toolName: string; sample: Sample | null; doc: boolean }) {
+function WorkspaceInner({ slug, def, toolName, sample, doc, paper }: { slug: string; def: ModelDefinition; toolName: string; sample: Sample | null; doc: boolean; paper: DocBlock[] | null }) {
   const [values, setValues] = useState<ModelValues>({ fields: {}, tables: {} });
   // "Print a blank copy": the form is drawn empty for the print only; the saved answers are untouched and come back when the print closes.
   const [blank, setBlank] = useState(false);
@@ -301,6 +303,12 @@ function WorkspaceInner({ slug, def, toolName, sample, doc }: { slug: string; de
     setValues((c) => { const n = { ...c, tables: { ...c.tables, [part.key]: rows } }; valuesRef.current = n; return n; });
     setSources((c) => { const n = { ...c, [part.key]: "Manual" }; sourcesRef.current = n; return n; });
     touch();
+  };
+
+  /** One cell of a table whose rows are the document's own, set by the row's name (the blank in the document that stands for it). */
+  const setCell = (part: TablePart, rowName: string, col: string, v: string) => {
+    const nameKey = labelColumnKey(part);
+    setRows(part, expandTable(part, valuesRef.current.tables[part.key]).map((r) => (r[nameKey] === rowName ? { ...r, [col]: v } : r)));
   };
 
   async function downloadWorkbook(withSample: boolean) {
@@ -589,7 +597,7 @@ function WorkspaceInner({ slug, def, toolName, sample, doc }: { slug: string; de
 
   return (
     <div>
-      {doc && <style dangerouslySetInnerHTML={{ __html: DOC_CSS }} />}
+      {doc && <style dangerouslySetInnerHTML={{ __html: paper?.length ? PAPER_CSS : DOC_CSS }} />}
       {/* AI help: the situation note, the questions and the draft of the empty parts */}
       <section className={cn(CARD, "no-print")} aria-labelledby="ai-help">
         <h2 id="ai-help" className={cn(LABEL, "flex items-center gap-2")}><Sparkles className="h-3.5 w-3.5" /> AI help</h2>
@@ -660,7 +668,14 @@ function WorkspaceInner({ slug, def, toolName, sample, doc }: { slug: string; de
       </div>
       <p className="mb-6 text-xs text-ink-light">Leave anything you do not know blank. It is treated as <strong>not known</strong>, never as zero, and the analysis says so.</p>
 
-      {def.sections.map((s) => (
+      {paper?.length ? (
+        <DocumentView
+          document={paper} def={def} values={shown} setField={setField} setCell={setCell}
+          onDraft={(key) => ai("fill", key)} draftBusy={busy === "fill" ? busySection : null} draftDisabled={!!busy || (!brief.trim() && nothingYet)}
+          draftHint={!brief.trim() && nothingYet ? "Describe your situation in AI help (top of the page) first." : "Only empty parts are drafted; your answers are never changed."}
+          message={secMsg}
+        />
+      ) : def.sections.map((s) => (
         <div key={s.key}>
         <ReadingPanels blocks={(s.reading ?? []).filter((b) => b.place === "above")} />
         <section className={cn(CARD, !doc && "break-inside-avoid")} aria-labelledby={`s-${s.key}`}>

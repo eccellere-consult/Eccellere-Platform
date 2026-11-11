@@ -292,6 +292,7 @@ export default function ReviewPanel({ slug, categories, practices, onChanged, on
         <div>
           <h3 className="text-xs font-medium uppercase tracking-wider text-ink-light">What a user will see</h3>
           {diagram ? <div className="mt-2 border border-eccellere-ink/10 p-2" dangerouslySetInnerHTML={{ __html: diagram }} /> : <p className="mt-2 text-xs text-red-700">No diagram yet.</p>}
+          {def?.document?.length ? <p className="mt-4 rounded bg-eccellere-cream p-3 text-xs text-ink-mid">The page shows the Word document itself, as it is. Only the parts listed below are inputs; everything else is the document&apos;s own text and tables. Use Preview to compare it with the Word file.</p> : null}
           <ol className="mt-4 space-y-4">
             {sections.map((s) => (
               <li key={s.key}>

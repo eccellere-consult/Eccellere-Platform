@@ -9,7 +9,7 @@
  * identity (name, slug, section), the originator and the review state are never taken from the AI; whatever the AI drops that was fine
  * (diagram, worked example) is kept; and every result is re-checked and goes back to review.
  */
-import { normaliseDeclarative, type DeclarativeTool } from '@/lib/strategyModels/declarative';
+import { keepDocumentLayout, normaliseDeclarative, type DeclarativeTool } from '@/lib/strategyModels/declarative';
 import type { GenerateArgs, GenerateResult } from '@/lib/ai/providers';
 import { SCHEMA_NOTES, extractJson } from './draft';
 import { DEFAULT_DRAFT_SKILL } from './skill';
@@ -34,7 +34,9 @@ export function buildRepairMessages(tool: DeclarativeTool, issues: string[], ins
     '# Format (fixed)',
     SCHEMA_NOTES,
   ].join('\n');
-  const { source, ...page } = tool; void source;
+  // The document a page was made from (its kept text and reading) is not sent: it is long and is not what is being corrected. It is put back afterwards.
+  const { source, document, ...rest } = tool; void source; void document;
+  const page = { ...rest, sections: rest.sections.map(({ reading, ...sec }) => { void reading; return sec; }) };
   const user = [
     issues.length ? `PROBLEMS TO FIX:\n${issues.map((i) => `- ${i}`).join('\n')}` : '',
     instruction.trim() ? `\nINSTRUCTION FROM THE ADMINISTRATOR (follow it as far as it is sensible and keeps the page valid):\n${instruction.trim().slice(0, 3000)}` : '',
@@ -251,6 +253,7 @@ export async function fixTool(
         if (!next.diagram && def.diagram) next.diagram = def.diagram;
         if (!next.sample && def.sample) next.sample = def.sample;
         if (!next.next && def.next) next.next = def.next;
+        keepDocumentLayout(next, def);
         next.source = def.source;
         let after = assess(next);
         // an example that no longer fits the changed fields: ask once for a new one

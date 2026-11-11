@@ -14,6 +14,7 @@ import { boardTable } from './boards';
 import { slug as keySlug } from './structure';
 import { fmtNum, norm, toNum } from './values';
 import { diagramIssues, type DiagramSpec } from './diagrams/templates';
+import { cleanDocument, documentBinds, type DocBlock } from './document';
 import type { BoardSpec, ColumnType, Derived, FieldDisplay, FieldType, ModelDefinition, ModelSample, ModelValues, Output, Part, RatingScale, ReadingBlock, Reference, Row, Section, Tone } from './types';
 
 export const TOOL_CATEGORIES = ['analytical', 'creative', 'decision-matrix', 'planning', 'root-cause', 'prioritisation', 'strategy', 'other'] as const;
@@ -108,6 +109,8 @@ export interface DeclarativeTool {
   links?: { buildsOn: string[]; feeds: string[] };
   /** 'document': made from a document and laid out like it (its own steps, reading in place, no added furniture). */
   layout?: 'document';
+  /** The source document itself, drawn as the page; its blanks are bound to the parts above. See document.ts. */
+  document?: DocBlock[];
 }
 
 // ── Reading a rule ───────────────────────────────────────────────────────────────────────────────────────────────────
@@ -526,6 +529,12 @@ export function validateDeclarative(raw: unknown): Issue[] {
   if (!(t.outputs ?? []).length) err('outputs', 'at least one output is required, so a later tool can build on this one');
   (t.outputs ?? []).forEach((o, i) => { if (ok.has(o.key)) err(`outputs[${i}].key`, `duplicate key ${o.key}`); ok.add(o.key); checkRule(o.rule, `outputs[${i}].rule`); });
 
+  // every blank of a kept document must be answered by a part that exists, or what is typed there would be lost
+  for (const b of documentBinds(t.document ?? [])) {
+    if ('f' in b) { if (!fieldKeys.has(b.f)) err('document', `a blank is bound to an unknown field ${b.f}`); }
+    else if (!tableCols.get(b.t)?.has(b.c)) err('document', `a blank is bound to an unknown table column ${b.t}.${b.c}`);
+  }
+
   if (t.sample) {
     for (const k of Object.keys(t.sample.values ?? {})) if (!fieldKeys.has(k)) err('sample.values', `unknown field ${k}`);
     for (const k of Object.keys(t.sample.tables ?? {})) if (!tableCols.has(k)) err('sample.tables', `unknown table ${k}`);
@@ -662,6 +671,8 @@ export function normaliseDeclarative(raw: unknown, ctx: { existingSlugs?: string
   };
   if (str(o.stage)) tool.stage = str(o.stage);
   if (o.layout === 'document') tool.layout = 'document';
+  const document = cleanDocument(o.document);
+  if (document.length) tool.document = document;
   if (str(o.whenNotToUse)) tool.whenNotToUse = str(o.whenNotToUse);
   if (str(o.next)) tool.next = str(o.next);
   if (o.diagram && typeof o.diagram === 'object') tool.diagram = o.diagram as DiagramSpec;
@@ -677,4 +688,41 @@ export function normaliseDeclarative(raw: unknown, ctx: { existingSlugs?: string
   if (ctx.existingSlugs?.includes(tool.slug)) issues.push({ level: 'error', path: 'slug', message: `A tool with the slug ${tool.slug} already exists` });
   if (!(o.category && (TOOL_CATEGORIES as readonly string[]).includes(str(o.category)))) issues.push({ level: 'warn', path: 'category', message: 'The category was not one of the known ones and was set to other' });
   return { tool, issues };
+}
+
+/**
+ * The AI improves wording; it is not asked to carry the document's layout. So when the form built from the file is laid out like the
+ * document, that layout is put back on the AI's version wherever the same step or part is still there: the reading in place, the grid
+ * tables, the tick boxes and visible choices. Nothing is added to a part whose type the AI changed.
+ */
+export function keepDocumentLayout(tool: DeclarativeTool, baseline: unknown): void {
+  if (!baseline || typeof baseline !== 'object' || (baseline as { layout?: unknown }).layout !== 'document') return;
+  tool.layout = 'document';
+  const base = normaliseDeclarative(baseline).tool;
+  if (!base) return;
+  // the kept document comes back only when every blank in it still has its part; otherwise the page falls back to the plain layout
+  if (base.document?.length && !tool.document) {
+    const fields = new Set(tool.sections.flatMap((s) => s.parts).filter((p) => p.kind === 'field').map((p) => p.key));
+    const cols = new Map(tool.sections.flatMap((s) => s.parts).flatMap((p) => (p.kind === 'table' ? [[p.key, new Set(p.columns.map((c) => c.key))] as const] : [])));
+    if (documentBinds(base.document).every((b) => ('f' in b ? fields.has(b.f) : !!cols.get(b.t)?.has(b.c)))) tool.document = base.document;
+  }
+  const sections = new Map(base.sections.map((s) => [s.key, s]));
+  const parts = new Map(base.sections.flatMap((s) => s.parts).map((p) => [p.key, p]));
+  for (const s of tool.sections) {
+    const was = sections.get(s.key);
+    if (was?.reading?.length && !s.reading?.length) {
+      const keys = new Set(s.parts.map((p) => p.key));
+      s.reading = cleanReading(was.reading).map((b) => { if (b.before && !keys.has(b.before)) { const { before, ...rest } = b; void before; return rest; } return b; });
+    }
+    for (const p of s.parts) {
+      const old = parts.get(p.key);
+      if (!old || old.kind !== p.kind) continue;
+      if (p.kind === 'field' && old.kind === 'field') {
+        if (!p.display && old.display && p.type === old.type && (p.options?.length ?? 0) >= 2) p.display = old.display;
+      } else if (p.kind === 'table' && old.kind === 'table') {
+        if (old.grid && !p.board) p.grid = true;
+        for (const c of p.columns) { const oc = old.columns.find((x) => x.key === c.key); if (!oc?.display || c.display || c.type !== 'select') continue; if (oc.display !== 'levels') c.display = oc.display; else if (oc.levels && (c.options ?? []).join('|') === (oc.options ?? []).join('|')) { c.display = 'levels'; c.levels = oc.levels; } }
+      }
+    }
+  }
 }

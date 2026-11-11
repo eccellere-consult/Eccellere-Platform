@@ -8,7 +8,8 @@
  * What the AI is never trusted with: the tool's slug, the originator and year (left blank), the review state (always a draft), and
  * whether every source element made it into the form (checked in code, see reconcile.ts). Nothing is published from here.
  */
-import { cleanReading, normaliseDeclarative, type DeclarativeTool } from '@/lib/strategyModels/declarative';
+import { keepDocumentLayout, normaliseDeclarative, type DeclarativeTool } from '@/lib/strategyModels/declarative';
+export { keepDocumentLayout };
 import type { GenerateArgs, GenerateResult } from '@/lib/ai/providers';
 import { EXAMPLE_TOOL, SCHEMA_NOTES, declarativeCategory, extractJson } from '@/lib/tools/draft';
 import { completePage, readSuggestion } from '@/lib/tools/complete';
@@ -26,6 +27,7 @@ import { assetTypeLabel, cleanClassification, suggestClassification, shapeOf, ty
 import { slideHash } from '@/lib/import/author';
 import { faithfulForm } from './fromSheets';
 import { structuredForm } from './structured';
+import { documentForm } from './docForm';
 
 export interface BuildRequest {
   /** what the administrator wants, in their own words (may be empty when a document is supplied) */
@@ -119,7 +121,8 @@ export function buildFormPrompt(req: BuildRequest, compact = false): { system: s
     ].join('\n'));
   }
   if (req.baseline) {
-    const { sourceMap, assumptions, approximations, confidence, concerns, ...form } = req.baseline; void sourceMap; void assumptions; void approximations; void confidence; void concerns;
+    // the kept document is never sent to the AI: it is long, and the AI is asked about the form's parts, not the document's look
+    const { sourceMap, assumptions, approximations, confidence, concerns, document, ...form } = req.baseline; void sourceMap; void assumptions; void approximations; void confidence; void concerns; void document;
     const json = JSON.stringify(form);
     if (json.length <= MAX_BASE_CHARS * 2) {
       parts.push([
@@ -136,42 +139,12 @@ export function buildFormPrompt(req: BuildRequest, compact = false): { system: s
   return { system, user: parts.join('\n\n'), notSent };
 }
 
-/**
- * The AI improves wording; it is not asked to carry the document's layout. So when the form built from the file is laid out like the
- * document, that layout is put back on the AI's version wherever the same step or part is still there: the reading in place, the grid
- * tables, the tick boxes and visible choices. Nothing is added to a part whose type the AI changed.
- */
-export function keepDocumentLayout(tool: DeclarativeTool, baseline: Record<string, unknown> | undefined): void {
-  if (!baseline || baseline.layout !== 'document') return;
-  tool.layout = 'document';
-  const base = normaliseDeclarative(baseline).tool;
-  if (!base) return;
-  const sections = new Map(base.sections.map((s) => [s.key, s]));
-  const parts = new Map(base.sections.flatMap((s) => s.parts).map((p) => [p.key, p]));
-  for (const s of tool.sections) {
-    const was = sections.get(s.key);
-    if (was?.reading?.length && !s.reading?.length) {
-      const keys = new Set(s.parts.map((p) => p.key));
-      s.reading = cleanReading(was.reading).map((b) => { if (b.before && !keys.has(b.before)) { const { before, ...rest } = b; void before; return rest; } return b; });
-    }
-    for (const p of s.parts) {
-      const old = parts.get(p.key);
-      if (!old || old.kind !== p.kind) continue;
-      if (p.kind === 'field' && old.kind === 'field') {
-        if (!p.display && old.display && p.type === old.type && (p.options?.length ?? 0) >= 2) p.display = old.display;
-      } else if (p.kind === 'table' && old.kind === 'table') {
-        if (old.grid && !p.board) p.grid = true;
-        for (const c of p.columns) { const oc = old.columns.find((x) => x.key === c.key); if (!oc?.display || c.display || c.type !== 'select') continue; if (oc.display !== 'levels') c.display = oc.display; else if (oc.levels && (c.options ?? []).join('|') === (oc.options ?? []).join('|')) { c.display = 'levels'; c.levels = oc.levels; } }
-      }
-    }
-  }
-}
-
 const clip = (v: unknown, n: number) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, n) : '');
 
 /** How many characters the AI would be sent for this request (no AI call is made). Used to show the cost before a "Build with AI" run. */
 export function promptSize(req: BuildRequest): number {
-  const rule = req.readings?.length ? (structuredForm(req.readings, { name: req.name, category: declarativeCategory(req.category) }) ?? faithfulForm(req.readings, { name: req.name, category: declarativeCategory(req.category) })) : null;
+  const o = { name: req.name, category: declarativeCategory(req.category) };
+  const rule = req.readings?.length ? (documentForm(req.readings, o) ?? structuredForm(req.readings, o) ?? faithfulForm(req.readings, o)) : null;
   const { system, user } = buildFormPrompt(rule ? { ...req, baseline: rule.form } : req, false);
   return system.length + user.length;
 }
@@ -271,7 +244,8 @@ export function makeFormBuilder(deps: BuilderDeps) {
     // An upload first becomes a working form with no AI, so there is always a valid result; the AI then improves it.
     // Documents (Word, PDF, text) are read step by step; sheets and anything the document reader cannot make sense of use the sheet reader.
     const readOpts = { name: req.name, category: declarativeCategory(req.category) };
-    const rule = req.readings?.length ? (structuredForm(req.readings, readOpts) ?? faithfulForm(req.readings, readOpts)) : null;
+    // A Word file is kept as a document and shown as it is; anything else is read step by step, and sheets by the sheet reader.
+    const rule = req.readings?.length ? (documentForm(req.readings, readOpts) ?? structuredForm(req.readings, readOpts) ?? faithfulForm(req.readings, readOpts)) : null;
     if (rule) req = { ...req, baseline: rule.form };
     let problem = '';
     let compact = false;
