@@ -13,6 +13,21 @@ import { HIRE_TO_ONBOARD } from './hireToOnboard';
 import { PRODUCT_SPEC } from './productSpec';
 import { STRATEGY_CASCADE } from './strategyCascade';
 import { VOICE_OF_CUSTOMER } from './voiceOfCustomer';
+import { OEE_CALCULATOR } from './industryManufacturing';
+import { SCRAP_YIELD } from './industryManufacturing';
+import { MAINTENANCE_PRIORITY } from './industryManufacturing';
+import { STORE_SCORECARD } from './industryRetail';
+import { STOCK_COVER } from './industryRetail';
+import { SHRINKAGE } from './industryRetail';
+import { TRADE_PROMO_ROI } from './industryConsumerGoods';
+import { SKU_RATIONALISATION } from './industryConsumerGoods';
+import { DISTRIBUTOR_HEALTH } from './industryConsumerGoods';
+import { LANE_PROFITABILITY } from './industryLogistics';
+import { FLEET_UTILISATION } from './industryLogistics';
+import { WAREHOUSE_PRODUCTIVITY } from './industryLogistics';
+import { UTILISATION_BENCH } from './industryTechServices';
+import { PROJECT_MARGIN } from './industryTechServices';
+import { SLA_BREACH } from './industryTechServices';
 import { LEAD_TO_QUOTE } from './leadToQuote';
 import { COLLECTIONS } from './collectionsFollowUp';
 import { PRODUCTION_SCHEDULER } from './productionScheduler';
@@ -224,6 +239,141 @@ export const PILOTS: Pilot[] = [
       process: ["Collect the exit interviews for the period", "Group by main reason", "Count leavers and regretted leavers", "Price the replacement cost", "Agree the retention fixes"],
       customers: ["HR head", "Leadership team who fund retention fixes"],
       refresh: "Rerun every quarter and compare reasons with the last quarter.",
+    },
+  },
+  {
+    agent: "oee-calculator", tool: OEE_CALCULATOR, marketCategory: "Business analysis", group: "Manufacturing", practice: "Process",
+    sipoc: {
+      suppliers: ["Production (planned time, downtime, units made)", "Quality (good units)", "Engineering (ideal cycle time)"],
+      process: ["Record planned time and downtime for each line", "Count units made and good units", "Work out availability, performance and quality", "Multiply them into OEE", "Act on the biggest loss"],
+      customers: ["Plant manager", "Line supervisors and maintenance"],
+      refresh: "Rerun every shift, week or month on the same lines so the trend is comparable.",
+    },
+  },
+  {
+    agent: "scrap-yield-analyzer", tool: SCRAP_YIELD, marketCategory: "Problem solving", group: "Manufacturing", practice: "Process",
+    sipoc: {
+      suppliers: ["Quality (scrap and rework log by cause)", "Production (units started and good first time)", "Finance (cost per scrapped unit)"],
+      process: ["Log scrap by cause", "Price each cause", "Rank causes by cost", "Work out first-pass yield", "Start a root cause study on the top cause"],
+      customers: ["Quality manager", "Plant manager and process engineers"],
+      refresh: "Rerun monthly and after any process change.",
+    },
+  },
+  {
+    agent: "maintenance-priority-ranker", tool: MAINTENANCE_PRIORITY, marketCategory: "Decision Models", group: "Manufacturing", practice: "Process",
+    sipoc: {
+      suppliers: ["Maintenance (breakdown history)", "Production (how critical each machine is)", "Finance (downtime cost per hour)"],
+      process: ["List the equipment", "Rate criticality from 1 to 5", "Rate failure likelihood from 1 to 5", "Work out priority score and cost of one failure", "Plan preventive work for the top items"],
+      customers: ["Maintenance manager", "Plant manager who approves the plan"],
+      refresh: "Re-rate after every breakdown and review all ratings each quarter.",
+    },
+  },
+  {
+    agent: "store-performance-scorecard", tool: STORE_SCORECARD, marketCategory: "Business analysis", group: "Retail", practice: "Process",
+    sipoc: {
+      suppliers: ["Store billing (sales and transactions)", "Door counters (visitors)", "Property team (selling area)"],
+      process: ["List the stores with area and sales", "Add visitors and transactions", "Work out sales per sq ft, conversion and average bill", "Find the weakest store", "Agree one fix per store"],
+      customers: ["Regional manager", "Store managers"],
+      refresh: "Rerun monthly across the same stores.",
+    },
+  },
+  {
+    agent: "stock-cover-markdown-planner", tool: STOCK_COVER, marketCategory: "Business analysis", group: "Retail", practice: "Process",
+    sipoc: {
+      suppliers: ["Inventory system (stock on hand)", "Sales data (weekly sales)", "Merchandising (unit cost and target cover)"],
+      process: ["Set the target cover in weeks", "List items with stock and weekly sales", "Work out weeks of cover", "Value the stock above target at cost", "Plan a markdown or transfer"],
+      customers: ["Merchandise manager", "Supply planner"],
+      refresh: "Rerun weekly or fortnightly and before the season ends.",
+    },
+  },
+  {
+    agent: "shrinkage-tracker", tool: SHRINKAGE, marketCategory: "Problem solving", group: "Retail", practice: "Finance & Risk",
+    sipoc: {
+      suppliers: ["Stock count results (loss by cause)", "Store billing (sales)", "Store managers (explanations)"],
+      process: ["Enter loss by cause for each store", "Compare loss with sales", "Flag stores above tolerance", "Find the largest cause", "Set one control per cause"],
+      customers: ["Retail operations manager", "Loss prevention lead"],
+      refresh: "Rerun after each stock count and compare with the last.",
+    },
+  },
+  {
+    agent: "trade-promotion-roi", tool: TRADE_PROMO_ROI, marketCategory: "Business analysis", group: "Consumer Goods", practice: "Finance & Risk",
+    sipoc: {
+      suppliers: ["Sales data (promo units and baseline)", "Finance (margin per unit)", "Trade marketing (discount and fixed spend)"],
+      process: ["Set and record the baseline method", "Enter promo units, discount and fixed spend", "Work out incremental margin and profit", "Work out ROI for each promotion", "Repeat, redesign or stop"],
+      customers: ["Trade marketing manager", "Sales head and finance"],
+      refresh: "Rerun after each promotion ends, with the baseline method recorded.",
+    },
+  },
+  {
+    agent: "sku-rationalisation", tool: SKU_RATIONALISATION, marketCategory: "Decision Models", group: "Consumer Goods", practice: "Strategy",
+    sipoc: {
+      suppliers: ["Finance (revenue and margin by product)", "Category team (strategic reasons)", "Sales (customer needs)"],
+      process: ["Set the contribution cut-off", "List products with revenue and margin", "Work out margin percent and share of margin", "Flag products under the cut-off", "Delist, fix or keep with a reason"],
+      customers: ["Category manager", "Leadership team who approve range changes"],
+      refresh: "Rerun yearly or when range complexity grows.",
+    },
+  },
+  {
+    agent: "distributor-health-check", tool: DISTRIBUTOR_HEALTH, marketCategory: "Business analysis", group: "Consumer Goods", practice: "Finance & Risk",
+    sipoc: {
+      suppliers: ["Sales and billing (orders, supply and sales)", "Accounts receivable (amounts owed)", "Regional managers (account context)"],
+      process: ["Set the credit limit in days", "Enter orders, supply, receivables and sales", "Work out fill rate, receivable days and growth", "Flag credit risk", "Agree actions with each flagged distributor"],
+      customers: ["Regional sales manager", "Finance head"],
+      refresh: "Rerun monthly or quarterly and before renewing terms.",
+    },
+  },
+  {
+    agent: "lane-profitability", tool: LANE_PROFITABILITY, marketCategory: "Business analysis", group: "Logistics", practice: "Finance & Risk",
+    sipoc: {
+      suppliers: ["Operations (trips by lane)", "Billing (revenue per trip)", "Finance (cost per trip)"],
+      process: ["Set the minimum margin and cost basis", "List lanes with trips and per-trip figures", "Work out revenue, cost and margin", "Flag lanes below the minimum", "Reprice, reroute or drop"],
+      customers: ["Commercial manager", "Operations head"],
+      refresh: "Rerun monthly and before rate negotiations.",
+    },
+  },
+  {
+    agent: "fleet-utilisation", tool: FLEET_UTILISATION, marketCategory: "Business analysis", group: "Logistics", practice: "Process",
+    sipoc: {
+      suppliers: ["Fleet logs (days and kilometres)", "Dispatch (load carried)", "Finance (running cost)"],
+      process: ["Set the utilisation target", "List vehicles with days, load, km and cost", "Work out utilisation, load factor and cost per km", "Flag low utilisation", "Reassign, release or repair"],
+      customers: ["Fleet manager", "Operations head"],
+      refresh: "Rerun monthly on the same vehicles.",
+    },
+  },
+  {
+    agent: "warehouse-productivity", tool: WAREHOUSE_PRODUCTIVITY, marketCategory: "Business analysis", group: "Logistics", practice: "Process",
+    sipoc: {
+      suppliers: ["Warehouse system (picks and checks)", "Labour records (hours)", "Supervisors (context)"],
+      process: ["Set the target pick rate", "List zones with picks, hours and correct picks", "Work out picks per hour and accuracy", "Flag zones below target", "Fix one cause per zone"],
+      customers: ["Warehouse manager", "Shift supervisors"],
+      refresh: "Rerun weekly or monthly on the same zones.",
+    },
+  },
+  {
+    agent: "utilisation-bench", tool: UTILISATION_BENCH, marketCategory: "Business analysis", group: "Technology Services", practice: "Organisation",
+    sipoc: {
+      suppliers: ["Timesheets (available and billable hours)", "Finance (loaded cost per hour)", "Delivery heads (context)"],
+      process: ["Set the utilisation target", "List people or teams with hours and cost rate", "Work out utilisation and idle hours", "Price the idle time", "Redeploy, train or hold hiring"],
+      customers: ["Delivery head", "Talent manager"],
+      refresh: "Rerun weekly or monthly and before any hiring decision.",
+    },
+  },
+  {
+    agent: "project-margin-forecast", tool: PROJECT_MARGIN, marketCategory: "Project Management", group: "Technology Services", practice: "Finance & Risk",
+    sipoc: {
+      suppliers: ["Project managers (percent complete)", "Finance (cost to date and budget)", "Sales (contract value)"],
+      process: ["Set the minimum margin and the progress measure", "Enter value, budget, progress and cost to date", "Project the final cost from progress", "Work out forecast margin and overrun", "Open a recovery plan for flagged projects"],
+      customers: ["Delivery head", "Project controller"],
+      refresh: "Rerun monthly on running fixed-price projects.",
+    },
+  },
+  {
+    agent: "sla-breach-tracker", tool: SLA_BREACH, marketCategory: "Business analysis", group: "Technology Services", practice: "Process",
+    sipoc: {
+      suppliers: ["Service desk (tickets and breaches)", "Contracts (penalty per breach)", "Delivery managers (causes)"],
+      process: ["Set the allowed breach rate", "Enter tickets, breaches, penalty and cause per client", "Work out breach rate and penalty exposure", "Flag clients above the allowed rate", "Fix the main cause for the top client"],
+      customers: ["Service delivery manager", "Client account owners"],
+      refresh: "Rerun monthly and before client reviews.",
     },
   },
 ];

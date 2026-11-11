@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { readAuth, writeAuth } from "@/lib/tools/server";
 import { audit } from "@/lib/tools/server";
-import { allAgents } from "@/lib/agents/catalogue";
+import { everyAgent } from "@/lib/agents/catalogue";
 import { pilotByAgent } from "@/lib/agents/pilots";
 import { prismaEditRepo } from "@/lib/agents/editRepo";
 import { cleanEdit } from "@/lib/agents/overrides";
@@ -9,7 +9,7 @@ import { agentGuard } from "@/lib/agents/server";
 
 export const dynamic = "force-dynamic";
 type Ctx = { params: Promise<{ slug: string }> };
-const known = (slug: string) => allAgents().some((a) => a.slug === slug);
+const known = (slug: string) => everyAgent().some((a) => a.slug === slug);
 
 /** GET /api/admin/agents/<slug>: the saved versions of this agent's edits, newest first. */
 export const GET = agentGuard(async (_req: Request, ctx: Ctx) => {

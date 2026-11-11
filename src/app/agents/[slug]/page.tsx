@@ -3,10 +3,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
-import { AREAS, allAgents } from "@/lib/agents/catalogue";
+import { everyArea, everyAgent } from "@/lib/agents/catalogue";
 import { pilotByAgent } from "@/lib/agents/pilots";
 import { inputsOf, outputsOf } from "@/lib/agents/sipoc";
-import { flowOf } from "@/lib/agents/flow";
 import { prismaRepo } from "@/lib/tools/prismaRepo";
 import { getPublishedTool } from "@/lib/tools/service";
 import { loadEdits, sipocWithEdit } from "@/lib/agents/overrides";
@@ -22,7 +21,7 @@ type Props = { params: Promise<{ slug: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
-  const agent = allAgents().find((a) => a.slug === slug);
+  const agent = everyAgent().find((a) => a.slug === slug);
   return agent ? { title: `${agent.name} | Agent Marketplace`, description: agent.does } : { title: "Agent Marketplace" };
 }
 
@@ -36,9 +35,9 @@ const td = "px-3 py-3 align-top text-sm text-ink-mid";
 
 export default async function AgentPage({ params }: Props) {
   const { slug } = await params;
-  const agent = allAgents().find((a) => a.slug === slug);
+  const agent = everyAgent().find((a) => a.slug === slug);
   if (!agent) notFound();
-  const area = AREAS.find((a) => a.agents.some((x) => x.slug === slug))!;
+  const area = everyArea().find((a) => a.agents.some((x) => x.slug === slug))!;
   const pilot = pilotByAgent(slug);
   const live = pilot ? await isLive(slug) : false;
   const edit = (await loadEdits(prismaEditRepo))[slug];
@@ -100,27 +99,6 @@ export default async function AgentPage({ params }: Props) {
                 </ol>
               </section>
 
-              {/* Flow: perceive to learn */}
-              <section id="flow" aria-label="How the agent works, step by step">
-                <h2 className="font-display text-2xl text-eccellere-ink">How it works, step by step</h2>
-                <p className="mt-2 max-w-2xl text-sm text-ink-mid">Six steps, top to bottom. What each box says comes from this agent&apos;s own inputs, method and results.</p>
-                <ol className="mx-auto mt-6 max-w-3xl">
-                  {flowOf(sipoc!, inputs, outputs).map((s, i, all) => (
-                    <li key={s.name}>
-                      <div className="flex gap-4 border border-eccellere-ink bg-white">
-                        <div className="flex w-14 shrink-0 items-center justify-center bg-eccellere-ink font-display text-2xl text-eccellere-gold" aria-hidden="true">{s.n}</div>
-                        <div className="py-4 pr-4">
-                          <h3 className="text-sm font-semibold text-eccellere-ink"><span className="sr-only">Step {s.n}: </span>{s.name}</h3>
-                          <p className="mt-0.5 text-xs text-gold-deep">{s.meaning}</p>
-                          <ul className="mt-2 list-disc space-y-1 pl-4 text-sm text-ink-mid">{s.points.map((p) => <li key={p}>{p}</li>)}</ul>
-                        </div>
-                      </div>
-                      {i < all.length - 1 && <div className="mx-auto h-6 w-px bg-eccellere-gold" aria-hidden="true" />}
-                    </li>
-                  ))}
-                </ol>
-              </section>
-
               {/* SIPOC */}
               <section>
                 <h2 className="font-display text-2xl text-eccellere-ink">SIPOC: how the agent works</h2>
@@ -136,7 +114,19 @@ export default async function AgentPage({ params }: Props) {
                       <tr>
                         <td className={td}><ul className="space-y-2">{sipoc!.suppliers.map((x) => <li key={x}>{x}</li>)}</ul></td>
                         <td className={td}><ul className="space-y-2">{inputs.map((i) => <li key={i.label}>{i.label}</li>)}</ul></td>
-                        <td className={td}><ol className="list-decimal space-y-2 pl-4">{sipoc!.process.map((x) => <li key={x}>{x}</li>)}</ol></td>
+                        <td className={td}>
+                          <ol aria-label="How the agent works, step by step">
+                            {sipoc!.process.map((x, i, all) => (
+                              <li key={x}>
+                                <div className="flex items-stretch border border-eccellere-ink/20 bg-eccellere-cream/40">
+                                  <span className="flex w-7 shrink-0 items-center justify-center bg-eccellere-ink font-display text-sm text-eccellere-gold" aria-hidden="true">{i + 1}</span>
+                                  <span className="px-2 py-1.5 text-xs leading-snug text-ink-mid"><span className="sr-only">Step {i + 1}: </span>{x}</span>
+                                </div>
+                                {i < all.length - 1 && <div className="ml-3.5 h-3 w-px bg-eccellere-gold" aria-hidden="true" />}
+                              </li>
+                            ))}
+                          </ol>
+                        </td>
                         <td className={td}><ul className="space-y-2">{results.map((o) => <li key={o.label}>{o.label}</li>)}</ul></td>
                         <td className={td}><ul className="space-y-2">{sipoc!.customers.map((x) => <li key={x}>{x}</li>)}</ul></td>
                       </tr>

@@ -105,3 +105,60 @@ export const AREAS: FunctionArea[] = [
 
 export const allAgents = (): Agent[] => AREAS.flatMap((a) => a.agents);
 export const pilotCount = (): number => allAgents().filter((a) => a.status === 'pilot').length;
+
+/**
+ * Industry agents: the same kind of working worksheet, shaped around the measures one industry runs on. They sit beside the functional
+ * areas, not inside them, so a business can start from its industry or from a function. Each uses the same fixed-formula engine.
+ */
+export const INDUSTRIES: FunctionArea[] = [
+  {
+    id: 'ind-manufacturing', code: 'MFG', name: 'Manufacturing', flow: 'Make → Ship',
+    purpose: 'Plant effectiveness, yield and maintenance: where the floor loses time and money.',
+    agents: [
+      pilot('oee-calculator', 'OEE Calculator', 'Works out overall equipment effectiveness from availability, performance and quality, and shows the biggest loss.'),
+      pilot('scrap-yield-analyzer', 'Scrap and Yield Analyzer', 'Ranks scrap and rework causes by cost and shows first-pass yield.'),
+      pilot('maintenance-priority-ranker', 'Maintenance Priority Ranker', 'Ranks equipment for maintenance by criticality and failure risk.'),
+    ],
+  },
+  {
+    id: 'ind-retail', code: 'RTL', name: 'Retail', flow: 'Stock → Sell',
+    purpose: 'Store productivity, stock cover and shrinkage: what each shop earns and loses.',
+    agents: [
+      pilot('store-performance-scorecard', 'Store Performance Scorecard', 'Compares stores on sales per square foot, conversion and basket size.'),
+      pilot('stock-cover-markdown-planner', 'Stock Cover and Markdown Planner', 'Shows weeks of stock cover per item and flags slow stock for markdown.'),
+      pilot('shrinkage-tracker', 'Shrinkage Tracker', 'Measures stock loss by cause and store against sales.'),
+    ],
+  },
+  {
+    id: 'ind-consumer-goods', code: 'CPG', name: 'Consumer Goods', flow: 'Promote → Distribute',
+    purpose: 'Promotions, range and distributors: where trade spend and shelf space earn their keep.',
+    agents: [
+      pilot('trade-promotion-roi', 'Trade Promotion ROI', 'Compares extra sales margin with promotion spend to show which promotions paid back.'),
+      pilot('sku-rationalisation', 'SKU Rationalisation', 'Ranks products by margin and sales speed to find the range worth keeping.'),
+      pilot('distributor-health-check', 'Distributor Health Check', 'Scores distributors on fill rate, receivable days and sales growth.'),
+    ],
+  },
+  {
+    id: 'ind-logistics', code: 'LOG', name: 'Logistics', flow: 'Collect → Deliver',
+    purpose: 'Lanes, fleet and warehouse: cost, utilisation and productivity of moving goods.',
+    agents: [
+      pilot('lane-profitability', 'Lane Profitability', 'Shows revenue, cost and margin per lane so unprofitable routes stand out.'),
+      pilot('fleet-utilisation', 'Fleet Utilisation', 'Works out running days, load factor and cost per kilometre for each vehicle.'),
+      pilot('warehouse-productivity', 'Warehouse Productivity', 'Measures picks per labour hour and order accuracy by shift.'),
+    ],
+  },
+  {
+    id: 'ind-technology-services', code: 'TSV', name: 'Technology Services', flow: 'Sell → Deliver',
+    purpose: 'People, projects and service levels: how a services business turns hours into margin.',
+    agents: [
+      pilot('utilisation-bench', 'Utilisation and Bench', 'Shows billable utilisation by team and the cost of idle bench time.'),
+      pilot('project-margin-forecast', 'Project Margin Forecast', 'Forecasts final cost and margin of a fixed-price project from work done so far.'),
+      pilot('sla-breach-tracker', 'SLA Breach Tracker', 'Counts service-level breaches by client and cause against targets.'),
+    ],
+  },
+];
+
+export const industryAgents = (): Agent[] => INDUSTRIES.flatMap((a) => a.agents);
+/** Every agent, functional and industry: what the detail page, the admin list and the install step work over. */
+export const everyAgent = (): Agent[] => [...allAgents(), ...industryAgents()];
+export const everyArea = (): FunctionArea[] => [...AREAS, ...INDUSTRIES];

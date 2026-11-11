@@ -2,10 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
-import { AREAS, allAgents, pilotCount } from "@/lib/agents/catalogue";
+import { AREAS, INDUSTRIES, allAgents, industryAgents } from "@/lib/agents/catalogue";
 import { loadEdits } from "@/lib/agents/overrides";
 import { prismaEditRepo } from "@/lib/agents/editRepo";
 import NotifyForm from "./NotifyForm";
+import type { FunctionArea } from "@/lib/agents/catalogue";
 
 export const dynamic = "force-dynamic";
 
@@ -18,30 +19,8 @@ export const metadata: Metadata = {
 export default async function AgentMarketplacePage() {
   const edits = await loadEdits(prismaEditRepo);
   const total = allAgents().length;
-  const pilots = pilotCount();
-  return (
-    <>
-      <Header />
-      <main id="main-content">
-        <section className="bg-eccellere-ink pt-[72px]">
-          <div className="mx-auto max-w-[1280px] px-6 py-20 lg:py-[120px]">
-            <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-eccellere-gold">Eccellere+ Agent Marketplace</p>
-            <h1 className="mt-4 max-w-3xl font-display text-[clamp(36px,6vw,72px)] font-light leading-[1.1] text-eccellere-cream">
-              Agents for every <span className="italic">function of the business</span>
-            </h1>
-            <p className="mt-6 max-w-2xl text-lg font-light text-white/60">
-              A catalogue of agents and tools mapped to each functional area, from strategic planning through to HR. Each one is built on
-              established management methods and fixed formulas, so the same inputs always give the same answer.
-            </p>
-            <p className="mt-6 text-sm text-white/60">
-              {total} agents in {AREAS.filter((a) => !a.proposed).length} functional areas · {pilots} in pilot · the rest are coming soon · {AREAS.filter((a) => a.proposed).length} more areas planned
-            </p>
-          </div>
-        </section>
-
-        <section className="bg-eccellere-cream py-16 lg:py-24">
-          <div className="mx-auto max-w-[1280px] space-y-14 px-6">
-            {AREAS.map((area) => (
+  const pilots = [...allAgents(), ...industryAgents()].filter((a) => a.status === "pilot").length;
+  const renderArea = (area: FunctionArea) => (
               <div key={area.id} id={area.id}>
                 <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-b border-eccellere-ink/10 pb-3">
                   <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gold-deep">{area.code}</span>
@@ -72,7 +51,41 @@ export default async function AgentMarketplacePage() {
                   </ul>
                 )}
               </div>
-            ))}
+  );
+  return (
+    <>
+      <Header />
+      <main id="main-content">
+        <section className="bg-eccellere-ink pt-[72px]">
+          <div className="mx-auto max-w-[1280px] px-6 py-20 lg:py-[120px]">
+            <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-eccellere-gold">Eccellere+ Agent Marketplace</p>
+            <h1 className="mt-4 max-w-3xl font-display text-[clamp(36px,6vw,72px)] font-light leading-[1.1] text-eccellere-cream">
+              Agents for every <span className="italic">function and industry</span>
+            </h1>
+            <p className="mt-6 max-w-2xl text-lg font-light text-white/60">
+              A catalogue of agents and tools mapped to each functional area, from strategic planning through to HR. Each one is built on
+              established management methods and fixed formulas, so the same inputs always give the same answer.
+            </p>
+            <p className="mt-6 text-sm text-white/60">
+              {total} functional agents in {AREAS.filter((a) => !a.proposed).length} areas and {industryAgents().length} industry agents in {INDUSTRIES.length} industries · {pilots} in pilot · {AREAS.filter((a) => a.proposed).length} more functional areas planned
+            </p>
+          </div>
+        </section>
+
+        <section className="bg-eccellere-cream py-16 lg:py-24">
+          <div className="mx-auto max-w-[1280px] space-y-14 px-6">
+            {AREAS.map(renderArea)}
+            <div id="industries" className="space-y-14 border-t-4 border-eccellere-gold pt-14">
+              <div>
+                <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-gold-deep">By industry</p>
+                <h2 className="mt-2 font-display text-3xl font-light text-eccellere-ink">Agents for your industry</h2>
+                <p className="mt-2 max-w-2xl text-sm text-ink-mid">The same fixed-formula worksheets, shaped around the measures one industry runs on. Pick your industry, or start from a function above.</p>
+                <nav aria-label="Industries" className="mt-4 flex flex-wrap gap-2">
+                  {INDUSTRIES.map((i) => <a key={i.id} href={`#${i.id}`} className="border border-eccellere-ink/20 bg-white px-3 py-1.5 text-sm text-eccellere-ink hover:bg-eccellere-cream">{i.name}</a>)}
+                </nav>
+              </div>
+              {INDUSTRIES.map(renderArea)}
+            </div>
           </div>
         </section>
 

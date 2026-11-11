@@ -72,12 +72,12 @@ describe('the edit store', () => {
 });
 
 describe('the admin list', () => {
-  it('lists all 21 agents with defaults, and marks which can have a SIPOC edited', async () => {
+  it('lists all 36 agents with defaults, and marks which can have a SIPOC edited', async () => {
     const repo = createMemoryEditRepo();
     await repo.save('demand-forecaster', ok('demand-forecaster', { does: 'Edited' }), 'a');
     const rows = await listAgents(repo);
-    expect(rows).toHaveLength(21);
-    expect(rows.filter((r) => r.sipocEditable).map((r) => r.slug).sort()).toEqual(['attendance-payroll-reconciler', 'capital-allocation-advisor', 'caro-compliance-checker', 'close-the-books-agent', 'collections-follow-up-agent', 'concept-screener', 'demand-forecaster', 'exit-interview-analyzer', 'hire-to-onboard-agent', 'lead-to-quote-assistant', 'mis-report-generator', 'otif-tracker', 'po-invoice-matcher', 'pricing-optimizer', 'product-spec-generator', 'production-scheduler', 'scenario-planner', 'strategy-plan-cascade', 'supplier-risk-monitor', 'vendor-onboarding-agent', 'voice-of-customer-synthesizer']);
+    expect(rows).toHaveLength(36);
+    expect(rows.filter((r) => r.sipocEditable).map((r) => r.slug).sort()).toEqual(['attendance-payroll-reconciler', 'capital-allocation-advisor', 'caro-compliance-checker', 'close-the-books-agent', 'collections-follow-up-agent', 'concept-screener', 'demand-forecaster', 'distributor-health-check', 'exit-interview-analyzer', 'fleet-utilisation', 'hire-to-onboard-agent', 'lane-profitability', 'lead-to-quote-assistant', 'maintenance-priority-ranker', 'mis-report-generator', 'oee-calculator', 'otif-tracker', 'po-invoice-matcher', 'pricing-optimizer', 'product-spec-generator', 'production-scheduler', 'project-margin-forecast', 'scenario-planner', 'scrap-yield-analyzer', 'shrinkage-tracker', 'sku-rationalisation', 'sla-breach-tracker', 'stock-cover-markdown-planner', 'store-performance-scorecard', 'strategy-plan-cascade', 'supplier-risk-monitor', 'trade-promotion-roi', 'utilisation-bench', 'vendor-onboarding-agent', 'voice-of-customer-synthesizer', 'warehouse-productivity']);
     const d = rows.find((r) => r.slug === 'demand-forecaster')!;
     expect(d.edit?.does).toBe('Edited');
     expect(d.defaults?.does).toMatch(/demand/i);
