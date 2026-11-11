@@ -6,7 +6,12 @@
  *   - a cell or line of underscores ("Founder name | ________") becomes a field named by the label beside it;
  *   - in a table with a heading row, a column whose cells are all empty is a column to fill in, one row for each printed row;
  *   - a cell printed "1  2  3  4  5" is a rating to choose; a cell holding only a tick box is a tick box.
- * Everything else stays reading, exactly as printed. Tables of advice, however question-like their wording, are never turned into inputs.
+ * And a toolkit is there to be worked through, so what it ASKS can be answered where it asks it:
+ *   - a table whose heading row has a question column ("Diagnostic Question", "Questions to Resolve") gets a box under each row for the answer;
+ *   - a worksheet table (a column of activities, actions, tasks, KPIs, targets or outcomes) gets a box under each row for the reader's notes;
+ *   - a list of three or more bullets inside a table cell is a checklist: each bullet can be ticked.
+ * These are decided by the table's own headings, never by the wording of a sentence, and each added box is drawn as a row of its own so
+ * the printed table is left as it was. Everything else stays reading, exactly as printed.
  */
 import type { ToolCategory } from '@/lib/strategyModels/declarative';
 import { cellText, paraText, type DocBind, type DocBlock, type DocCell, type DocPara, type DocTable } from '@/lib/strategyModels/document';
@@ -19,7 +24,10 @@ const SCALE = /^(\d)(?:\s+\d){2,9}$/;
 const TICK = /^(?:[☐□◻]|\[\s?\])$/;
 const MODULE = /^(?:SECTION|MODULE|ANNEXURE|ANNEX|APPENDIX|PART|STEP|STAGE|CHAPTER)\b/i;
 const ID_HEAD = /^(?:#|no\.?|id|ref\.?|sr\.?|s\.?\s?no\.?)$/i;
-const Q_HEAD = /question|criteria|checklist|prompt/i;
+const Q_HEAD = /question|resolve|diagnostic|prompt|criteria|checklist|ask yourself|consider/i;
+/** A column heading that says the table is a worksheet to act on (activities, tasks, deliverables, metrics), so each row is something to answer. */
+const WORK_HEAD = /activit|action|task|deliverable|checklist|to do|exercise|worksheet|template|metric|kpi|target|outcome/i;
+const BULLET = /^\s*[•●▪◦]\s*/;
 const LONG_HEAD = /answer|note|evidence|comment|detail|describe|explain|observation|action|plan|finding|response|remark|status|your /i;
 const RAG_HEAD = /^rag(?:\s+status)?$/i;
 const YESNO_HEAD = /\byes\s*\/\s*no\b|\by\s*\/\s*n\b/i;
@@ -103,6 +111,20 @@ export function documentForm(readings: readonly SourceReading[], opts: { name?: 
     const rows = t.rows.filter(full);
     if (!rows.length) return;
 
+    // ── a checklist inside a cell: three or more bullets, each of which can be ticked ──
+    for (const r of rows) for (const c of r.c) {
+      const items = c.p.filter((p) => (p.li === 1 || BULLET.test(paraText(p))) && tidy(paraText(p).replace(BULLET, '')).length >= 4);
+      if (items.length < 3) continue;
+      const s = section(t);
+      for (const p of items) {
+        const l = label(paraText(p).replace(BULLET, ''));
+        const key = unique(safeKey(l), used);
+        s.parts.push({ kind: 'field', key, label: l, type: 'select', options: ['Yes', 'No'], display: 'tick', help: 'Tick the box when this item is done or applies to you.' });
+        sampleValues[key] = 'Yes';
+        p.in = { f: key, kind: 'tick' };
+      }
+    }
+
     // ── labelled blanks: "Founder name | ________" ──
     let blanks = 0;
     for (const r of rows) {
@@ -127,7 +149,14 @@ export function documentForm(readings: readonly SourceReading[], opts: { name?: 
       if (cells.every((c) => TICK.test(c))) return { kind: 'tick' };
       return null;
     });
-    if (!kinds.some(Boolean) || kinds.every(Boolean)) return;
+    if (kinds.every(Boolean)) return;
+    // nothing left blank: is it a table of questions to answer, or a worksheet to act on? Then each row gets a box of its own.
+    let added: string | null = null;
+    if (!kinds.some(Boolean)) {
+      if (heads.some((h) => Q_HEAD.test(h))) added = 'Your answer';
+      else if (heads.slice(1).some((h) => WORK_HEAD.test(h))) added = 'Your notes';
+      else return;
+    }
 
     const idCol = heads.findIndex((h, j) => !kinds[j] && (ID_HEAD.test(h) || (j === 0 && body.every((r) => /^[#A-Za-z]{0,3}\d[\w.\-]{0,8}$/.test(flat(r.c[j]))))) && heads.some((_, k) => k !== j && !kinds[k]));
     const qCol = heads.findIndex((h, j) => !kinds[j] && j !== idCol && Q_HEAD.test(h));
@@ -146,7 +175,7 @@ export function documentForm(readings: readonly SourceReading[], opts: { name?: 
       return n;
     });
     const inputs = heads.map((h, j) => ({ h, j, k: kinds[j] })).filter((x) => x.k);
-    const tLabel = label(`${about}: ${inputs.map((x) => x.h).join(', ')}`, 110);
+    const tLabel = label(`${about}: ${added ?? inputs.map((x) => x.h).join(', ')}`, 110);
     const tKey = unique(safeKey(tLabel), used);
     const columns: Part[] = [{ key: nameKey, header: cut(heads[nameCol] || 'Item', 60), help: 'The row as printed in the document.', type: 'text' }];
     for (const { h, j, k } of inputs) {
@@ -159,6 +188,12 @@ export function documentForm(readings: readonly SourceReading[], opts: { name?: 
       else if (YESNO_HEAD.test(h)) { columns.push({ key, header, help: 'Answer Yes or No for this row.', type: 'select', options: ['Yes', 'No'], display: 'radio' }); bind = 'choice'; }
       else { const long = LONG_HEAD.test(h); columns.push({ key, header, help: `Write your entry under “${cut(header, 40)}”.`, type: long ? 'longtext' : 'text' }); bind = long ? 'long' : 'text'; }
       body.forEach((r, i) => { r.c[j].in = { t: tKey, r: names[i], c: key, kind: bind }; });
+    }
+    if (added) {
+      const key = unique(safeKey(added), colKeys);
+      columns.push({ key, header: added, help: added === 'Your answer' ? 'Write your answer to the question in this row.' : 'Write what you will do, or what you have found, for this row.', type: 'longtext' });
+      // the box is a row of its own under the printed row, across the whole table, so the printed cells are untouched
+      body.forEach((r, i) => { t.rows.splice(t.rows.indexOf(r) + 1, 0, { c: [{ p: [], s: cols, in: { t: tKey, r: names[i], c: key, kind: 'long' } }] }); });
     }
     s.parts.push({ kind: 'table', key: tKey, label: tLabel, help: 'Fill in the blank columns for each row. The other columns are as printed in the document.', rowLabel: 'Row', fixedRows: names, grid: true, columns });
     const rated = columns.find((c) => c.type === 'rating');
@@ -195,6 +230,8 @@ export function documentForm(readings: readonly SourceReading[], opts: { name?: 
   const fields = sections.flatMap((s) => s.parts).filter((p) => p.kind === 'field');
   const extraOutputs: Record<string, unknown>[] = [];
   if (fields.length) extraOutputs.push({ key: 'answered', label: 'How much is filled in', rule: { op: 'answers', show: 'progress', fields: fields.map((f) => String(f.key)) } });
+  const ticks = fields.filter((f) => f.display === 'tick');
+  if (ticks.length >= 3) extraOutputs.push({ key: 'boxes_ticked', label: 'Checklist items ticked', rule: { op: 'answers', show: 'ticked', fields: ticks.map((f) => String(f.key)) } });
   for (const s of sections) for (const p of s.parts) {
     if (p.kind !== 'table' || extraOutputs.length >= 12) continue;
     const first = (p.columns as Part[])[1];
