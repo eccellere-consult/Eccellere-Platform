@@ -58,6 +58,18 @@ describe('a toolkit made online, on the page', () => {
     expect(screen.queryByText(/as it is asked in the document/)).toBeNull();
   });
 
+  it('keeps every existing feature of the worksheet: AI help, AI drafting for each step, the Excel template and upload, print, download, results and the analysis', async () => {
+    await open();
+    expect(screen.getByRole('button', { name: 'Draft the empty parts' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Suggest questions for my situation/ })).toBeTruthy();
+    expect(screen.getAllByRole('button', { name: /Draft this section with AI/ })).toHaveLength(4);
+    expect(screen.getByRole('button', { name: 'Upload a filled template' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Download blank template' })).toBeTruthy();
+    for (const name of ['Print', 'Download', 'Analyse & recommend']) expect(screen.getByRole('button', { name })).toBeTruthy();
+    expect(screen.getByText('Results at a glance')).toBeTruthy();
+    expect(screen.getByText('Methodology')).toBeTruthy();
+  });
+
   it('draws a table to fill in as a real table: column headings, a row for each printed row, a 1 to 5 scale and a notes box', async () => {
     await open();
     const table = screen.getByRole('table', { name: 'Delivery and quality' });

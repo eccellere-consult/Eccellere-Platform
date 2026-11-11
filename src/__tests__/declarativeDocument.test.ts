@@ -7,6 +7,7 @@ import { fieldsFromValues, valuesFromFields } from '@/lib/strategyModels/values'
 import { buildWorkbook, readWorkbook, workbookBytes } from '@/lib/tools/workbook';
 import { landedIn } from '@/app/admin/tools/ReviewPanel';
 import type { TablePart } from '@/lib/strategyModels/types';
+import { describePart, parseGenerated } from '@/lib/strategyHubAi';
 
 /** A small form in the document layout: reading in place, a tick box, visible choices, tick-all-that-apply and a grid table with a printed column. */
 const DOC_TOOL: DeclarativeTool = {
@@ -164,5 +165,36 @@ describe('the side-by-side check on the review screen', () => {
   it('flags an item that is not in the form, and gives the reason for one left out', () => {
     expect(landedIn(item({ status: 'not-covered' }), DOC_TOOL)).toBe('Not in the form yet');
     expect(landedIn(item({ status: 'excluded', note: 'Cover page' }), DOC_TOOL)).toBe('Left out on purpose: Cover page');
+  });
+});
+
+describe('AI help on a form in the document layout', () => {
+  const def = interpret(DOC_TOOL);
+  const [tick, radio, multi, table] = def.sections[0].parts;
+  const labels = def.sections[0].parts.map((p) => p.label);
+
+  it('tells the AI what each new kind of answer accepts', () => {
+    expect(describePart(1, tick)).toContain('choose exactly one of: Yes | No');
+    expect(describePart(2, radio)).toContain('choose exactly one of: Transactional | Cooperative');
+    expect(describePart(3, multi)).toContain('choose every one that applies, joined by "; ", only from: Single source | Long lead time | Quality drift');
+    const t = describePart(4, table);
+    expect(t).toContain('Exactly one row for each of: "Access review", "Backup test"');
+    // the printed column is not something to draft
+    expect(t).not.toContain('"owner"');
+  });
+  it('keeps only answers the form can show: a tick, one option, listed options in the form order, and the table rows', () => {
+    const reply = JSON.stringify({
+      fields: [
+        { label: 'Contract is signed', value: 'yes' },
+        { label: 'Relationship', value: 'Friendly' },
+        { label: 'Risks that apply', value: 'Quality drift, single source; Currency risk' },
+      ],
+      tables: [{ label: 'Controls', rows: [{ control: 'Backup test', done: 'Yes', rating: '4', owner: 'Someone' }] }],
+    });
+    const got = parseGenerated(reply, labels, def);
+    expect(got.get('Contract is signed')).toBe('Yes');
+    expect(got.has('Relationship')).toBe(false);
+    expect(got.get('Risks that apply')).toBe('Single source; Quality drift');
+    expect(JSON.parse(got.get('Controls')!)).toEqual([{ control: 'Backup test', done: 'Yes', rating: '4' }]);
   });
 });
