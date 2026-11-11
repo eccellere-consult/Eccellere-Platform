@@ -75,3 +75,20 @@ Owner's requirement: a toolkit made online must look like its offline document, 
 Limits, decided: a printed column is not in the Excel template (the row names and the fill-in columns are). Cells already filled in inside a fill-in column are left blank and reported. Nested lists are read as one item. Pictures, text boxes and merged-cell layouts in a Word file are not reproduced. PDF sources are still read as lines of text. Show/hide rules and date pickers are still not in the engine.
 
 **Verified:** unit tests; a sample Word file read end to end; the page filled in with Chromium at desktop and phone width and printed to PDF, through a temporary preview page with the save API faked. **Not verified:** a real toolkit file from the marketplace, the real database and login, the real host build, Safari, and an AI "improve" run on a document-layout draft.
+
+## 8. The Word document itself as the page (11 Nov 2026, replaces the reader of section 7 for Word files)
+
+The first real toolkit (Startup Founder Playbook, 51 pages, 76 tables) showed that rebuilding a designed document from its lines fails: advice tables became answer boxes, banners became questions, and the look was lost. So a Word file is now KEPT as a document and drawn as it is.
+
+- **Reader** (`lib/forms/docx.ts`): reads the file's own XML into plain data (`strategyModels/document.ts`): paragraphs and tables in order, with bold, italic, colour, size, heading face, alignment, shading, borders, padding, merged cells, bullets and numbers, and page starts. No markup from the file is stored or inserted; the page builds its own elements, and a stored document is cleaned (known shapes, valid colours, bounded numbers) every time it is loaded.
+- **Blanks only** (`lib/forms/docForm.ts`): a place becomes an input only when the document shows it as a blank: a cell or line of underscores; in a table with a heading row, a column whose cells are all empty; a cell printed "1 2 3 4 5" (a rating); a cell holding only a tick box. A heading "RAG" over an empty column gives Red, Amber, Green. Nothing is inferred from wording, so advice is never turned into a question.
+- **The form behind it** is unchanged in kind (fields and tables with fixed rows), so autosave, AI help, the Excel template, results and the analysis work as before. Each blank in the document is bound to a field or to one cell of a table; a blank bound to a part that does not exist fails the quality gate.
+- **Page** (`app/tools/[slug]/DocumentView.tsx`): the document on a sheet, in the document's own colours and in Calibri and Cambria (with close faces where a computer lacks them). A "Draft this part with AI" button stands above each part of the form.
+- **AI** never receives the document; "Modify with AI" and an AI build keep it when every blank still has its part.
+- **Fallbacks**: text, PDF, several files at once, and the Form Builder's two-step upload (which sends the item list back from the browser) still use the step-by-step reader of section 7.
+
+Not carried over from a Word file, and reported when present: page headers and footers, pictures, text boxes, footnotes, tables inside table cells (kept as lines of text). A document with nothing to fill in gets one box for the reader's own notes, and the review screen says so.
+
+Colours: the page chrome keeps the Eccellere+ colours; inside the sheet the document's own colours are shown, because they are the document.
+
+**Verified:** unit tests; the Founder Playbook file read end to end (6 cover blanks, 2 rating tables, Annexure B and C; nothing else bound), drawn in Chromium at desktop and phone width through a temporary preview page with the save API faked, and compared by eye with the Word pages. **Not verified:** the real database, login and host build; Safari; print on paper; a real AI call; any other toolkit file.

@@ -12,6 +12,8 @@
 import { docKindOf, extractDocumentText, legacyOfficeHint, ExtractError, type DocKind } from '@/lib/tools/extract';
 import { IMAGE_NAME, MAX_IMAGE_BYTES, sniffImage, type ImageReader } from './image';
 import { loadXlsx } from '@/lib/spendAnalysis/xlsxLoader';
+import type { DocBlock } from '@/lib/strategyModels/document';
+import { readDocx } from './docx';
 
 export type ElementKind = 'heading' | 'question' | 'option' | 'instruction' | 'tablehead' | 'row' | 'formula' | 'note';
 
@@ -40,6 +42,8 @@ export interface SourceReading {
   warnings: string[];
   /** true when the file had more than the limit and the rest was not listed */
   truncated: boolean;
+  /** a Word file kept as a document (its paragraphs and tables with their look), so its online version can be drawn like the original */
+  doc?: DocBlock[];
 }
 
 /** The Form Builder puts no limit on how much of a document is read: every item is listed. A single cell or paragraph is kept to this length for display. */
@@ -360,7 +364,13 @@ export async function readSource(fileName: string, buffer: Buffer, startAt = 0, 
   if (c.elements.length < 2) {
     throw new ExtractError('UNREADABLE', kind === 'pdf' ? 'No text could be read from that PDF. A scanned (picture-only) PDF needs OCR, which is not supported yet.' : 'No readable questions or fields were found in that file.');
   }
-  return { fileName: safeName, kind, elements: c.elements, warnings: c.warnings, truncated: c.truncated };
+  // A Word file is also kept as a document. If that reading fails the element list above still gives a form, so it never blocks.
+  let doc: DocBlock[] | undefined;
+  if (kind === 'word') {
+    const read = await readDocx(buffer).catch(() => null);
+    if (read) { doc = read.blocks; for (const n of read.notes) c.warn(n); }
+  }
+  return { fileName: safeName, kind, elements: c.elements, warnings: c.warnings, truncated: c.truncated, ...(doc ? { doc } : {}) };
 }
 
 /** Elements numbered across several files: E ids continue from one file to the next. */

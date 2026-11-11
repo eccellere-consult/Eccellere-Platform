@@ -58,6 +58,8 @@ function inventory(tool: DeclarativeTool) {
       }
     }
   }
+  // a form that shows the source document itself carries every item of it
+  if (tool.document?.length) keys.add('document');
   for (const d of tool.derived ?? []) { keys.add(`derived:${d.key}`); addText(d.label); }
   for (const o of tool.outputs ?? []) { keys.add(`derived:${o.key}`); addText(o.label); }
   return { keys, texts, optionSets };
