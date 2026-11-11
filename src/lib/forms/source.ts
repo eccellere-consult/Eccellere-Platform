@@ -24,6 +24,12 @@ export interface SourceElement {
   text: string;
   /** a human-readable location: Sheet "Survey" cell B4, Page 2 line 7, Table 1 row 3 ... */
   where: string;
+  /** an answer option printed with a tick box ('box') or a round button ('circle') */
+  mark?: 'box' | 'circle';
+  /** a heading's depth: 1 to 6 for the document's own heading styles, 7 for a short line set in bold */
+  level?: number;
+  /** a bulleted or numbered list item */
+  list?: true;
 }
 
 export interface SourceReading {
@@ -84,11 +90,11 @@ class Collector {
   private counter: number;
   constructor(private file: string, startAt: number) { this.counter = startAt; }
   get next() { return this.counter; }
-  add(kind: ElementKind, text: string, where: string): boolean {
+  add(kind: ElementKind, text: string, where: string, extra: Pick<SourceElement, 'mark' | 'level' | 'list'> = {}): boolean {
     const t = clip(clean(text));
     if (!t) return true;
     this.counter += 1;
-    this.elements.push({ id: `E${this.counter}`, file: this.file, kind, text: t, where });
+    this.elements.push({ id: `E${this.counter}`, file: this.file, kind, text: t, where, ...extra });
     return true;
   }
   warn(w: string) { if (!this.warnings.includes(w)) this.warnings.push(w); }
@@ -132,7 +138,17 @@ function fromDelimited(c: Collector, text: string, sep: string): void {
 const decode = (s: string) => s.replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&amp;/g, '&');
 const stripTags = (s: string) => decode(s.replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]+>/g, ' '));
 
-/** A Word document: headings, paragraphs, list items and tables, in order. */
+const BOX_MARK = /^\s*(?:[☐☑☒□■◻]|\[\s?[xX ]?\s?\])/;
+const CIRCLE_MARK = /^\s*(?:[○◯●]|\(\s?\))/;
+/** A Word tick box (a content control) is kept as the tick-box character, so it is read as an option and not lost with the other tags. */
+const tickBoxes = (html: string) => html.replace(/<input\b[^>]*type="checkbox"[^>]*>/gi, (m) => (/\bchecked\b/i.test(m) ? ' ☑ ' : ' ☐ '));
+/** The text of one table cell: list items keep a bullet and tick boxes keep their character, so a checklist inside a cell can still be told apart. */
+const cellText = (html: string) => clean(stripTags(tickBoxes(html).replace(/<li\b[^>]*>/gi, ' • ')));
+
+/**
+ * A Word document: headings (with their depth), paragraphs, list items and tables, in order. A table keeps every row, including the
+ * blank ones a person is meant to write in, and every cell, including the empty ones, so its shape can be rebuilt.
+ */
 async function fromDocx(c: Collector, buffer: Buffer): Promise<void> {
   const mammoth = await import('mammoth');
   const { value: html } = await mammoth.convertToHtml({ buffer });
@@ -146,21 +162,37 @@ async function fromDocx(c: Collector, buffer: Buffer): Promise<void> {
     if (tag === 'table') {
       tables += 1;
       const rows = b.match(/<tr\b[\s\S]*?<\/tr>/g) ?? [];
+      let seen = 0;
       rows.forEach((r, i) => {
-        const cells = (r.match(/<t[dh]\b[\s\S]*?<\/t[dh]>/g) ?? []).map((x) => clean(stripTags(x)));
-        if (cells.some(Boolean)) c.add(i === 0 ? 'tablehead' : 'row', cells.join(' | '), `Table ${tables}, row ${i + 1}`);
+        const cells: string[] = [];
+        for (const x of r.match(/<t[dh]\b[\s\S]*?<\/t[dh]>/g) ?? []) {
+          cells.push(cellText(x));
+          // a cell merged across columns still takes up its columns, so the rows stay lined up
+          const span = Math.min(12, Number(/^<t[dh]\b[^>]*\bcolspan="(\d+)"/i.exec(x)?.[1] ?? 1));
+          for (let k = 1; k < span; k++) cells.push('');
+        }
+        const any = cells.some(Boolean);
+        // a blank row under a table that has started is a row to write in: keep it (as bare separators) so the table keeps its length
+        if (any || (seen > 0 && cells.length >= 2)) { c.add(seen === 0 ? 'tablehead' : 'row', any ? cells.join(' | ') : cells.map(() => '').join(' | ').trim() || '|', `Table ${tables}, row ${i + 1}`); seen += 1; }
       });
       if (/colspan|rowspan/i.test(b)) c.warn(`Table ${tables} has merged cells. Only the text in them is kept; check its layout against the original.`);
       afterQuestion = false;
       continue;
     }
-    const text = clean(stripTags(b));
+    const marked = tickBoxes(b);
+    const text = clean(stripTags(marked));
     if (!text) continue;
     para += 1;
     const where = `${heading ? `Under “${heading.slice(0, 40)}”, ` : ''}paragraph ${para}`;
-    if (/^h[1-6]$/.test(tag)) { heading = text; c.add('heading', text, `Heading ${para}`); afterQuestion = false; continue; }
+    if (/^h[1-6]$/.test(tag)) { heading = text; c.add('heading', text, `Heading ${para}`, { level: Number(tag[1]) }); afterQuestion = false; continue; }
+    const mark = BOX_MARK.test(text) ? 'box' as const : CIRCLE_MARK.test(text) ? 'circle' as const : undefined;
+    // a short line set wholly in bold is a sub-heading in most toolkits
+    const boldOnly = /^\s*(?:<strong>[^<]*<\/strong>\s*)+$/.test(b.replace(/<(?!\/?strong\b)[^>]+>/g, ''));
+    if (tag === 'p' && !mark && boldOnly && text.length <= 100 && !/[.?:;,]$/.test(text) && !/_{3,}/.test(text)) {
+      heading = text; c.add('heading', text, `Heading ${para}`, { level: 7 }); afterQuestion = false; continue;
+    }
     const hit = classifyLine(tag === 'li' ? `- ${text}` : text, afterQuestion);
-    if (hit) { c.add(hit.kind, hit.text, where); afterQuestion = hit.kind === 'question' || (afterQuestion && hit.kind === 'option'); }
+    if (hit) { c.add(hit.kind, hit.text, where, { ...(mark ? { mark } : {}), ...(tag === 'li' ? { list: true as const } : {}) }); afterQuestion = hit.kind === 'question' || (afterQuestion && hit.kind === 'option'); }
   }
 }
 
@@ -416,7 +448,12 @@ export function sanitiseElements(raw: unknown): SourceElement[] {
     const text = clip(clean(o.text));
     if (!text) continue;
     seen.add(o.id);
-    out.push({ id: o.id, file: clean(String(o.file ?? 'document')).slice(0, 120) || 'document', kind: o.kind as ElementKind, text, where: clean(String(o.where ?? '')).slice(0, 160) });
+    out.push({
+      id: o.id, file: clean(String(o.file ?? 'document')).slice(0, 120) || 'document', kind: o.kind as ElementKind, text, where: clean(String(o.where ?? '')).slice(0, 160),
+      ...(o.mark === 'box' || o.mark === 'circle' ? { mark: o.mark } : {}),
+      ...(typeof o.level === 'number' && o.level >= 1 && o.level <= 7 ? { level: Math.round(o.level) } : {}),
+      ...(o.list === true ? { list: true as const } : {}),
+    });
   }
   return out;
 }

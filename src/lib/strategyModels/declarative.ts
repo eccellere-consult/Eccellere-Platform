@@ -14,7 +14,7 @@ import { boardTable } from './boards';
 import { slug as keySlug } from './structure';
 import { fmtNum, norm, toNum } from './values';
 import { diagramIssues, type DiagramSpec } from './diagrams/templates';
-import type { BoardSpec, ColumnType, Derived, FieldType, ModelDefinition, ModelSample, ModelValues, Output, Part, RatingScale, Reference, Row, Section, Tone } from './types';
+import type { BoardSpec, ColumnType, Derived, FieldDisplay, FieldType, ModelDefinition, ModelSample, ModelValues, Output, Part, RatingScale, ReadingBlock, Reference, Row, Section, Tone } from './types';
 
 export const TOOL_CATEGORIES = ['analytical', 'creative', 'decision-matrix', 'planning', 'root-cause', 'prioritisation', 'strategy', 'other'] as const;
 export type ToolCategory = (typeof TOOL_CATEGORIES)[number];
@@ -55,21 +55,30 @@ export type Rule =
    * (`exclude`, for example N/A) ignored, shown as a percentage of the best possible and, when `bands` are given, the band it falls in.
    * Plain counting and the points written in the rule: no AI, nothing invented.
    */
-  | { op: 'answers'; fields: string[]; show: 'progress' | 'yes' | 'score'; points?: Record<string, number>; exclude?: string[]; bands?: { min: number; label: string }[] }
-  | { op: 'ration'; table: string; name: string; cost: string; value: string; budget: string; show: 'names' | 'cost' | 'value' };
+  | { op: 'answers'; fields: string[]; show: 'progress' | 'yes' | 'score' | 'ticked'; points?: Record<string, number>; exclude?: string[]; bands?: { min: number; label: string }[] }
+  | { op: 'ration'; table: string; name: string; cost: string; value: string; budget: string; show: 'names' | 'cost' | 'value' }
+  /**
+   * The average level chosen in a maturity table: each chosen option counts as its position (the first option is 1), rows with no choice are
+   * left out. Shown as "2.5 of 4 (from 3 of 5 rows)". Plain arithmetic on the choices; no bands or labels are added.
+   */
+  | { op: 'levelavg'; table: string; col: string; options: string[] }
+  /** Fixed words for a row, looked up by the text of another cell of the same row (the row's name). For a column a source document prints and nobody fills in. */
+  | { op: 'lookup'; by: string; map: Record<string, string> };
 
 // ── The declarative tool ─────────────────────────────────────────────────────────────────────────────────────────────
 
-export interface DeclField { kind: 'field'; key: string; label: string; type: FieldType; help: string; example?: string; options?: string[]; scale?: Partial<RatingScale>; unit?: string }
-export interface DeclColumn { key: string; header: string; help: string; type: ColumnType; options?: string[]; scale?: Partial<RatingScale>; unit?: string; half?: boolean; rule?: Rule }
+export interface DeclField { kind: 'field'; key: string; label: string; type: FieldType; help: string; example?: string; options?: string[]; scale?: Partial<RatingScale>; unit?: string; display?: FieldDisplay }
+export interface DeclColumn { key: string; header: string; help: string; type: ColumnType; options?: string[]; scale?: Partial<RatingScale>; unit?: string; half?: boolean; rule?: Rule; display?: 'radio' | 'tick' | 'levels'; levels?: Record<string, string[]> }
 export interface DeclTable {
   kind: 'table'; key: string; label: string; help: string; rowLabel: string; columns: DeclColumn[];
   fixedRows?: string[]; rowHints?: Record<string, string>; minRows?: number; maxRows?: number;
+  /** Drawn as a real grid with column headings, the way the table looks in a document. */
+  grid?: boolean;
   /** A board: its columns are generated from the spec (the declared columns are ignored). */
   board?: { spec: BoardSpec; regions?: string[]; statuses?: string[]; scale?: Partial<RatingScale> };
 }
 export type DeclPart = DeclField | DeclTable;
-export interface DeclSection { key: string; title: string; summary: string; parts: DeclPart[] }
+export interface DeclSection { key: string; title: string; summary: string; parts: DeclPart[]; reading?: ReadingBlock[] }
 export interface DeclDerived { key: string; label: string; help?: string; rule: Rule }
 export interface DeclOutput { key: string; label: string; rule: Rule; conditional?: boolean }
 /** A worked example. It is optional and, when an AI drafted it, labelled as such; `analysis` is optional because an AI-drafted tool has no authored verdict. */
@@ -97,6 +106,8 @@ export interface DeclarativeTool {
   sample?: DeclSample;
   source?: DeclSource;
   links?: { buildsOn: string[]; feeds: string[] };
+  /** 'document': made from a document and laid out like it (its own steps, reading in place, no added furniture). */
+  layout?: 'document';
 }
 
 // ── Reading a rule ───────────────────────────────────────────────────────────────────────────────────────────────────
@@ -218,6 +229,7 @@ export function ruleFn(rule: Rule, cm?: ComputedMap): (row: Row | undefined, v: 
           const vals = rule.fields.map((k) => (v.fields[k] ?? '').trim()).filter(Boolean);
           const pct = (a: number, b: number) => fmtNum((a / b) * 100, 0);
           if (rule.show === 'progress') return `${vals.length} of ${rule.fields.length} answered (${pct(vals.length, rule.fields.length)}%)`;
+          if (rule.show === 'ticked') { const n = vals.filter((x) => /^yes$/i.test(x)).length; return `${n} of ${rule.fields.length} ticked (${pct(n, rule.fields.length)}%)`; }
           if (rule.show === 'yes') {
             const yn = vals.filter((x) => /^(yes|no)$/i.test(x));
             return yn.length ? `${yn.filter((x) => /^yes$/i.test(x)).length} of ${yn.length} answered Yes (${pct(yn.filter((x) => /^yes$/i.test(x)).length, yn.length)}%)` : null;
@@ -269,6 +281,16 @@ export function ruleFn(rule: Rule, cm?: ComputedMap): (row: Row | undefined, v: 
           if (n === null) return null;
           return (rule.gt === undefined || n > rule.gt) && (rule.lt === undefined || n < rule.lt) ? rule.then : rule.else;
         }
+        case 'levelavg': {
+          const all = rowsOf(v, rule.table);
+          const at = all.map((r) => rule.options.findIndex((o) => norm(o) === norm(r[rule.col])) + 1).filter((n) => n > 0);
+          if (!at.length) return null;
+          return `${fmtNum(at.reduce((a, b) => a + b, 0) / at.length, 1)} of ${rule.options.length} (from ${at.length} row${at.length === 1 ? '' : 's'})`;
+        }
+        case 'lookup': {
+          const name = row ? (row[rule.by] ?? '').trim() : '';
+          return name && Object.prototype.hasOwnProperty.call(rule.map, name) ? rule.map[name] : null;
+        }
       }
     } catch { return null; }
   };
@@ -286,12 +308,15 @@ const toneFn = (rule: Rule, cm?: ComputedMap): Derived['tone'] =>
 function partOf(p: DeclPart, cm?: ComputedMap): Part {
   if (p.kind === 'field') {
     const ex = p.example ?? '';
+    // 'multi' is a text answer chosen from options; 'radio' and 'tick' are ways to draw a choice.
+    const multi = p.display === 'multi' && (p.type === 'text' || p.type === 'longtext') && (p.options?.length ?? 0) >= 2;
+    const drawn = p.type === 'select' && (p.display === 'radio' || p.display === 'tick') ? { display: p.display } : {};
     switch (p.type) {
-      case 'longtext': return long(p.key, p.label, p.help, ex);
-      case 'select': return select(p.key, p.label, p.help, p.options ?? [], ex);
+      case 'longtext': return multi ? { ...long(p.key, p.label, p.help, ex, { options: p.options }), display: 'multi' } : long(p.key, p.label, p.help, ex);
+      case 'select': return { ...select(p.key, p.label, p.help, p.options ?? [], ex), ...drawn };
       case 'rating': return rating(p.key, p.label, p.help, p.scale ?? {}, ex);
       case 'number': return num(p.key, p.label, p.help, p.unit ?? '', ex);
-      default: return text(p.key, p.label, p.help, ex);
+      default: return multi ? { ...text(p.key, p.label, p.help, ex, { options: p.options }), display: 'multi' } : text(p.key, p.label, p.help, ex);
     }
   }
   if (p.board) return boardTable(p.key, p.label, p.help, p.board.spec, { regions: p.board.regions, statuses: p.board.statuses, scale: p.board.scale, maxRows: p.maxRows });
@@ -299,13 +324,13 @@ function partOf(p: DeclPart, cm?: ComputedMap): Part {
     switch (c.type) {
       case 'longtext': return col.long(c.key, c.header, c.help, { half: c.half });
       case 'number': return col.num(c.key, c.header, c.help, c.unit ?? '', { half: c.half });
-      case 'select': return col.select(c.key, c.header, c.help, c.options ?? []);
+      case 'select': return { ...col.select(c.key, c.header, c.help, c.options ?? []), ...(c.display ? { display: c.display } : {}), ...(c.display === 'levels' && c.levels ? { levels: c.levels } : {}) };
       case 'rating': return col.rating(c.key, c.header, c.help, c.scale ?? {});
       case 'computed': { const f = ruleFn(c.rule ?? { op: 'template', text: '' }, cm); return col.computed(c.key, c.header, c.help, (row, v) => f(row, v) ?? ''); }
       default: return col.text(c.key, c.header, c.help, { half: c.half });
     }
   });
-  return table(p.key, p.label, p.help, p.rowLabel, columns, { fixed: p.fixedRows, hints: p.rowHints, min: p.minRows, max: p.maxRows });
+  return { ...table(p.key, p.label, p.help, p.rowLabel, columns, { fixed: p.fixedRows, hints: p.rowHints, min: p.minRows, max: p.maxRows }), ...(p.grid ? { grid: true } : {}) };
 }
 
 /** The ModelDefinition the engine runs. Everything downstream (form, kit, AI, outputs) treats it like a hand-coded one. */
@@ -320,7 +345,7 @@ function computedMapOf(tool: DeclarativeTool): ComputedMap {
 
 export function interpret(tool: DeclarativeTool): ModelDefinition {
   const cm = computedMapOf(tool);
-  const sections: Section[] = tool.sections.map((s) => section(s.key, s.title, s.summary, ...s.parts.map((p) => partOf(p, cm))));
+  const sections: Section[] = tool.sections.map((s) => ({ ...section(s.key, s.title, s.summary, ...s.parts.map((p) => partOf(p, cm))), ...(s.reading?.length ? { reading: s.reading } : {}) }));
   const derived: Derived[] = (tool.derived ?? []).map((d) => { const f = ruleFn(d.rule, cm); return { key: d.key, label: d.label, help: d.help, compute: (v) => f(undefined, v), tone: toneFn(d.rule, cm) }; });
   const outputs: Output[] = (tool.outputs ?? []).map((o) => { const f = ruleFn(o.rule, cm); return { key: o.key, label: o.label, compute: (v) => f(undefined, v), conditional: o.conditional }; });
   return { toolId: tool.slug, reference: tool.reference, sections, derived, outputs, analysisGuide: tool.analysisGuide };
@@ -373,6 +398,7 @@ export function validateDeclarative(raw: unknown): Issue[] {
     labels = new Set<string>();
     if (!s.title?.trim()) err(`${sp}.title`, 'title is required');
     if (!Array.isArray(s.parts) || !s.parts.length) err(`${sp}.parts`, 'a section needs at least one part');
+    for (const m of readingIssues(s.reading, new Set((s.parts ?? []).map((p) => p.key)))) err(`${sp}.reading`, m);
     (s.parts ?? []).forEach((p, pi) => {
       const pp = `${sp}.parts[${pi}]`;
       if (!p.key || !SNAKE.test(p.key)) err(`${pp}.key`, 'key must be snake_case');
@@ -387,6 +413,10 @@ export function validateDeclarative(raw: unknown): Issue[] {
         if (p.type === 'rating' && p.scale && p.scale.min !== undefined && p.scale.max !== undefined && p.scale.max <= p.scale.min) err(`${pp}.scale`, 'scale max must exceed min');
         if (p.type === 'number' && !p.unit) err(`${pp}.unit`, 'a number needs a unit');
         if (!(p.example ?? '').trim() && p.type !== 'longtext') warn(`${pp}.example`, 'no example');
+        if (p.display !== undefined) {
+          if (!['radio', 'tick', 'multi'].includes(p.display)) err(`${pp}.display`, 'display must be radio, tick or multi');
+          else if (p.display === 'multi' ? !((p.type === 'text' || p.type === 'longtext') && (p.options?.length ?? 0) >= 2) : p.type !== 'select') err(`${pp}.display`, p.display === 'multi' ? 'tick-all-that-apply needs a text field with at least 2 options' : `${p.display} can be used only on a select`);
+        }
       } else if (p.kind === 'table') {
         const ck = new Set<string>();
         tableCols.set(p.key, ck);
@@ -409,6 +439,12 @@ export function validateDeclarative(raw: unknown): Issue[] {
             if ((c.help ?? '').trim().length <= 5) err(`${cp}.help`, 'column help needs more than 5 characters');
             if (c.type === 'select' && (c.options?.length ?? 0) < 2) err(`${cp}.options`, 'a select column needs at least 2 options');
             if (c.type === 'computed' && !c.rule) err(`${cp}.rule`, 'a computed column needs a rule');
+            if (c.display !== undefined && (c.type !== 'select' || !['radio', 'tick', 'levels'].includes(c.display))) err(`${cp}.display`, 'display must be radio, tick or levels, on a select column');
+            if (c.display === 'levels') {
+              const n = c.options?.length ?? 0;
+              if (!c.levels || typeof c.levels !== 'object' || !Object.keys(c.levels).length) err(`${cp}.levels`, 'a levels column needs the description of each level for each row');
+              else for (const [row, d] of Object.entries(c.levels)) if (!Array.isArray(d) || d.length !== n) err(`${cp}.levels`, `the row ${row} needs ${n} descriptions, one for each level`);
+            }
           });
           if (p.fixedRows?.length) {
             if (p.columns?.[0]?.type !== 'text') err(`${pp}.columns[0]`, 'the first column of a fixed table must be text (it holds the row name)');
@@ -463,7 +499,18 @@ export function validateDeclarative(raw: unknown): Issue[] {
         if (!Array.isArray(r.fields) || !r.fields.length) err(path, 'answers needs at least one field');
         for (const f of r.fields ?? []) if (!fieldKeys.has(f)) err(path, `unknown field ${f}`);
         if (r.show === 'score' && !Object.keys(r.points ?? {}).length) err(path, 'a score needs points for the answers');
-        if (!['progress', 'yes', 'score'].includes(r.show)) err(path, 'show must be progress, yes or score');
+        if (!['progress', 'yes', 'score', 'ticked'].includes(r.show)) err(path, 'show must be progress, yes, score or ticked');
+        break;
+      }
+      case 'levelavg': {
+        const cols = tableCols.get(r.table);
+        if (!cols) err(path, `unknown table ${r.table}`); else if (!cols.has(r.col)) err(path, `unknown column ${r.col} in ${r.table}`);
+        if (!Array.isArray(r.options) || r.options.length < 2) err(path, 'a level average needs the list of levels');
+        break;
+      }
+      case 'lookup': {
+        if (!rowCols || !rowCols.has(r.by)) err(path, `unknown column ${r.by} (a lookup can be used only inside a computed column of the same table)`);
+        if (!r.map || typeof r.map !== 'object' || Array.isArray(r.map) || Object.values(r.map).some((x) => typeof x !== 'string')) err(path, 'a lookup needs a map of row name to text');
         break;
       }
       case 'template': for (const m of r.text.matchAll(/\{([a-z0-9_]+)\}/g)) if (!fieldKeys.has(m[1])) err(path, `unknown field {${m[1]}}`); break;
@@ -487,6 +534,26 @@ export function validateDeclarative(raw: unknown): Issue[] {
   return out;
 }
 
+/** Limits on reading kept from a document: enough for a long toolkit, small enough to store and draw. */
+export const READING_LIMITS = { blocks: 400, text: 6000, items: 80, rows: 200, cols: 12, cell: 2000 } as const;
+
+function readingIssues(reading: unknown, partKeys: Set<string>): string[] {
+  if (reading === undefined) return [];
+  if (!Array.isArray(reading)) return ['reading must be a list'];
+  const out: string[] = [];
+  if (reading.length > READING_LIMITS.blocks) out.push(`at most ${READING_LIMITS.blocks} reading blocks in a section`);
+  reading.forEach((b: ReadingBlock, i) => {
+    if (!b || typeof b !== 'object') { out.push(`block ${i + 1} is not an object`); return; }
+    if (b.kind === 'heading' || b.kind === 'text') { if (typeof b.text !== 'string' || !b.text.trim()) out.push(`block ${i + 1} has no text`); }
+    else if (b.kind === 'list') { if (!Array.isArray(b.items) || !b.items.length || b.items.some((x) => typeof x !== 'string')) out.push(`block ${i + 1} is a list with no items`); }
+    else if (b.kind === 'table') { if (!Array.isArray(b.head) || !Array.isArray(b.rows) || (!b.head.length && !b.rows.length)) out.push(`block ${i + 1} is an empty table`); }
+    else out.push(`block ${i + 1} has an unknown kind`);
+    if (b.before !== undefined && !partKeys.has(b.before)) out.push(`block ${i + 1} sits before an unknown part ${String(b.before)}`);
+    if (b.place !== undefined && b.place !== 'above' && b.place !== 'below') out.push(`block ${i + 1} has an unknown place`);
+  });
+  return out;
+}
+
 export interface Gate { blockers: string[]; warnings: string[]; ok: boolean }
 export function qualityGate(tool: unknown): Gate {
   const issues = validateDeclarative(tool);
@@ -500,6 +567,27 @@ const str = (x: unknown): string => (typeof x === 'string' ? x.trim() : typeof x
 const strs = (x: unknown): string[] => (Array.isArray(x) ? x.map(str).filter(Boolean) : []);
 const snake = (s: string): string => { const k = keySlug(s); return /^[a-z]/.test(k) ? k : `k_${k}`; };
 const uniqueKey = (base: string, used: Set<string>): string => { const b = base || 'item'; let k = b, n = 2; while (used.has(k)) k = `${b}_${n++}`; used.add(k); return k; };
+/** Reading blocks as stored: only the known shapes, plain strings, cut to the limits. Anything else is dropped. */
+export function cleanReading(x: unknown): ReadingBlock[] {
+  if (!Array.isArray(x)) return [];
+  const L = READING_LIMITS;
+  const out: ReadingBlock[] = [];
+  for (const b of x.slice(0, L.blocks)) {
+    if (!b || typeof b !== 'object') continue;
+    const o = b as Record<string, unknown>;
+    const where = { ...(str(o.before) ? { before: str(o.before) } : {}), ...(o.place === 'above' || o.place === 'below' ? { place: o.place } : {}) } as { before?: string; place?: 'above' | 'below' };
+    if ((o.kind === 'heading' || o.kind === 'text') && str(o.text)) out.push({ kind: o.kind, text: str(o.text).slice(0, L.text), ...where });
+    else if (o.kind === 'list') { const items = strs(o.items).slice(0, L.items).map((i) => i.slice(0, L.cell)); if (items.length) out.push({ kind: 'list', items, ...where }); }
+    else if (o.kind === 'table') {
+      const cells = (r: unknown): string[] => (Array.isArray(r) ? r.slice(0, L.cols).map((c) => str(c).slice(0, L.cell)) : []);
+      const head = cells(o.head);
+      const rows = (Array.isArray(o.rows) ? o.rows : []).slice(0, L.rows).map(cells).filter((r) => r.some(Boolean));
+      if (head.some(Boolean) || rows.length) out.push({ kind: 'table', head, rows, ...where });
+    }
+  }
+  return out;
+}
+
 const scaleOf = (x: unknown): Partial<RatingScale> | undefined => {
   if (!x || typeof x !== 'object') return undefined;
   const o = x as Record<string, unknown>;
@@ -533,6 +621,10 @@ export function normaliseDeclarative(raw: unknown, ctx: { existingSlugs?: string
         if (scaleOf(r.scale)) d.scale = scaleOf(r.scale);
         if (str(r.unit)) d.unit = str(r.unit);
         if (r.half === true) d.half = true;
+        if (r.display === 'radio' || r.display === 'tick' || r.display === 'levels') d.display = r.display;
+        if (r.display === 'levels' && r.levels && typeof r.levels === 'object' && !Array.isArray(r.levels)) {
+          d.levels = Object.fromEntries(Object.entries(r.levels as Record<string, unknown>).slice(0, READING_LIMITS.rows).map(([k, v]) => [k, (Array.isArray(v) ? v : []).slice(0, 12).map((x) => str(x).slice(0, READING_LIMITS.cell))]));
+        }
         if (r.rule && typeof r.rule === 'object') d.rule = r.rule as Rule;
         return d;
       });
@@ -541,6 +633,7 @@ export function normaliseDeclarative(raw: unknown, ctx: { existingSlugs?: string
       if (q.rowHints && typeof q.rowHints === 'object') t.rowHints = Object.fromEntries(Object.entries(q.rowHints as Record<string, unknown>).map(([k, v]) => [k, str(v)]));
       if (typeof q.minRows === 'number') t.minRows = q.minRows;
       if (typeof q.maxRows === 'number') t.maxRows = q.maxRows;
+      if (q.grid === true) t.grid = true;
       if (q.board && typeof q.board === 'object') t.board = q.board as DeclTable['board'];
       return t;
     }
@@ -550,11 +643,13 @@ export function normaliseDeclarative(raw: unknown, ctx: { existingSlugs?: string
     if (strs(q.options).length) f.options = strs(q.options);
     if (scaleOf(q.scale)) f.scale = scaleOf(q.scale);
     if (str(q.unit)) f.unit = str(q.unit);
+    if (q.display === 'radio' || q.display === 'tick' || q.display === 'multi') f.display = q.display;
     return f;
   });
   const sections: DeclSection[] = (Array.isArray(o.sections) ? o.sections : []).filter((s) => s && typeof s === 'object').map((s, i) => {
     const q = s as Record<string, unknown>;
-    return { key: str(q.key) || `section_${i + 1}`, title: str(q.title), summary: str(q.summary), parts: parts(q.parts) };
+    const reading = cleanReading(q.reading);
+    return { key: str(q.key) || `section_${i + 1}`, title: str(q.title), summary: str(q.summary), parts: parts(q.parts), ...(reading.length ? { reading } : {}) };
   });
   const r = (o.reference && typeof o.reference === 'object' ? o.reference : {}) as Record<string, unknown>;
   const slug = (str(o.slug) || str(o.name)).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
@@ -566,6 +661,7 @@ export function normaliseDeclarative(raw: unknown, ctx: { existingSlugs?: string
     sections,
   };
   if (str(o.stage)) tool.stage = str(o.stage);
+  if (o.layout === 'document') tool.layout = 'document';
   if (str(o.whenNotToUse)) tool.whenNotToUse = str(o.whenNotToUse);
   if (str(o.next)) tool.next = str(o.next);
   if (o.diagram && typeof o.diagram === 'object') tool.diagram = o.diagram as DiagramSpec;

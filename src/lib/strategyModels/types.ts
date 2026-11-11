@@ -59,7 +59,24 @@ export interface FieldPart {
   scale?: RatingScale;
   unit?: string;
   prefill?: Prefill;
+  /** How the control is drawn. 'radio': a choice with every option visible. 'tick': one tick box (Yes when ticked). 'multi': tick all that apply (a text field with options; the answer is the ticked options joined by "; "). */
+  display?: FieldDisplay;
 }
+
+export type FieldDisplay = 'radio' | 'tick' | 'multi';
+
+/** Reading kept from a source document and shown in place: a sub-heading, a paragraph, a list or a reference table. Never an answer, never saved. */
+export type ReadingBlock = (
+  | { kind: 'heading'; text: string }
+  | { kind: 'text'; text: string }
+  | { kind: 'list'; items: string[] }
+  | { kind: 'table'; head: string[]; rows: string[][] }
+) & {
+  /** The key of the part this block sits just before. Without it the block follows the section's last part. */
+  before?: string;
+  /** 'above': drawn as its own panel before the section (a part of the document with nothing to fill in). 'below': the same, after it. */
+  place?: 'above' | 'below';
+};
 
 export type ColumnType = 'text' | 'longtext' | 'number' | 'select' | 'rating' | 'computed';
 
@@ -71,6 +88,13 @@ export interface Column {
   options?: readonly string[];
   scale?: RatingScale;
   unit?: string;
+  /**
+   * A select column drawn as visible options ('radio'), as one tick box ('tick', Yes when ticked), or as a maturity grid ('levels'):
+   * one column for each option, each cell holding that row's description of the level, chosen by clicking the cell.
+   */
+  display?: 'radio' | 'tick' | 'levels';
+  /** For 'levels': row name → the description printed under each option, in option order. */
+  levels?: Readonly<Record<string, readonly string[]>>;
   /** In the card layout, two long-text columns marked `half` that follow one another sit side by side instead of one under the other. */
   half?: boolean;
   /** `computed` columns derive their text from the rest of the row (and the model's other values); they are not typed, saved or put in a template. */
@@ -95,6 +119,8 @@ export interface TablePart {
   maxRows: number;
   /** An illustrative row, shown greyed in the first blank row. */
   exampleRow?: Row;
+  /** Drawn as a real grid with column headings (on a wide screen and in print), the way a table looks in a document. */
+  grid?: boolean;
   /** When present the table is drawn as a board of sticky notes (a fishbone, an affinity wall, an impact-effort grid); each row is one note. See boards.ts. */
   board?: BoardSpec;
 }
@@ -136,6 +162,8 @@ export interface Section {
   /** One line: what this part of the model asks. */
   summary: string;
   parts: Part[];
+  /** Reading from a source document, shown in place among the parts. */
+  reading?: ReadingBlock[];
 }
 
 export type Tone = 'good' | 'warn' | 'bad' | 'neutral';

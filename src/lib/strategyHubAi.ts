@@ -145,7 +145,8 @@ export function describePart(index: number, part: Part, onlyRows?: string[]): st
     return `${index}. "${part.label}" — ${part.help} This is a TABLE: reply under "tables" with {"label":"${part.label}","rows":[…]}. ${rowsRule} Each row is an object with the keys: ${cols.map(columnDescription).join('; ')}.`;
   }
   const kind =
-    part.type === 'select' ? `choose exactly one of: ${(part.options ?? []).join(' | ')}`
+    part.display === 'multi' && part.options?.length ? `choose every one that applies, joined by "; ", only from: ${part.options.join(' | ')}`
+    : part.type === 'select' ? `choose exactly one of: ${(part.options ?? []).join(' | ')}`
     : part.type === 'rating' ? scaleText(part.scale!)
     : part.type === 'number' ? `a number${part.unit ? ` (${part.unit})` : ''}`
     : part.type === 'longtext' ? 'a few specific sentences' : 'a short phrase';
@@ -165,7 +166,14 @@ function coerceValue(type: string, raw: unknown, options?: readonly string[], sc
   return typeof raw === 'string' ? raw.trim() : String(raw).trim();
 }
 
-const coerceField = (p: FieldPart, raw: unknown): string => coerceValue(p.type, raw, p.options, p.scale);
+/** "Tick all that apply": only the listed options are kept, in the order the form lists them, so a draft always shows as ticked boxes. */
+function coerceMulti(options: readonly string[], raw: unknown): string {
+  const said = (Array.isArray(raw) ? raw.map(String) : String(raw ?? '').split(/\s*[;\n]\s*|\s*,\s+/)).map((x) => matchOption(x, options)).filter(Boolean);
+  return options.filter((o) => said.includes(o)).join('; ');
+}
+
+const coerceField = (p: FieldPart, raw: unknown): string =>
+  p.display === 'multi' && p.options?.length ? coerceMulti(p.options, raw) : coerceValue(p.type, raw, p.options, p.scale);
 
 /** A table's rows from whatever the model returned, validated cell by cell; the saved JSON, or '' when nothing usable. */
 function coerceRows(part: TablePart, raw: unknown): string {
