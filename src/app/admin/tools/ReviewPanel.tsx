@@ -32,19 +32,40 @@ export const StatusChip = ({ s }: { s: string }) => (
 
 const field = "w-full border border-eccellere-ink/20 bg-white px-3 py-2 text-sm focus:border-eccellere-gold focus:outline-none";
 
+interface SourceItem { id: string; kind: string; text: string; where: string; status: string; target?: string; note?: string }
+
+/** Where an item of the source document ended up in the form, in plain words. */
+export function landedIn(item: SourceItem, def: DeclarativeTool): string {
+  const open = item.status === "not-covered" || item.status === "proposed-exclusion" || item.status === "not-sent";
+  if (open) return "Not in the form yet";
+  if (item.status === "excluded") return `Left out on purpose${item.note ? `: ${item.note}` : ""}`;
+  const m = /^(section|reading|field|option|table|column|derived):([^.]+)/.exec(item.target ?? "");
+  if (!m) return item.status === "auto" ? "In the form (same words found)" : "In the form";
+  const step = def.sections.find((s) => s.key === m[2]);
+  const part = def.sections.flatMap((s) => s.parts).find((p) => p.key === m[2]);
+  if (m[1] === "section") return step ? `Step title: ${step.title}` : "A step title";
+  if (m[1] === "reading") return step ? `Reading shown in the step “${step.title}”` : "Reading shown in place";
+  if (m[1] === "option") return part ? `An option of “${part.label}”` : "An answer option";
+  if (m[1] === "field") return part ? `Question: ${part.label}` : "A question";
+  if (m[1] === "table" || m[1] === "column") return part ? `Table: ${part.label}` : "A table";
+  return "A result";
+}
+
 function PartPreview({ p }: { p: DeclPart }) {
   if (p.kind === "table") {
     return (
       <li className="rounded border border-eccellere-ink/10 p-3">
         <p className="text-sm font-medium text-eccellere-ink">{p.label} <span className="text-[11px] font-normal text-ink-light">table</span></p>
         <p className="mt-1 text-xs text-ink-mid">{p.help}</p>
-        <p className="mt-2 text-[11px] text-ink-light">Columns: {p.columns.map((c) => `${c.header}${c.type === "computed" ? " (calculated)" : ""}`).join(" · ")}</p>
+        <p className="mt-2 text-[11px] text-ink-light">Columns: {p.columns.map((c) => `${c.header}${c.type === "computed" ? (c.rule?.op === "lookup" ? " (printed)" : " (calculated)") : c.display === "tick" ? " (tick box)" : ""}`).join(" · ")}</p>
+        {p.grid && <p className="mt-1 text-[11px] text-ink-light">{p.fixedRows ? `${p.fixedRows.length} printed rows, drawn as a grid like the document.` : "Blank rows to fill in, drawn as a grid like the document."}</p>}
       </li>
     );
   }
   return (
     <li className="rounded border border-eccellere-ink/10 p-3">
-      <p className="text-sm font-medium text-eccellere-ink">{p.label} <span className="text-[11px] font-normal text-ink-light">{p.type}</span></p>
+      <p className="text-sm font-medium text-eccellere-ink">{p.label} <span className="text-[11px] font-normal text-ink-light">{p.display === "tick" ? "tick box" : p.display === "radio" ? "choose one (options shown)" : p.display === "multi" ? "tick all that apply" : p.type}</span></p>
+      {p.display && p.display !== "tick" && p.options && <p className="mt-1 text-[11px] text-ink-light">Options: {p.options.join(" · ")}</p>}
       <p className="mt-1 text-xs text-ink-mid">{p.help}</p>
       {p.example && <p className="mt-1 text-[11px] italic text-ink-light">Example: {p.example}</p>}
     </li>
@@ -131,6 +152,7 @@ export default function ReviewPanel({ slug, categories, practices, onChanged, on
   const suggestion = (prov.originatorSuggestion ?? null) as Suggestion | null;
   const needsOriginator = !!def && !def.reference?.originator?.trim();
   const sections = def ? def.sections : hand?.sections ?? [];
+  const sourceItems = (((prov.formBuilder as { coverage?: { items?: SourceItem[] } } | undefined)?.coverage?.items) ?? []).filter((i) => i && typeof i.id === "string");
 
   return (
     <section className="mt-6 rounded bg-white p-5 shadow-sm ring-1 ring-eccellere-gold/40" aria-label={`Review ${tool.name}`}>
@@ -275,6 +297,7 @@ export default function ReviewPanel({ slug, categories, practices, onChanged, on
               <li key={s.key}>
                 <p className="text-sm font-medium text-eccellere-ink">{s.title}</p>
                 <p className="text-xs text-ink-mid">{s.summary}</p>
+                {(() => { const n = ((s as { reading?: unknown[] }).reading ?? []).length; return n ? <p className="mt-1 text-[11px] text-ink-light">{n} block{n === 1 ? "" : "s"} of reading from the document (instructions, lists, reference tables) shown in place.</p> : null; })()}
                 <ul className="mt-2 space-y-2">
                   {s.parts.map((p) => ("columns" in p || "type" in p)
                     ? <PartPreview key={p.key} p={p as DeclPart} />
@@ -283,6 +306,28 @@ export default function ReviewPanel({ slug, categories, practices, onChanged, on
               </li>
             ))}
           </ol>
+          {def && sourceItems.length > 0 && (
+            <details className="mt-4 rounded border border-eccellere-ink/10 p-3 text-xs text-ink-mid">
+              <summary className="cursor-pointer font-medium text-eccellere-ink">Compare with the document, item by item ({sourceItems.length})</summary>
+              <p className="mt-2">Left: each item as it stands in the uploaded document, in order. Right: where it is in the online form. Check the two side by side before you approve.</p>
+              <div className="mt-2 max-h-[480px] overflow-auto">
+                <table className="w-full border-collapse text-left">
+                  <thead><tr><th className="border-b border-eccellere-ink/15 py-1 pr-3 font-medium text-eccellere-ink">In the document</th><th className="border-b border-eccellere-ink/15 py-1 font-medium text-eccellere-ink">In the online form</th></tr></thead>
+                  <tbody>
+                    {sourceItems.map((i) => {
+                      const where = landedIn(i, def);
+                      return (
+                        <tr key={i.id} className="border-t border-eccellere-ink/5 align-top">
+                          <td className="py-1.5 pr-3"><span className="block text-[11px] text-ink-light">{i.where}</span>{i.text}</td>
+                          <td className={cn("py-1.5", where === "Not in the form yet" && "font-medium text-red-700")}>{where}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </details>
+          )}
           {def && (def.outputs?.length ?? 0) > 0 && <p className="mt-4 text-xs text-ink-mid"><strong>Results shown:</strong> {def.outputs!.map((o) => o.label).join(", ")}</p>}
           {def?.sample && (
             <details className="mt-4 rounded bg-eccellere-cream p-3 text-xs text-ink-mid">

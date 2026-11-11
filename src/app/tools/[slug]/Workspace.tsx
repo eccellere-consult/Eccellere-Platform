@@ -6,7 +6,7 @@ import { readJson } from "@/lib/toolkit/http";
 import { cn } from "@/lib/utils";
 import { interpret, type DeclarativeTool } from "@/lib/strategyModels/declarative";
 import { cleanTable, completeness, computeDerived, computeOutputs, evalColumn, expandTable, fieldsFromValues, valuesFromFields, labelColumnKey } from "@/lib/strategyModels/values";
-import type { Column, FieldPart, ModelDefinition, ModelValues, Part, Row, TablePart } from "@/lib/strategyModels/types";
+import type { Column, FieldPart, ModelDefinition, ModelValues, Part, ReadingBlock, Row, Section, TablePart } from "@/lib/strategyModels/types";
 import { loadModelDefinition } from "@/lib/strategyModels/groups";
 import { BTN_LINE, BTN_MAIN, CARD, FIELD, LABEL } from "../styles";
 import { worksheetText } from "@/lib/tools/worksheetText";
@@ -65,6 +65,61 @@ function Cell({ col, row, values, onChange, id }: { col: Column; row: Row; value
   );
 }
 
+/**
+ * The look of a form made from a document: its tables are real grids (stacked into labelled rows on a phone), and in print a written answer
+ * is printed in full as text instead of a cut-off box. Colours are the standard border, cream, ink and muted ink.
+ */
+export const DOC_CSS = [
+  ".ws-grid{width:100%;border-collapse:collapse;font-size:.875rem;line-height:1.5}",
+  ".ws-grid th{border:1px solid #E5E2DB;background:#FAF8F4;padding:.5rem .625rem;text-align:left;vertical-align:bottom;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#6B695F}",
+  ".ws-grid td{border:1px solid #E5E2DB;padding:.5rem .625rem;vertical-align:top;color:#0E0E0D}",
+  ".ws-print{display:none}",
+  "@media screen and (max-width:767px){.ws-grid thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}.ws-grid,.ws-grid tbody,.ws-grid tr,.ws-grid td{display:block;width:100%}.ws-grid tr{border:1px solid #E5E2DB;margin-bottom:.75rem}.ws-grid td{border:0;border-top:1px solid #E5E2DB}.ws-grid tr td:first-child{border-top:0}.ws-grid td[data-label]::before{content:attr(data-label);display:block;margin-bottom:.25rem;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#6B695F}}",
+  "@media print{.ws-screen{display:none!important}.ws-print{display:block!important;min-height:1.6em;white-space:pre-wrap}.ws-print-line{border-bottom:1px solid #E5E2DB}.ws-grid th,.ws-grid td{border-color:#6B695F}.ws-grid tr{break-inside:avoid}}",
+].join("");
+
+/** Help lines the document reader writes when the document itself gives none. In the document layout they are kept as a tooltip, not printed under every question. */
+export const GENERIC_HELP = /^(?:Fill in “|Tick the box when|Choose the one option|Tick every option|Write your answer|Fill in the blank columns|Fill in one row for each entry)/;
+
+const TICK_BOX = "h-4 w-4 shrink-0 accent-eccellere-gold-deep";
+
+/** Printed words kept from a document. "• a • b" (a list typed inside a table cell) is set out as a list. */
+function Printed({ text }: { text: string }) {
+  const bits = text.split(/\s*[•●▪◦]\s+/).map((x) => x.trim()).filter(Boolean);
+  if (bits.length < 2 || !/[•●▪◦]/.test(text)) return <>{text}</>;
+  const lead = /^\s*[•●▪◦]/.test(text) ? null : bits.shift();
+  return <>{lead}<ul className="list-disc space-y-0.5 pl-4">{bits.map((b, i) => <li key={i}>{b}</li>)}</ul></>;
+}
+
+/** One block of reading from the source document, shown where it stood. */
+function Reading({ b }: { b: ReadingBlock }) {
+  if (b.kind === "heading") return <h4 className="mt-6 mb-0 font-display text-xl font-normal text-eccellere-ink">{b.text}</h4>;
+  if (b.kind === "text") return <p className="mt-3 text-sm leading-relaxed text-ink-mid">{b.text}</p>;
+  if (b.kind === "list") return <ul className="mt-3 list-disc space-y-1 pl-5 text-sm leading-relaxed text-ink-mid">{b.items.map((x, i) => <li key={i}>{x}</li>)}</ul>;
+  return (
+    <div className="mt-3 overflow-x-auto">
+      <table className="ws-grid">
+        {b.head.some(Boolean) && <thead><tr>{b.head.map((h, i) => <th key={i} scope="col">{h}</th>)}</tr></thead>}
+        <tbody>{b.rows.map((r, i) => <tr key={i}>{r.map((c, j) => <td key={j} data-label={b.head[j] || undefined}><Printed text={c} /></td>)}</tr>)}</tbody>
+      </table>
+    </div>
+  );
+}
+
+/** Reading that belongs to no step (a part of the document with nothing to fill in): one panel for each heading. */
+function ReadingPanels({ blocks }: { blocks: ReadingBlock[] }) {
+  if (!blocks.length) return null;
+  const groups: ReadingBlock[][] = [];
+  for (const b of blocks) { if (b.kind === "heading" || !groups.length) groups.push([b]); else groups[groups.length - 1].push(b); }
+  return <>{groups.map((g, i) => (
+    <section key={i} className={cn(CARD, "break-inside-avoid")}>
+      {g.map((b, j) => (j === 0 && b.kind === "heading" ? <h3 key={j} className={`${LABEL} m-0`}>{b.text}</h3> : <Reading key={j} b={b} />))}
+    </section>
+  ))}</>;
+}
+
+const multiOf = (v: string): string[] => v.split(/\s*;\s*/).map((x) => x.trim()).filter(Boolean);
+
 interface Sample { scenario: string; values: Record<string, string>; tables: Record<string, Row[]> }
 export interface WorkspaceProps {
   slug: string;
@@ -88,7 +143,7 @@ export default function Workspace({ slug, definition, toolId, toolName, sample }
   }, [def, toolId]);
   if (defErr) return <p className="my-6 rounded bg-red-50 p-4 text-sm text-red-800">This worksheet could not be loaded. Please reload the page.</p>;
   if (!def) return <p className="py-10 text-sm text-ink-mid"><Loader2 className="mr-2 inline h-4 w-4 animate-spin" />Opening your worksheet…</p>;
-  return <WorkspaceInner slug={slug} toolName={toolName} def={def} sample={sample ?? null} />;
+  return <WorkspaceInner slug={slug} toolName={toolName} def={def} sample={sample ?? null} doc={definition?.layout === "document"} />;
 }
 
 /** The fictional worked example, laid out with the page's own labels. Read-only: it never touches the person's answers. */
@@ -133,8 +188,17 @@ function ExamplePanel({ def, sample, onClose }: { def: ModelDefinition; sample: 
   );
 }
 
-function WorkspaceInner({ slug, def, toolName, sample }: { slug: string; def: ModelDefinition; toolName: string; sample: Sample | null }) {
+function WorkspaceInner({ slug, def, toolName, sample, doc }: { slug: string; def: ModelDefinition; toolName: string; sample: Sample | null; doc: boolean }) {
   const [values, setValues] = useState<ModelValues>({ fields: {}, tables: {} });
+  // "Print a blank copy": the form is drawn empty for the print only; the saved answers are untouched and come back when the print closes.
+  const [blank, setBlank] = useState(false);
+  useEffect(() => {
+    if (!blank) return;
+    const done = () => setBlank(false);
+    window.addEventListener("afterprint", done);
+    const t = setTimeout(() => window.print(), 60);
+    return () => { clearTimeout(t); window.removeEventListener("afterprint", done); };
+  }, [blank]);
   const [sources, setSources] = useState<Record<string, string>>({});
   const [saved, setSaved] = useState<Saved | null>(null);
   const [load, setLoad] = useState<"loading" | "ready" | "error">("loading");
@@ -306,33 +370,146 @@ function WorkspaceInner({ slug, def, toolName, sample }: { slug: string; def: Mo
   const aiBadge = (key: string) => (sources[key] === "AI" || sources[key] === "Manual + AI"
     ? <span className="ml-2 rounded-sm bg-violet-100 px-1.5 py-0.5 text-[11px] font-medium text-violet-800">AI-suggested</span> : null);
 
-  const renderPart = (p: Part) => {
-    const id = `p-${p.key}`;
-    const badge = aiBadge(p.key);
-    if (p.kind === "field") {
-      const f: FieldPart = p;
-      const eg = f.example ? `e.g. ${f.example}` : undefined;
+  const shown: ModelValues = blank ? { fields: {}, tables: {} } : values;
+  /** A written answer: a box on screen; in the document layout the print shows the words in full (or a line to write on). */
+  const written = (control: React.ReactNode, v: string, lines = 1) => (doc
+    ? <><div className="ws-screen">{control}</div><div className="ws-print ws-print-line text-sm text-eccellere-ink" style={{ minHeight: `${lines * 1.7}em` }}>{v}</div></>
+    : control);
+
+  const renderField = (f: FieldPart, id: string, badge: React.ReactNode) => {
+    const v = shown.fields[f.key] ?? "";
+    const eg = f.example ? `e.g. ${f.example}` : undefined;
+    const quiet = doc && GENERIC_HELP.test(f.help);
+    const help = quiet ? null : <p className="mt-1 text-xs text-ink-light">{f.help}</p>;
+    const opts = f.options ?? [];
+    if (f.type === "select" && f.display === "tick") {
       return (
-        <div key={p.key} className="mt-7">
-          <label id={`${id}-label`} htmlFor={id} className="block text-sm leading-relaxed font-semibold text-eccellere-ink">{f.label}{f.unit ? ` (${f.unit})` : ""}{badge}</label>
-          <p className="mt-1 text-xs text-ink-light">{f.help}</p>
-          <div className="mt-2.5">
-            {f.type === "rating" && f.scale ? <Rating label={f.label} scale={f.scale} value={values.fields[f.key] ?? ""} onChange={(v) => setField(f.key, v)} />
-              : f.type === "select" ? (
-                <select id={id} className={input} value={values.fields[f.key] ?? ""} onChange={(e) => setField(f.key, e.target.value)}>
-                  <option value="">Choose…</option>{(f.options ?? []).map((o) => <option key={o}>{o}</option>)}
-                </select>
-              ) : f.type === "longtext" ? (
-                <textarea id={id} rows={4} className={input} value={values.fields[f.key] ?? ""} placeholder={eg} onChange={(e) => setField(f.key, e.target.value)} />
-              ) : (
-                <input id={id} className={input} inputMode={f.type === "number" ? "decimal" : undefined} value={values.fields[f.key] ?? ""} placeholder={eg} onChange={(e) => setField(f.key, e.target.value)} />
-              )}
-          </div>
+        <div key={f.key} className="mt-4">
+          <label className="flex items-start gap-3 text-sm leading-relaxed text-eccellere-ink" title={quiet ? f.help : undefined}>
+            <input id={id} type="checkbox" className={cn(TICK_BOX, "mt-1")} checked={v === "Yes"} onChange={(e) => setField(f.key, e.target.checked ? "Yes" : "")} />
+            <span>{f.label}{badge}</span>
+          </label>
+          {help && <div className="pl-7">{help}</div>}
         </div>
       );
     }
+    if ((f.type === "select" && f.display === "radio") || f.display === "multi") {
+      const multi = f.display === "multi";
+      const picked = multi ? multiOf(v) : [v];
+      const toggle = (o: string, on: boolean) => setField(f.key, multi ? opts.filter((x) => (x === o ? on : picked.includes(x))).join("; ") : on ? o : "");
+      return (
+        <fieldset key={f.key} className="mt-7 min-w-0 border-0 p-0">
+          <legend id={`${id}-label`} className="p-0 text-sm leading-relaxed font-semibold text-eccellere-ink" title={quiet ? f.help : undefined}>{f.label}{badge}</legend>
+          {help}
+          <div className="mt-2.5 space-y-1.5">
+            {opts.map((o, i) => (
+              <label key={o} className="flex items-start gap-3 text-sm leading-relaxed text-eccellere-ink">
+                <input id={i === 0 ? id : undefined} type={multi ? "checkbox" : "radio"} name={multi ? undefined : id} className={cn(TICK_BOX, "mt-1")} checked={picked.includes(o)} onChange={(e) => toggle(o, e.target.checked)} />
+                <span>{o}</span>
+              </label>
+            ))}
+          </div>
+          {!multi && v && <button type="button" className="no-print mt-2 text-xs text-ink-light underline" onClick={() => setField(f.key, "")}>Clear my choice</button>}
+        </fieldset>
+      );
+    }
+    return (
+      <div key={f.key} className="mt-7">
+        <label id={`${id}-label`} htmlFor={id} className="block text-sm leading-relaxed font-semibold text-eccellere-ink" title={quiet ? f.help : undefined}>{f.label}{f.unit ? ` (${f.unit})` : ""}{badge}</label>
+        {help}
+        <div className="mt-2.5">
+          {f.type === "rating" && f.scale ? <Rating label={f.label} scale={f.scale} value={v} onChange={(x) => setField(f.key, x)} />
+            : f.type === "select" ? (
+              <select id={id} className={input} value={v} onChange={(e) => setField(f.key, e.target.value)}>
+                <option value="">Choose…</option>{opts.map((o) => <option key={o}>{o}</option>)}
+              </select>
+            ) : f.type === "longtext" ? written(
+              <textarea id={id} rows={4} className={input} value={v} placeholder={eg} onChange={(e) => setField(f.key, e.target.value)} />, v, 4,
+            ) : written(
+              <input id={id} className={input} inputMode={f.type === "number" ? "decimal" : undefined} value={v} placeholder={eg} onChange={(e) => setField(f.key, e.target.value)} />, v,
+            )}
+        </div>
+      </div>
+    );
+  };
+
+  /** One cell of a grid table: printed words for a column nobody fills in, otherwise the control its column asks for. */
+  const gridCell = (t: TablePart, c: Column, r: Row, id: string, name: string, onChange: (v: string) => void) => {
+    const v = r[c.key] ?? "";
+    const label = `${c.header}: ${name}`;
+    if (c.type === "computed") return <Printed text={evalColumn(c, r, shown)} />;
+    if (c.type === "select" && c.display === "tick") return <input id={id} type="checkbox" aria-label={label} className={TICK_BOX} checked={v === "Yes"} onChange={(e) => onChange(e.target.checked ? "Yes" : "")} />;
+    if (c.type === "select" && c.display === "radio") return (
+      <div role="radiogroup" aria-label={label} className="flex flex-wrap gap-x-4 gap-y-1">
+        {(c.options ?? []).map((o) => (
+          <label key={o} className="flex items-center gap-1.5 whitespace-nowrap">
+            <input type="radio" name={id} className={TICK_BOX} checked={v === o} onChange={() => onChange(o)} onClick={() => { if (v === o) onChange(""); }} /><span>{o}</span>
+          </label>
+        ))}
+      </div>
+    );
+    if (c.type === "select") return <select id={id} aria-label={label} className={input} value={v} onChange={(e) => onChange(e.target.value)}><option value="">Choose…</option>{(c.options ?? []).map((o) => <option key={o}>{o}</option>)}</select>;
+    if (c.type === "rating" && c.scale) return <Rating label={label} scale={c.scale} value={v} onChange={onChange} />;
+    if (c.type === "longtext") return written(<textarea id={id} aria-label={label} rows={2} className={cn(input, "min-w-[180px]")} value={v} onChange={(e) => onChange(e.target.value)} />, v, 2);
+    return written(<input id={id} aria-label={label} className={cn(input, c.type === "number" ? "min-w-[90px]" : "min-w-[120px]")} inputMode={c.type === "number" ? "decimal" : undefined} value={v} onChange={(e) => onChange(e.target.value)} />, v);
+  };
+
+  const renderGrid = (t: TablePart, id: string, badge: React.ReactNode) => {
+    const rows = expandTable(t, shown.tables[t.key]);
+    const nameKey = labelColumnKey(t);
+    const update = (i: number, col: string, v: string) => setRows(t, rows.map((r, j) => (j === i ? { ...r, [col]: v } : r)));
+    const canRemove = !t.fixedRows && rows.length > t.minRows;
+    const hideLabel = doc && /^Table: /.test(t.label);
+    return (
+      <div key={t.key} className="mt-7">
+        <p id={`${id}-label`} className={cn("text-sm leading-relaxed font-semibold text-eccellere-ink", hideLabel && "sr-only")}>{t.label}{badge}</p>
+        {!(doc && GENERIC_HELP.test(t.help)) && <p className="mt-1 text-xs text-ink-light">{t.help}</p>}
+        <div className="mt-3 overflow-x-auto">
+          <table className="ws-grid" aria-labelledby={`${id}-label`}>
+            <thead>
+              <tr>
+                {t.columns.map((c) => (
+                  <th key={c.key} scope="col" title={c.help}>
+                    {c.header}{c.unit ? ` (${c.unit})` : ""}
+                    {c.type === "rating" && c.scale && !/\d\s*[–-]\s*\d/.test(c.header) && <span className="block font-normal normal-case tracking-normal">{c.scale.min} = {c.scale.low}, {c.scale.max} = {c.scale.high}</span>}
+                  </th>
+                ))}
+                {canRemove && <th className="no-print"><span className="sr-only">Remove</span></th>}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, i) => {
+                const name = t.fixedRows ? r[nameKey] : `${t.rowLabel.toLowerCase()} ${i + 1}`;
+                return (
+                  <tr key={i}>
+                    {t.columns.map((c, ci) => (
+                      <td key={c.key} data-label={c.header}>
+                        {t.fixedRows && ci === 0
+                          ? <><span className="font-medium">{r[nameKey]}</span>{t.rowHints?.[r[nameKey]] && <span className="mt-0.5 block text-xs text-ink-light">{t.rowHints[r[nameKey]]}</span>}</>
+                          : gridCell(t, c, r, `${id}-${i}-${c.key}`, name, (v) => update(i, c.key, v))}
+                      </td>
+                    ))}
+                    {canRemove && <td className="no-print"><button type="button" aria-label={`Remove ${t.rowLabel.toLowerCase()} ${i + 1}`} className="text-xs text-ink-light underline hover:text-red-700" onClick={() => setRows(t, cleanTable(t, rows.filter((_, j) => j !== i)))}>Remove</button></td>}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        {!t.fixedRows && rows.length < t.maxRows && (
+          <button type="button" className={cn(BTN_LINE, "no-print mt-3 px-3 py-1.5 text-xs")} onClick={() => setRows(t, [...rows, {}])}>+ Add a {t.rowLabel.toLowerCase()}</button>
+        )}
+      </div>
+    );
+  };
+
+  const renderPart = (p: Part) => {
+    const id = `p-${p.key}`;
+    const badge = aiBadge(p.key);
+    if (p.kind === "field") return renderField(p, id, badge);
     const t: TablePart = p;
-    const rows = expandTable(t, values.tables[t.key]);
+    if (t.grid && !t.board) return renderGrid(t, id, badge);
+    const rows = expandTable(t, shown.tables[t.key]);
     const nameKey = labelColumnKey(t);
     const update = (i: number, col: string, v: string) => setRows(t, rows.map((r, j) => (j === i ? { ...r, [col]: v } : r)));
     return (
@@ -350,7 +527,7 @@ function WorkspaceInner({ slug, def, toolName, sample }: { slug: string; def: Mo
               )}
               <div className="flex flex-wrap items-start gap-x-6 gap-y-4">
                 {t.columns.filter((c, ci) => !(t.fixedRows && ci === 0)).map((c) => (
-                  <Cell key={c.key} id={`${id}-${i}-${c.key}`} col={c} row={r} values={values} onChange={(v) => update(i, c.key, v)} />
+                  <Cell key={c.key} id={`${id}-${i}-${c.key}`} col={c} row={r} values={shown} onChange={(v) => update(i, c.key, v)} />
                 ))}
               </div>
               {!t.fixedRows && rows.length > t.minRows && (
@@ -363,6 +540,22 @@ function WorkspaceInner({ slug, def, toolName, sample }: { slug: string; def: Mo
           <button type="button" className={cn(BTN_LINE, "mt-3 px-3 py-1.5 text-xs")} onClick={() => setRows(t, [...rows, {}])}>+ Add a {t.rowLabel.toLowerCase()}</button>
         )}
       </div>
+    );
+  };
+
+  /** A step of the form: its reading and its parts in the order the document had them. */
+  const renderSectionBody = (s: Section) => {
+    const inline = (s.reading ?? []).filter((b) => !b.place);
+    return (
+      <>
+        {s.parts.map((p) => (
+          <div key={p.key}>
+            {inline.filter((b) => b.before === p.key).map((b, i) => <Reading key={i} b={b} />)}
+            {renderPart(p)}
+          </div>
+        ))}
+        {inline.filter((b) => !b.before || !s.parts.some((p) => p.key === b.before)).map((b, i) => <Reading key={i} b={b} />)}
+      </>
     );
   };
 
@@ -381,6 +574,7 @@ function WorkspaceInner({ slug, def, toolName, sample }: { slug: string; def: Mo
 
   return (
     <div>
+      {doc && <style dangerouslySetInnerHTML={{ __html: DOC_CSS }} />}
       {/* AI help: the situation note, the questions and the draft of the empty parts */}
       <section className={cn(CARD, "no-print")} aria-labelledby="ai-help">
         <h2 id="ai-help" className={cn(LABEL, "flex items-center gap-2")}><Sparkles className="h-3.5 w-3.5" /> AI help</h2>
@@ -452,9 +646,11 @@ function WorkspaceInner({ slug, def, toolName, sample }: { slug: string; def: Mo
       <p className="mb-6 text-xs text-ink-light">Leave anything you do not know blank. It is treated as <strong>not known</strong>, never as zero, and the analysis says so.</p>
 
       {def.sections.map((s) => (
-        <section key={s.key} className={cn(CARD, "break-inside-avoid")} aria-labelledby={`s-${s.key}`}>
+        <div key={s.key}>
+        <ReadingPanels blocks={(s.reading ?? []).filter((b) => b.place === "above")} />
+        <section className={cn(CARD, !doc && "break-inside-avoid")} aria-labelledby={`s-${s.key}`}>
           <h3 id={`s-${s.key}`} className={`${LABEL} m-0`}>{s.title}</h3>
-          <p className="mt-1.5 text-sm text-ink-mid">{s.summary}</p>
+          {s.summary && <p className="mt-1.5 text-sm text-ink-mid">{s.summary}</p>}
           <div className="no-print mt-3 flex flex-wrap items-center gap-3">
             <button type="button" disabled={!!busy || (!brief.trim() && nothingYet)} onClick={() => ai("fill", s.key)} className={cn(BTN_LINE, "inline-flex items-center gap-1 px-3 py-1.5 text-xs")}>
               {busy === "fill" && busySection === s.key ? <><Loader2 className="mr-1 inline h-3.5 w-3.5 animate-spin" />Drafting this section…</> : <><Sparkles className="h-3.5 w-3.5" /> Draft this section with AI</>}
@@ -462,11 +658,13 @@ function WorkspaceInner({ slug, def, toolName, sample }: { slug: string; def: Mo
             <span className="text-[11px] text-ink-light">{!brief.trim() && nothingYet ? "Describe your situation in AI help (top of the page) first." : questions.length ? "Uses your situation note and the suggested questions. Only empty parts are drafted; your answers are never changed." : "Uses your situation note. Only empty parts are drafted; your answers are never changed."}</span>
           </div>
           {secMsg?.key === s.key && <p role="status" className={cn("no-print mt-3 text-sm", secMsg.kind === "ok" ? "text-eccellere-teal" : "text-red-700")}>{secMsg.text}</p>}
-          {s.parts.map((p) => renderPart(p))}
+          {renderSectionBody(s)}
         </section>
+        <ReadingPanels blocks={(s.reading ?? []).filter((b) => b.place === "below")} />
+        </div>
       ))}
 
-      {derived.length + outputs.length > 0 && (
+      {!blank && derived.length + outputs.length > 0 && (
         <section className={cn(CARD, "break-inside-avoid")} aria-labelledby="results">
           <h3 id="results" className={`${LABEL} m-0`}>Results at a glance</h3>
           <dl className="mt-4 grid gap-5 sm:grid-cols-2">
@@ -479,10 +677,11 @@ function WorkspaceInner({ slug, def, toolName, sample }: { slug: string; def: Mo
 
       <div className="no-print mb-6 flex flex-wrap gap-3">
         <button type="button" onClick={() => window.print()} className={BTN_LINE}>Print</button>
+        {doc && <button type="button" onClick={() => setBlank(true)} className={BTN_LINE}>Print a blank copy</button>}
         <button type="button" onClick={download} className={BTN_LINE}>Download</button>
       </div>
 
-      <section id="stage-3" className={cn(CARD, "scroll-mt-24")} aria-labelledby="analysis">
+      <section id="stage-3" className={cn(CARD, "scroll-mt-24", blank && "hidden")} aria-labelledby="analysis">
         <p className={LABEL}>End output</p>
         <h2 id="analysis" className="m-0 mt-1 font-display text-2xl font-light text-eccellere-ink">Analysis, Recommendations &amp; Actionables</h2>
         <button type="button" disabled={!!busy || filled < 1} onClick={() => ai("analyse")} className="no-print mt-4 w-full bg-eccellere-ink px-5 py-2.5 text-sm font-medium text-white hover:opacity-90 disabled:bg-ink-light disabled:opacity-100">

@@ -32,6 +32,15 @@ function inventory(tool: DeclarativeTool) {
   for (const s of tool.sections) {
     keys.add(`section:${s.key}`);
     addText(s.title);
+    // reading kept from the document and shown in place counts as carried into the form
+    if (s.reading?.length) {
+      keys.add(`reading:${s.key}`);
+      for (const b of s.reading) {
+        if (b.kind === 'heading' || b.kind === 'text') addText(b.text);
+        else if (b.kind === 'list') b.items.forEach((i) => addText(i));
+        else { b.head.forEach((c) => addText(c)); b.rows.forEach((r) => r.forEach((c) => addText(c))); }
+      }
+    }
     for (const p of s.parts) {
       if (p.kind === 'field') {
         keys.add(`field:${p.key}`); keys.add(`option:${p.key}`);

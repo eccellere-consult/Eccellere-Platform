@@ -170,6 +170,8 @@ export interface FinishArgs {
   firstField: { key: string; label: string } | null;
   /** results added after the summary (counts and scores worked out from the answers) */
   extraOutputs?: Record<string, unknown>[];
+  /** Laid out like the document it came from: no context section and no action plan are added, and the page is drawn in the document layout. */
+  faithful?: boolean;
 }
 
 /** The plain furniture every form gets around the sections built from a file: a context section, an action plan, a diagram, a summary result, a labelled sample. Shared by both file readers. */
@@ -208,11 +210,14 @@ export function finishForm(a: FinishArgs): FaithfulResult {
       ],
     }],
   };
-  sampleTables.actions = [{ action: 'Agree one improvement from this review', owner: 'Operations Manager', measure: 'Improvement agreed in writing', horizon: '30 days' }];
-  const allSections = [context, ...sections, plan];
+  if (!a.faithful) sampleTables.actions = [{ action: 'Agree one improvement from this review', owner: 'Operations Manager', measure: 'Improvement agreed in writing', horizon: '30 days' }];
+  if (!a.faithful) sampleValues.purpose ??= 'A fictional example of why this form is being filled in.';
+  if (!a.faithful) sampleValues.filled_in_by ??= 'Operations Manager';
+  const allSections = a.faithful ? sections : [context, ...sections, plan];
   const labels = allSections.map((s) => String(s.title));
-  const stepNames = labels.length > 8 ? [...labels.slice(0, 7), 'Action plan'] : labels;
-  const first = firstField ?? { key: 'purpose', label: 'What is this form being filled in for?' };
+  const stepNames = a.faithful ? [...labels.slice(0, 8), ...['Review', 'Print or save'].slice(0, Math.max(0, 3 - labels.length))] : labels.length > 8 ? [...labels.slice(0, 7), 'Action plan'] : labels;
+  const first = firstField ?? (a.faithful ? null : { key: 'purpose', label: 'What is this form being filled in for?' });
+  const source = readings[0]?.fileName ?? name;
   const stepList = labels.slice(0, 6).join(', ');
 
   const form: Record<string, unknown> = {
@@ -220,24 +225,25 @@ export function finishForm(a: FinishArgs): FaithfulResult {
     slug: snake(name).replace(/_/g, '-').slice(0, 60).replace(/-+$/, ''),
     name,
     category: opts.category,
-    does: cut(`Collects the same information as the uploaded file “${readings[0]?.fileName ?? name}”, in the same order, and ends with an action plan.`, 300),
+    ...(a.faithful ? { layout: 'document' } : {}),
+    does: cut(a.faithful ? `The online version of “${source}”: the same steps, instructions and tables, in the same order, to fill in on screen and print.` : `Collects the same information as the uploaded file “${source}”, in the same order, and ends with an action plan.`, 300),
     whenToUse: 'Use it when you need to gather this information in a consistent way from several people or teams, instead of passing a spreadsheet around.',
     whenNotToUse: 'Do not use it when the questions in the original file have changed; update the form first so answers stay comparable.',
-    next: 'Review the answers with the people involved and turn the main findings into the action plan below.',
+    next: a.faithful ? 'Review the completed version with the people involved, then print it or save it as a PDF for your records.' : 'Review the answers with the people involved and turn the main findings into the action plan below.',
     reference: {
       originator: '', year: '',
       summary: cut(`This form follows the layout of the uploaded file: ${stepList}${labels.length > 6 ? ' and more' : ''}.`, 400),
       caption: 'The steps of the form, in the order they appear.',
-      howToRead: ['Work through the sections from left to right.', 'Totals are worked out for you from the numbers you enter.'],
+      howToRead: a.faithful ? ['Work through the steps in order, as in the document.', 'Anything counted or averaged is worked out for you from what you enter.'] : ['Work through the sections from left to right.', 'Totals are worked out for you from the numbers you enter.'],
     },
     diagram: { template: 'steps', title: cut(name, 60), steps: (stepNames.length >= 3 ? stepNames : [...stepNames, 'Decide']).slice(0, 8).map((n) => ({ name: cut(n, 30) })) },
     sections: allSections,
     ...(derived.length ? { derived } : {}),
-    outputs: [{ key: 'summary', label: 'Summary of your entry', rule: { op: 'template', text: `${first.label}: {${first.key}}` } }, ...(a.extraOutputs ?? [])],
-    analysisGuide: `Start with the sections in the order shown: ${stepList}. Look first for blanks and for answers that disagree with each other, because they usually point to a misunderstanding of the question rather than a real difference. Where totals are shown, check that they match what you expect from your own records before relying on them. Then pick the two or three findings that matter most for the decision this form supports, and write them as actions in the action plan, each with an owner (a role), a measure of success and a start window. Share the completed form with the people who answered so they can confirm it reads correctly.`,
+    outputs: [...(first ? [{ key: 'summary', label: 'Summary of your entry', rule: { op: 'template', text: `${first.label.replace(/[{}]/g, '')}: {${first.key}}` } }] : []), ...(a.extraOutputs ?? [])],
+    analysisGuide: `Start with the sections in the order shown: ${stepList}. Look first for blanks and for answers that disagree with each other, because they usually point to a misunderstanding of the question rather than a real difference. Where totals are shown, check that they match what you expect from your own records before relying on them. Then pick the two or three findings that matter most for the decision this form supports, and ${a.faithful ? 'agree who will act on each one, how you will know it worked and when it starts' : 'write them as actions in the action plan, each with an owner (a role), a measure of success and a start window'}. Share the completed form with the people who answered so they can confirm it reads correctly.`,
     sample: { scenario: 'A fictional example, not real data, to show what a completed form can look like.', values: sampleValues, tables: sampleTables },
     sourceMap: map,
-    assumptions: ['Built directly from the uploaded file without AI. Wording of help text is generic; use Modify with AI to improve it.', 'A context section and an action plan were added because every Eccellere form has them.'],
+    assumptions: ['Built directly from the uploaded file without AI. Wording of help text is generic; use Modify with AI to improve it.', a.faithful ? 'Laid out like the document: its own steps, instructions and tables, with nothing added.' : 'A context section and an action plan were added because every Eccellere form has them.'],
     approximations,
     confidence: 'medium',
     concerns: ['Layout and questions follow the file; the help text and any calculations still need a person (or the AI) to improve them.'],

@@ -58,3 +58,19 @@ Unit tests with a pretend AI: source reading for Excel (including hidden sheets,
 - New builds carry a classification (the administrator's choice, else the AI's, else the rules') and list depth gaps as review warnings.
 
 **Not verified:** a real vision call, a real classify/enrich AI call, browser journeys (drag-drop, paste, filters), and the classification of the live catalogue (the rules were tested on examples, not run over the production list).
+
+## 7. Document layout: an online version that reads like the Word file (11 Nov 2026)
+
+Owner's requirement: a toolkit made online must look like its offline document, with clear instructions, tables, tick boxes and selection options.
+
+- **Reading kept in place.** A section may carry `reading` blocks (sub-heading, paragraph, list, reference table). Each sits before a named part, at the end of its step, or as its own panel above or below the step (a part of the document with nothing to fill in). Reading is never an answer and is never saved.
+- **Tables stay tables.** A document table with blank columns becomes one table with `grid: true`: a row for each printed row, printed columns shown as text (a computed column with the new `lookup` rule), blank columns as inputs. A table of blank rows stays a table of blank rows under the same headings. On a phone a grid stacks into labelled rows; in print it is a grid.
+- **Tick boxes and choices.** `display` on a field: `tick` (one tick box, saved as Yes), `radio` (a choice with every option visible), `multi` (tick all that apply; a text answer, the ticked options joined by "; "). `display` on a select column: `tick` or `radio`. The saved shape and the Excel template are unchanged, so nothing already saved is affected.
+- **Nothing added.** A form built from a document (`layout: 'document'`) gets no "About this form" step and no added action plan. Forms built from sheets are unchanged.
+- **Word reader.** Heading depth, list items, Word's own tick-box controls, typed tick boxes and round buttons, blank table rows and empty cells are now read. The two highest heading depths open steps; deeper headings are sub-headings.
+- **Review.** The review panel lists every document item beside where it is in the form.
+- **Print.** Written answers print in full as text; "Print a blank copy" prints the form empty without touching the saved answers.
+
+Limits, decided: a printed column is not in the Excel template (the row names and the fill-in columns are). Cells already filled in inside a fill-in column are left blank and reported. Nested lists are read as one item. Pictures, text boxes and merged-cell layouts in a Word file are not reproduced. PDF sources are still read as lines of text. Show/hide rules and date pickers are still not in the engine.
+
+**Verified:** unit tests; a sample Word file read end to end; the page filled in with Chromium at desktop and phone width and printed to PDF, through a temporary preview page with the save API faked. **Not verified:** a real toolkit file from the marketplace, the real database and login, the real host build, Safari, and an AI "improve" run on a document-layout draft.
