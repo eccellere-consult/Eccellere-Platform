@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { AREAS } from './catalogue';
+import { everyArea } from './catalogue';
 import { pilotByAgent } from './pilots';
 import { loadEdits, type AgentEdit, type AgentEditRepo } from './overrides';
 
@@ -33,7 +33,7 @@ export interface AgentRow {
 
 export async function listAgents(repo: AgentEditRepo): Promise<AgentRow[]> {
   const edits = await loadEdits(repo);
-  return AREAS.flatMap((area) => area.agents.map((a): AgentRow => {
+  return everyArea().flatMap((area) => area.agents.map((a): AgentRow => {
     const p = pilotByAgent(a.slug);
     const e = edits[a.slug];
     return {
