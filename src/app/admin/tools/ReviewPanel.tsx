@@ -57,7 +57,7 @@ function PartPreview({ p }: { p: DeclPart }) {
       <li className="rounded border border-eccellere-ink/10 p-3">
         <p className="text-sm font-medium text-eccellere-ink">{p.label} <span className="text-[11px] font-normal text-ink-light">table</span></p>
         <p className="mt-1 text-xs text-ink-mid">{p.help}</p>
-        <p className="mt-2 text-[11px] text-ink-light">Columns: {p.columns.map((c) => `${c.header}${c.type === "computed" ? (c.rule?.op === "lookup" ? " (printed)" : " (calculated)") : c.display === "tick" ? " (tick box)" : ""}`).join(" · ")}</p>
+        <p className="mt-2 text-[11px] text-ink-light">Columns: {p.columns.map((c) => `${c.header}${c.type === "computed" ? (c.rule?.op === "lookup" ? " (printed)" : " (calculated)") : c.display === "tick" ? " (tick box)" : c.display === "levels" ? ` (click a level: ${(c.options ?? []).join(", ")})` : ""}`).join(" · ")}</p>
         {p.grid && <p className="mt-1 text-[11px] text-ink-light">{p.fixedRows ? `${p.fixedRows.length} printed rows, drawn as a grid like the document.` : "Blank rows to fill in, drawn as a grid like the document."}</p>}
       </li>
     );

@@ -57,13 +57,18 @@ export type Rule =
    */
   | { op: 'answers'; fields: string[]; show: 'progress' | 'yes' | 'score' | 'ticked'; points?: Record<string, number>; exclude?: string[]; bands?: { min: number; label: string }[] }
   | { op: 'ration'; table: string; name: string; cost: string; value: string; budget: string; show: 'names' | 'cost' | 'value' }
+  /**
+   * The average level chosen in a maturity table: each chosen option counts as its position (the first option is 1), rows with no choice are
+   * left out. Shown as "2.5 of 4 (from 3 of 5 rows)". Plain arithmetic on the choices; no bands or labels are added.
+   */
+  | { op: 'levelavg'; table: string; col: string; options: string[] }
   /** Fixed words for a row, looked up by the text of another cell of the same row (the row's name). For a column a source document prints and nobody fills in. */
   | { op: 'lookup'; by: string; map: Record<string, string> };
 
 // ── The declarative tool ─────────────────────────────────────────────────────────────────────────────────────────────
 
 export interface DeclField { kind: 'field'; key: string; label: string; type: FieldType; help: string; example?: string; options?: string[]; scale?: Partial<RatingScale>; unit?: string; display?: FieldDisplay }
-export interface DeclColumn { key: string; header: string; help: string; type: ColumnType; options?: string[]; scale?: Partial<RatingScale>; unit?: string; half?: boolean; rule?: Rule; display?: 'radio' | 'tick' }
+export interface DeclColumn { key: string; header: string; help: string; type: ColumnType; options?: string[]; scale?: Partial<RatingScale>; unit?: string; half?: boolean; rule?: Rule; display?: 'radio' | 'tick' | 'levels'; levels?: Record<string, string[]> }
 export interface DeclTable {
   kind: 'table'; key: string; label: string; help: string; rowLabel: string; columns: DeclColumn[];
   fixedRows?: string[]; rowHints?: Record<string, string>; minRows?: number; maxRows?: number;
@@ -276,6 +281,12 @@ export function ruleFn(rule: Rule, cm?: ComputedMap): (row: Row | undefined, v: 
           if (n === null) return null;
           return (rule.gt === undefined || n > rule.gt) && (rule.lt === undefined || n < rule.lt) ? rule.then : rule.else;
         }
+        case 'levelavg': {
+          const all = rowsOf(v, rule.table);
+          const at = all.map((r) => rule.options.findIndex((o) => norm(o) === norm(r[rule.col])) + 1).filter((n) => n > 0);
+          if (!at.length) return null;
+          return `${fmtNum(at.reduce((a, b) => a + b, 0) / at.length, 1)} of ${rule.options.length} (from ${at.length} row${at.length === 1 ? '' : 's'})`;
+        }
         case 'lookup': {
           const name = row ? (row[rule.by] ?? '').trim() : '';
           return name && Object.prototype.hasOwnProperty.call(rule.map, name) ? rule.map[name] : null;
@@ -313,7 +324,7 @@ function partOf(p: DeclPart, cm?: ComputedMap): Part {
     switch (c.type) {
       case 'longtext': return col.long(c.key, c.header, c.help, { half: c.half });
       case 'number': return col.num(c.key, c.header, c.help, c.unit ?? '', { half: c.half });
-      case 'select': return { ...col.select(c.key, c.header, c.help, c.options ?? []), ...(c.display ? { display: c.display } : {}) };
+      case 'select': return { ...col.select(c.key, c.header, c.help, c.options ?? []), ...(c.display ? { display: c.display } : {}), ...(c.display === 'levels' && c.levels ? { levels: c.levels } : {}) };
       case 'rating': return col.rating(c.key, c.header, c.help, c.scale ?? {});
       case 'computed': { const f = ruleFn(c.rule ?? { op: 'template', text: '' }, cm); return col.computed(c.key, c.header, c.help, (row, v) => f(row, v) ?? ''); }
       default: return col.text(c.key, c.header, c.help, { half: c.half });
@@ -428,7 +439,12 @@ export function validateDeclarative(raw: unknown): Issue[] {
             if ((c.help ?? '').trim().length <= 5) err(`${cp}.help`, 'column help needs more than 5 characters');
             if (c.type === 'select' && (c.options?.length ?? 0) < 2) err(`${cp}.options`, 'a select column needs at least 2 options');
             if (c.type === 'computed' && !c.rule) err(`${cp}.rule`, 'a computed column needs a rule');
-            if (c.display !== undefined && (c.type !== 'select' || !['radio', 'tick'].includes(c.display))) err(`${cp}.display`, 'display must be radio or tick, on a select column');
+            if (c.display !== undefined && (c.type !== 'select' || !['radio', 'tick', 'levels'].includes(c.display))) err(`${cp}.display`, 'display must be radio, tick or levels, on a select column');
+            if (c.display === 'levels') {
+              const n = c.options?.length ?? 0;
+              if (!c.levels || typeof c.levels !== 'object' || !Object.keys(c.levels).length) err(`${cp}.levels`, 'a levels column needs the description of each level for each row');
+              else for (const [row, d] of Object.entries(c.levels)) if (!Array.isArray(d) || d.length !== n) err(`${cp}.levels`, `the row ${row} needs ${n} descriptions, one for each level`);
+            }
           });
           if (p.fixedRows?.length) {
             if (p.columns?.[0]?.type !== 'text') err(`${pp}.columns[0]`, 'the first column of a fixed table must be text (it holds the row name)');
@@ -484,6 +500,12 @@ export function validateDeclarative(raw: unknown): Issue[] {
         for (const f of r.fields ?? []) if (!fieldKeys.has(f)) err(path, `unknown field ${f}`);
         if (r.show === 'score' && !Object.keys(r.points ?? {}).length) err(path, 'a score needs points for the answers');
         if (!['progress', 'yes', 'score', 'ticked'].includes(r.show)) err(path, 'show must be progress, yes, score or ticked');
+        break;
+      }
+      case 'levelavg': {
+        const cols = tableCols.get(r.table);
+        if (!cols) err(path, `unknown table ${r.table}`); else if (!cols.has(r.col)) err(path, `unknown column ${r.col} in ${r.table}`);
+        if (!Array.isArray(r.options) || r.options.length < 2) err(path, 'a level average needs the list of levels');
         break;
       }
       case 'lookup': {
@@ -599,7 +621,10 @@ export function normaliseDeclarative(raw: unknown, ctx: { existingSlugs?: string
         if (scaleOf(r.scale)) d.scale = scaleOf(r.scale);
         if (str(r.unit)) d.unit = str(r.unit);
         if (r.half === true) d.half = true;
-        if (r.display === 'radio' || r.display === 'tick') d.display = r.display;
+        if (r.display === 'radio' || r.display === 'tick' || r.display === 'levels') d.display = r.display;
+        if (r.display === 'levels' && r.levels && typeof r.levels === 'object' && !Array.isArray(r.levels)) {
+          d.levels = Object.fromEntries(Object.entries(r.levels as Record<string, unknown>).slice(0, READING_LIMITS.rows).map(([k, v]) => [k, (Array.isArray(v) ? v : []).slice(0, 12).map((x) => str(x).slice(0, READING_LIMITS.cell))]));
+        }
         if (r.rule && typeof r.rule === 'object') d.rule = r.rule as Rule;
         return d;
       });

@@ -161,7 +161,7 @@ export function keepDocumentLayout(tool: DeclarativeTool, baseline: Record<strin
         if (!p.display && old.display && p.type === old.type && (p.options?.length ?? 0) >= 2) p.display = old.display;
       } else if (p.kind === 'table' && old.kind === 'table') {
         if (old.grid && !p.board) p.grid = true;
-        for (const c of p.columns) { const oc = old.columns.find((x) => x.key === c.key); if (oc?.display && !c.display && c.type === 'select') c.display = oc.display; }
+        for (const c of p.columns) { const oc = old.columns.find((x) => x.key === c.key); if (!oc?.display || c.display || c.type !== 'select') continue; if (oc.display !== 'levels') c.display = oc.display; else if (oc.levels && (c.options ?? []).join('|') === (oc.options ?? []).join('|')) { c.display = 'levels'; c.levels = oc.levels; } }
       }
     }
   }

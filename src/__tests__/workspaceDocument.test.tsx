@@ -48,8 +48,9 @@ describe('a toolkit made online, on the page', () => {
       'This toolkit helps you review one supplier at a time.', 'How to use this toolkit', 'Rate honestly', 'Fully in place and evidenced',
       'Part 1: Supplier details', 'Fill in the details of the supplier you are reviewing.', 'Supplier name',
       'Part 2: Performance assessment', 'Rate each question from 1 to 5 and note your evidence.', 'Delivery and quality', 'Does the supplier deliver on the agreed date?',
-      'Part 3: Readiness checklist', 'Tick each item once it is done.', 'Contract is signed and filed',
-      'Part 4: Action plan', 'List the actions you agree with the supplier.',
+      'Part 3: Maturity of supplier management', 'For each area, choose the level that describes you today.', 'Quarterly reviews with agreed measures.',
+      'Part 4: Readiness checklist', 'Tick each item once it is done.', 'Contract is signed and filed',
+      'Part 5: Action plan', 'List the actions you agree with the supplier.',
       'Appendix: Benchmarks', 'Typical ranges seen in practice.', 'Under 2 percent',
     ].map(at);
     expect(order).toEqual([...order].sort((a, b) => a - b));
@@ -62,7 +63,7 @@ describe('a toolkit made online, on the page', () => {
     await open();
     expect(screen.getByRole('button', { name: 'Draft the empty parts' })).toBeTruthy();
     expect(screen.getByRole('button', { name: /Suggest questions for my situation/ })).toBeTruthy();
-    expect(screen.getAllByRole('button', { name: /Draft this section with AI/ })).toHaveLength(4);
+    expect(screen.getAllByRole('button', { name: /Draft this section with AI/ })).toHaveLength(5);
     expect(screen.getByRole('button', { name: 'Upload a filled template' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Download blank template' })).toBeTruthy();
     for (const name of ['Print', 'Download', 'Analyse & recommend']) expect(screen.getByRole('button', { name })).toBeTruthy();
@@ -81,6 +82,33 @@ describe('a toolkit made online, on the page', () => {
     await settle();
     expect(JSON.parse(answer('Delivery and quality'))).toEqual([{ diagnostic_question: '2.2 Are quality rejections below the agreed limit?', rating_1_5: '4', evidence_notes: 'Two rejections in March' }]);
     expect(screen.getByText('Average rating (1-5): Delivery and quality').parentElement!.textContent).toContain('4');
+  });
+
+  it('draws a maturity model as its table of descriptions, and picks a level when its description is clicked', async () => {
+    await open();
+    const table = screen.getAllByRole('table').find((t) => within(t).queryByRole('columnheader', { name: 'Level 3: Defined' }))!;
+    expect(within(table).getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['Area', 'Level 1: Initial', 'Level 2: Developing', 'Level 3: Defined', 'Level 4: Leading']);
+    expect(within(table).getAllByRole('row')).toHaveLength(4);
+    // every description is on the page, in its own cell
+    expect(within(table).getAllByRole('button')).toHaveLength(12);
+    const cell = within(table).getByRole('button', { name: 'Level 3: Defined: Performance review' });
+    expect(cell.textContent).toBe('Quarterly reviews with agreed measures.');
+    fireEvent.click(cell);
+    expect(cell.getAttribute('aria-pressed')).toBe('true');
+    expect(cell.textContent).toContain('Chosen');
+    // one level for each row: choosing another moves the choice
+    const other = within(table).getByRole('button', { name: 'Level 2: Developing: Performance review' });
+    fireEvent.click(other);
+    expect(cell.getAttribute('aria-pressed')).toBe('false');
+    fireEvent.click(within(table).getByRole('button', { name: 'Level 4: Leading: Risk management' }));
+    await settle();
+    const rows = JSON.parse(saved.find((f) => /^Table: Area/.test(f.label))!.value);
+    expect(rows).toEqual([{ area: 'Performance review', level_chosen: 'Level 2: Developing' }, { area: 'Risk management', level_chosen: 'Level 4: Leading' }]);
+    // (2 + 4) / 2 = 3
+    expect(screen.getByText(/^Average level:/).parentElement!.textContent).toContain('3 of 4 (from 2 rows)');
+    // clicking the chosen description again clears it
+    fireEvent.click(other);
+    expect(other.getAttribute('aria-pressed')).toBe('false');
   });
 
   it('draws tick boxes as tick boxes, and saves a tick as Yes', async () => {

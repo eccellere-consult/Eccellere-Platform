@@ -35,6 +35,8 @@ const RATING_HEAD = /rating|score|\(\s*\d\s*[–-]\s*\d\s*\)/i;
 const YESNO_HEAD = /\byes\s*\/\s*no\b|\by\s*\/\s*n\b/i;
 const TICK_HEAD = /^(?:done|tick|check(?:ed)?|complete[d]?|✓|✔)\b/i;
 const LONG_HEAD = /note|evidence|comment|detail|describe|explain|observation|action|plan|finding|answer|response|remark|why|how/i;
+/** A column heading that names a maturity level: "Level 1", "Stage 2", "1", or one of the usual level names. */
+const LEVEL_HEAD = /^(?:(?:level|stage|tier|maturity|grade|l)\s*[-:]?\s*\d\b|\d\b|(?:initial|ad[- ]hoc|basic|beginner|beginning|nascent|foundational|emerging|aware|reactive|developing|repeatable|defined|intermediate|proactive|managed|established|integrated|advanced|mature|predictive|optimi[sz]ed|optimi[sz]ing|leading|world[- ]class|best[- ]in[- ]class)\b)/i;
 const IMPACT = /\s*\[([^\]]{3,60})\]\s*$/;
 const ONE_HINT = /\b(?:tick|select|choose|pick|circle)\s+(?:only\s+)?one\b|\bonly one\b/i;
 const ALL_HINT = /all that apply|tick all|select all|choose all|as many as/i;
@@ -304,6 +306,46 @@ export function structuredForm(readings: readonly SourceReading[], opts: { name?
     const caption = captionFor();
     const label = uniqueLabel(caption?.text ?? `Table: ${head.join(', ')}`, 80);
     const tKey = unique(safeKey(label), used);
+
+    // ── A maturity model: three or more level columns, each cell describing that level for its row. The table is kept as it is, and
+    //    the reader picks a level for each row by clicking its description. ──
+    const levelAt = head.map((h, j) => j > 0 && LEVEL_HEAD.test(h));
+    const levelCols = head.map((_, j) => j).filter((j) => levelAt[j]);
+    const described = content.length ? content.filter((x) => levelCols.every((j) => x.r[j].length >= 4 && !TICK.test(x.r[j]))).length / content.length : 0;
+    if (levelCols.length >= 3 && levelCols.length <= 7 && new Set(levelCols.map((j) => head[j].toLowerCase())).size === levelCols.length && described >= 0.8 && head.some((_, j) => !levelAt[j] && !isInput[j])) {
+      const nameCol = head.findIndex((_, j) => !levelAt[j] && !isInput[j]);
+      const nameKey = unique(safeKey(head[nameCol] || 'item'), colKeys);
+      const names: string[] = [];
+      const seen = new Set<string>();
+      content.forEach(({ r }, i) => {
+        const base = cut(tidy(r[nameCol]) || `Row ${i + 1}`, 300);
+        let n = base;
+        for (let k = 2; seen.has(n.toLowerCase()); k++) n = `${cut(base, 290)} (${k})`;
+        seen.add(n.toLowerCase()); names.push(n);
+      });
+      const options = levelCols.map((j) => cut(head[j], 60));
+      const levelKey = unique('level_chosen', colKeys);
+      const columns: Part[] = [{ key: nameKey, header: cut(head[nameCol] || 'Item', 60), help: 'The row as printed in the document.', type: 'text' }];
+      head.forEach((h, j) => {
+        if (j === nameCol) return;
+        if (j === levelCols[0]) {
+          columns.push({ key: levelKey, header: 'Level chosen', help: 'Click the description that fits you best for this row.', type: 'select', options, display: 'levels', levels: Object.fromEntries(names.map((n, i) => [n, levelCols.map((k) => content[i].r[k])])) });
+          return;
+        }
+        if (levelAt[j]) return;
+        const cells = content.map((x) => x.r[j]);
+        if (isInput[j]) { columns.push(inputColumn(h, cells, colKeys)); return; }
+        if (!cells.some(Boolean)) return;
+        columns.push({ key: unique(safeKey(h || 'info'), colKeys), header: cut(h || 'Details', 60), help: 'Printed in the document for this row; nothing to fill in.', type: 'computed', rule: { op: 'lookup', by: nameKey, map: Object.fromEntries(names.map((n, i) => [n, cells[i]]).filter(([, v]) => v)) } });
+      });
+      const part: Part = { kind: 'table', key: tKey, label, help: pad('For each row, click the description that fits you best. Click it again to clear your choice.'), rowLabel: 'Row', fixedRows: names, grid: true, columns };
+      pushTable(els, part, names.length);
+      if (derived.length < 8) derived.push({ key: unique(`level_${tKey}`.slice(0, 40), used), label: cut(`Average level: ${label}`, 90), help: 'The average of the levels chosen, counting the first level as 1. Rows with no choice are left out.', rule: { op: 'levelavg', table: tKey, col: levelKey, options } });
+      const ok = names.filter((n) => !PLACEHOLDER.test(n)).slice(0, 2);
+      const pick = options.find((o) => !PLACEHOLDER.test(o));
+      if (ok.length && pick) sampleTables[tKey] = ok.map((n) => ({ [nameKey]: n, [levelKey]: pick }));
+      return;
+    }
 
     // ── Nothing printed in the rows (or only examples): a table of blank rows to fill in ──
     if (isInput.every(Boolean)) {

@@ -73,13 +73,15 @@ export const DOC_CSS = [
   ".ws-grid{width:100%;border-collapse:collapse;font-size:.875rem;line-height:1.5}",
   ".ws-grid th{border:1px solid #E5E2DB;background:#FAF8F4;padding:.5rem .625rem;text-align:left;vertical-align:bottom;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#6B695F}",
   ".ws-grid td{border:1px solid #E5E2DB;padding:.5rem .625rem;vertical-align:top;color:#0E0E0D}",
+  ".ws-grid td.ws-level{padding:0;cursor:pointer}.ws-grid td.ws-level button{padding:.5rem .625rem;min-height:100%;cursor:pointer}.ws-grid td.ws-level:hover{background:#FAF8F4}",
+  ".ws-grid td.ws-level-on{background:#FAF8F4;outline:2px solid #7F611A;outline-offset:-2px;color:#0E0E0D}.ws-grid td.ws-level-on span{color:#7F611A}",
   ".ws-print{display:none}",
-  "@media screen and (max-width:767px){.ws-grid thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}.ws-grid,.ws-grid tbody,.ws-grid tr,.ws-grid td{display:block;width:100%}.ws-grid tr{border:1px solid #E5E2DB;margin-bottom:.75rem}.ws-grid td{border:0;border-top:1px solid #E5E2DB}.ws-grid tr td:first-child{border-top:0}.ws-grid td[data-label]::before{content:attr(data-label);display:block;margin-bottom:.25rem;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#6B695F}}",
+  "@media screen and (max-width:767px){.ws-grid thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}.ws-grid,.ws-grid tbody,.ws-grid tr,.ws-grid td{display:block;width:100%}.ws-grid tr{border:1px solid #E5E2DB;margin-bottom:.75rem}.ws-grid td{border:0;border-top:1px solid #E5E2DB}.ws-grid tr td:first-child{border-top:0}.ws-grid td[data-label]::before{content:attr(data-label);display:block;margin-bottom:.25rem;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#6B695F}.ws-grid td.ws-level[data-label]::before{padding:.5rem .625rem 0;margin-bottom:0}}",
   "@media print{.ws-screen{display:none!important}.ws-print{display:block!important;min-height:1.6em;white-space:pre-wrap}.ws-print-line{border-bottom:1px solid #E5E2DB}.ws-grid th,.ws-grid td{border-color:#6B695F}.ws-grid tr{break-inside:avoid}}",
 ].join("");
 
 /** Help lines the document reader writes when the document itself gives none. In the document layout they are kept as a tooltip, not printed under every question. */
-export const GENERIC_HELP = /^(?:Fill in “|Tick the box when|Choose the one option|Tick every option|Write your answer|Fill in the blank columns|Fill in one row for each entry)/;
+export const GENERIC_HELP = /^(?:Fill in “|Tick the box when|Choose the one option|Tick every option|Write your answer|Fill in the blank columns|Fill in one row for each entry|For each row, click the description)/;
 
 const TICK_BOX = "h-4 w-4 shrink-0 accent-eccellere-gold-deep";
 
@@ -460,6 +462,7 @@ function WorkspaceInner({ slug, def, toolName, sample, doc }: { slug: string; de
     const update = (i: number, col: string, v: string) => setRows(t, rows.map((r, j) => (j === i ? { ...r, [col]: v } : r)));
     const canRemove = !t.fixedRows && rows.length > t.minRows;
     const hideLabel = doc && /^Table: /.test(t.label);
+    const isLevels = (c: Column) => c.type === "select" && c.display === "levels" && !!c.levels && (c.options?.length ?? 0) > 0;
     return (
       <div key={t.key} className="mt-7">
         <p id={`${id}-label`} className={cn("text-sm leading-relaxed font-semibold text-eccellere-ink", hideLabel && "sr-only")}>{t.label}{badge}</p>
@@ -468,12 +471,12 @@ function WorkspaceInner({ slug, def, toolName, sample, doc }: { slug: string; de
           <table className="ws-grid" aria-labelledby={`${id}-label`}>
             <thead>
               <tr>
-                {t.columns.map((c) => (
+                {t.columns.flatMap((c) => (isLevels(c) ? (c.options ?? []).map((o) => <th key={`${c.key}-${o}`} scope="col" title={c.help}>{o}</th>) : [(
                   <th key={c.key} scope="col" title={c.help}>
                     {c.header}{c.unit ? ` (${c.unit})` : ""}
                     {c.type === "rating" && c.scale && !/\d\s*[–-]\s*\d/.test(c.header) && <span className="block font-normal normal-case tracking-normal">{c.scale.min} = {c.scale.low}, {c.scale.max} = {c.scale.high}</span>}
                   </th>
-                ))}
+                )]))}
                 {canRemove && <th className="no-print"><span className="sr-only">Remove</span></th>}
               </tr>
             </thead>
@@ -482,13 +485,25 @@ function WorkspaceInner({ slug, def, toolName, sample, doc }: { slug: string; de
                 const name = t.fixedRows ? r[nameKey] : `${t.rowLabel.toLowerCase()} ${i + 1}`;
                 return (
                   <tr key={i}>
-                    {t.columns.map((c, ci) => (
+                    {t.columns.flatMap((c, ci) => (isLevels(c) ? (c.options ?? []).map((o, oi) => {
+                      // a maturity level: the cell is the choice. Clicking it picks that level for the row; clicking it again clears it.
+                      const on = (r[c.key] ?? "") === o;
+                      const words = c.levels?.[name]?.[oi] ?? "";
+                      return (
+                        <td key={`${c.key}-${o}`} data-label={o} className={cn("ws-level", on && "ws-level-on")}>
+                          <button type="button" aria-pressed={on} aria-label={`${o}: ${name}`} title={on ? "Chosen. Click to clear." : "Click to choose this level"} className="block h-full w-full text-left" onClick={() => update(i, c.key, on ? "" : o)}>
+                            {on && <span className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.08em]">&#10003; Chosen</span>}
+                            <Printed text={words} />
+                          </button>
+                        </td>
+                      );
+                    }) : [(
                       <td key={c.key} data-label={c.header}>
                         {t.fixedRows && ci === 0
                           ? <><span className="font-medium">{r[nameKey]}</span>{t.rowHints?.[r[nameKey]] && <span className="mt-0.5 block text-xs text-ink-light">{t.rowHints[r[nameKey]]}</span>}</>
                           : gridCell(t, c, r, `${id}-${i}-${c.key}`, name, (v) => update(i, c.key, v))}
                       </td>
-                    ))}
+                    )]))}
                     {canRemove && <td className="no-print"><button type="button" aria-label={`Remove ${t.rowLabel.toLowerCase()} ${i + 1}`} className="text-xs text-ink-light underline hover:text-red-700" onClick={() => setRows(t, cleanTable(t, rows.filter((_, j) => j !== i)))}>Remove</button></td>}
                   </tr>
                 );

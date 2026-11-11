@@ -88,8 +88,13 @@ export interface Column {
   options?: readonly string[];
   scale?: RatingScale;
   unit?: string;
-  /** A select column drawn as visible options ('radio') or as one tick box ('tick', Yes when ticked). */
-  display?: 'radio' | 'tick';
+  /**
+   * A select column drawn as visible options ('radio'), as one tick box ('tick', Yes when ticked), or as a maturity grid ('levels'):
+   * one column for each option, each cell holding that row's description of the level, chosen by clicking the cell.
+   */
+  display?: 'radio' | 'tick' | 'levels';
+  /** For 'levels': row name → the description printed under each option, in option order. */
+  levels?: Readonly<Record<string, readonly string[]>>;
   /** In the card layout, two long-text columns marked `half` that follow one another sit side by side instead of one under the other. */
   half?: boolean;
   /** `computed` columns derive their text from the rest of the row (and the model's other values); they are not typed, saved or put in a template. */

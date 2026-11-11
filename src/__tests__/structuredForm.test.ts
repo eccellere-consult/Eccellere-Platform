@@ -127,11 +127,11 @@ describe('a real Word file, read end to end', () => {
     expect(el('Rate honestly').list).toBe(true);
     expect(el('Contract is signed and filed')).toMatchObject({ kind: 'option', mark: 'box' });
     expect(el('Strategic partner')).toMatchObject({ kind: 'option', mark: 'circle' });
-    expect(reading.elements.filter((e) => /^Table 4, row/.test(e.where))).toHaveLength(5);
+    expect(reading.elements.filter((e) => /^Table 5, row/.test(e.where))).toHaveLength(5);
   });
   it('keeps the steps of the document, in order, with nothing added', async () => {
     const { tool } = await made;
-    expect(tool.sections.map((s) => s.title)).toEqual(['Part 1: Supplier details', 'Part 2: Performance assessment', 'Part 3: Readiness checklist', 'Part 4: Action plan']);
+    expect(tool.sections.map((s) => s.title)).toEqual(['Part 1: Supplier details', 'Part 2: Performance assessment', 'Part 3: Maturity of supplier management', 'Part 4: Readiness checklist', 'Part 5: Action plan']);
   });
   it('shows the introduction before the first step and the appendix after the last, as reading', async () => {
     const { tool } = await made;
@@ -139,7 +139,7 @@ describe('a real Word file, read end to end', () => {
     expect(above[0]).toMatchObject({ kind: 'heading', text: 'Supplier Review Toolkit' });
     expect(above.some((b) => b.kind === 'list' && b.items.length === 2)).toBe(true);
     expect(above.some((b) => b.kind === 'table' && b.head.join('|') === 'Rating|Meaning' && b.rows.length === 3)).toBe(true);
-    const below = (tool.sections[3].reading ?? []).filter((b) => b.place === 'below');
+    const below = (tool.sections[4].reading ?? []).filter((b) => b.place === 'below');
     expect(below[0]).toMatchObject({ kind: 'heading', text: 'Appendix: Benchmarks' });
     expect(below.some((b) => b.kind === 'text' && /Typical ranges/.test(b.text))).toBe(true);
     expect(below.some((b) => b.kind === 'table' && b.rows.some((row) => row[1] === 'Under 2 percent'))).toBe(true);
@@ -162,7 +162,7 @@ describe('a real Word file, read end to end', () => {
   });
   it('makes a checklist of tick boxes, and counts the ticks', async () => {
     const { tool } = await made;
-    const ticks = tool.sections[2].parts as DeclField[];
+    const ticks = tool.sections[3].parts as DeclField[];
     expect(ticks.map((t) => t.label)).toEqual(['Contract is signed and filed', 'Service levels are agreed in writing', 'Escalation contacts are named']);
     expect(ticks.every((t) => t.type === 'select' && t.display === 'tick')).toBe(true);
     const out = interpret(tool).outputs!.find((o) => o.key === 'boxes_ticked')!;
@@ -170,11 +170,32 @@ describe('a real Word file, read end to end', () => {
   });
   it('keeps a table of blank rows as a table to fill in, with the same headings, row count and tick column', async () => {
     const { tool } = await made;
-    const t = tool.sections[3].parts[0] as DeclTable;
+    const t = tool.sections[4].parts[0] as DeclTable;
     expect(t.columns.map((c) => c.header)).toEqual(['Action', 'Owner', 'Due date', 'Done']);
     expect(t).toMatchObject({ grid: true, minRows: 4 });
     expect(t.fixedRows).toBeUndefined();
     expect(t.columns[3]).toMatchObject({ type: 'select', display: 'tick' });
+  });
+  it('keeps a maturity model as its table: a row for each area, a column for each level, every description, one level to choose', async () => {
+    const { tool } = await made;
+    const t = tool.sections[2].parts[0] as DeclTable;
+    expect(t).toMatchObject({ grid: true, fixedRows: ['Supplier selection', 'Performance review', 'Risk management'] });
+    expect(t.columns).toHaveLength(2);
+    const level = t.columns[1];
+    expect(level).toMatchObject({ type: 'select', display: 'levels', options: ['Level 1: Initial', 'Level 2: Developing', 'Level 3: Defined', 'Level 4: Leading'] });
+    expect(level.levels!['Performance review']).toEqual(['No regular review takes place.', 'Reviews happen after a problem.', 'Quarterly reviews with agreed measures.', 'Joint improvement plans with key suppliers.']);
+    expect(Object.keys(level.levels!)).toEqual(t.fixedRows);
+    expect(tool.sections[2].reading).toContainEqual({ kind: 'text', text: 'For each area, choose the level that describes you today.', before: t.key });
+  });
+  it('averages the levels chosen, counting the first level as 1 and leaving out rows with no choice', async () => {
+    const { tool } = await made;
+    const t = tool.sections[2].parts[0] as DeclTable;
+    const avg = interpret(tool).derived!.find((d) => d.key.startsWith('level_'))!;
+    const row = (name: string, level: string) => ({ [t.columns[0].key]: name, [t.columns[1].key]: level });
+    // levels 2 and 3 chosen on two of the three rows: (2 + 3) / 2 = 2.5
+    expect(avg.compute({ fields: {}, tables: { [t.key]: [row('Supplier selection', 'Level 2: Developing'), row('Risk management', 'Level 3: Defined')] } })).toBe('2.5 of 4 (from 2 rows)');
+    expect(avg.compute({ fields: {}, tables: { [t.key]: [row('Supplier selection', 'Level 4: Leading')] } })).toBe('4 of 4 (from 1 row)');
+    expect(avg.compute({ fields: {}, tables: {} })).toBeNull();
   });
   it('averages a rating column from what is entered, and nothing else', async () => {
     const { tool } = await made;
@@ -227,6 +248,23 @@ describe('table shapes', () => {
     const ticks = tool.sections[0].parts.filter((p) => p.kind === 'field' && p.display === 'tick');
     expect(ticks.map((t) => t.label)).toEqual(['Set up company email', 'Register the trademark', 'Open a bank account']);
     expect(tool.sections[0].reading!.some((b) => b.kind === 'heading' && b.text === 'Workspace')).toBe(true);
+  });
+  it('reads a maturity table by level names alone, keeps a printed column beside it and a blank column as an input', () => {
+    const t = build([['heading', 'Maturity'], ...filler,
+      ['tablehead', 'Dimension | Weight | Basic | Developing | Advanced | Leading | Evidence'],
+      ['row', 'Planning | High | Plans are made when needed | An annual plan exists | Plans are reviewed quarterly | Plans adapt to live data | '],
+      ['row', 'Data | Medium | Data sits in spreadsheets | Some data is shared | One source of truth | Data drives daily decisions | '],
+    ]).sections[0].parts.find((p) => p.kind === 'table') as DeclTable;
+    expect(t.columns.map((c) => c.header)).toEqual(['Dimension', 'Weight', 'Level chosen', 'Evidence']);
+    expect(t.columns[1]).toMatchObject({ type: 'computed', rule: { op: 'lookup' } });
+    expect(t.columns[2]).toMatchObject({ display: 'levels', options: ['Basic', 'Developing', 'Advanced', 'Leading'] });
+    expect(t.columns[3]).toMatchObject({ type: 'longtext' });
+  });
+  it('does not take a scoring grid with empty cells, or an ordinary table, for a maturity model', () => {
+    const scoring = build([['heading', 'Scores'], ...filler, ['tablehead', 'Question | 1 | 2 | 3 | 4'], ['row', 'Is the plan written down | | | | '], ['row', 'Is the plan reviewed | | | | ']]).sections[0].parts.find((p) => p.kind === 'table') as DeclTable;
+    expect(scoring.columns.some((c) => c.display === 'levels')).toBe(false);
+    const plain = build([['heading', 'Plain'], ...filler, ['tablehead', 'Activity | Owner | Notes'], ['row', 'Review the contract | Buyer | '], ['row', 'Agree the measures | Manager | ']]).sections[0].parts.find((p) => p.kind === 'table') as DeclTable;
+    expect(plain.columns.some((c) => c.display === 'levels')).toBe(false);
   });
   it('keeps two rows that read the same as two rows', () => {
     const t = build([['heading', 'Repeat'], ...filler, ['tablehead', 'Item | Notes'], ['row', 'Review | '], ['row', 'Review | ']]).sections[0].parts.find((p) => p.kind === 'table') as DeclTable;
