@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { Hero } from "@/components/home/Hero";
@@ -12,6 +13,9 @@ import { ChatbotTeaser } from "@/components/home/ChatbotTeaser";
 import { Perspectives } from "@/components/home/Perspectives";
 import { Testimonials } from "@/components/home/Testimonials";
 import { SpecialistCTA } from "@/components/home/SpecialistCTA";
+
+// The official address of the home page, so Google treats www and non-www as one page.
+export const metadata: Metadata = { alternates: { canonical: "/" } };
 
 export default function Home() {
   return (

@@ -100,12 +100,14 @@ export const metadata: Metadata = {
     locale: "en_IN",
     url: "https://eccellere.co.in",
     siteName: "Eccellere+",
+    images: [{ url: "/eccellere-banner.png", width: 1735, height: 907, alt: "Eccellere+" }],
     title: "Eccellere+ — Industry and function specific strategy and operations assets",
     description:
       "Deeper industry and function specific strategic planning and operations assets, frameworks and toolkits.",
   },
   twitter: {
     card: "summary_large_image",
+    images: ["/eccellere-banner.png"],
     title: "Eccellere+ — Industry and function specific strategy and operations assets",
     description:
       "Deeper industry and function specific strategic planning and operations assets, frameworks and toolkits.",
