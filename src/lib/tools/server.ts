@@ -73,7 +73,7 @@ export async function resetSkill(kind: SkillKind): Promise<void> {
 export function realDrafter() {
   return makeDrafter({
     // drafting a tool page is important work: strongest models first
-    generate: (a) => generateText({ ...a, quality: true }),
+    generate: (a) => generateText({ capability: 'tool_draft', module: 'tool_library', ...a, quality: true }),
     getSkill: async () => {
       const info = await loadSkillInfo('draft');
       return info.isCustom ? info.text : undefined;
@@ -122,7 +122,7 @@ export async function userTool(slug: string): Promise<{ error: NextResponse } | 
 
 /** The AI helpers wired to the providers chosen in the admin AI settings and the saved assist skill. */
 export const realAiDeps: AiDeps = {
-  generate: (a) => generateText(a),
+  generate: (a) => generateText({ capability: 'tool_assist', module: 'tool_library', ...a }),
   getSkill: async () => {
     const info = await loadSkillInfo('assist');
     return info.isCustom ? info.text : undefined;

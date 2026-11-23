@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateText } from "@/lib/ai/gateway";
+import { labelled } from "@/lib/ai/gateway";
 import { prismaRepo } from "@/lib/tools/prismaRepo";
 import { aiReady, audit, readAuth, toolsGuard, writeAuth } from "@/lib/tools/server";
 import { aiRefine, approveClassification, catalogue } from "@/lib/tools/classify";
@@ -43,7 +43,7 @@ export const POST = toolsGuard(async (req: NextRequest) => {
   const slugs = new Set(Array.isArray(body?.slugs) ? body!.slugs.filter((s): s is string => typeof s === "string").slice(0, 25) : []);
   const rows = (await catalogue(prismaRepo)).filter((r) => slugs.has(r.slug));
   if (!rows.length) return NextResponse.json({ error: "Choose at least one tool." }, { status: 400 });
-  const suggestions = await aiRefine((a) => generateText(a), rows);
+  const suggestions = await aiRefine(labelled("tool_classification", "tool_library"), rows);
   if (!suggestions.length) return NextResponse.json({ error: "The AI did not give a usable answer. Try again.", code: "AI_FAILED" }, { status: 502 });
   return NextResponse.json({ suggestions });
 });

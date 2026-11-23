@@ -10,6 +10,7 @@
  */
 
 import { LEVERS, SCREENING, DRILLDOWNS, QUESTION_BY_ID, type LeverId } from "./questions";
+import { aiops } from "@/lib/aiops";
 
 type AnswerValue = number | "yes" | "no";
 type AnswerMap = Record<string, AnswerValue>;
@@ -233,7 +234,10 @@ Rules:
 - Use Indian terms (₹, lakh, crore) where amounts are mentioned.`;
 
   try {
-    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    const res = await aiops.trackedFetch(
+      { provider: "groq", model: "llama-3.3-70b-versatile", capability: "wc_diagnostic_narrative", module: "wc_diagnostic" },
+      "https://api.groq.com/openai/v1/chat/completions",
+      {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -248,7 +252,8 @@ Rules:
           { role: "user", content: prompt },
         ],
       }),
-    });
+    }
+    );
     if (!res.ok) {
       console.error("[wc-analyze] groq non-200", res.status, await res.text().catch(() => ""));
       return null;

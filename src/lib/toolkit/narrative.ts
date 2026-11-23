@@ -159,8 +159,8 @@ export interface NarrativeResult {
 }
 
 async function defaultGenerator(): Promise<NarrativeGenerator> {
-  const { generateText } = await import("@/lib/ai/gateway");
-  return generateText;
+  const { labelled } = await import("@/lib/ai/gateway");
+  return labelled("toolkit_narrative", "toolkit");
 }
 
 export async function draftNarrative(input: NarrativeInput & { gen?: NarrativeGenerator }): Promise<NarrativeResult> {

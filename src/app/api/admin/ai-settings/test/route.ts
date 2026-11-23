@@ -33,6 +33,7 @@ async function POST_(req: NextRequest) {
   clearAiSettingsCache();
   const diag: string[] = [];
   const out = await generateText({
+    capability: "ai_connectivity_check", module: "admin",
     system: "You are a connectivity check. Reply with the single word OK.",
     user: "Reply OK",
     maxTokens: 10,

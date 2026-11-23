@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { aiops } from "@/lib/aiops";
 import { prisma } from "@/lib/prisma";
 
 const CATEGORIES = [
@@ -93,7 +94,10 @@ export async function POST(req: NextRequest) {
 
   let groqResponse: Response;
   try {
-    groqResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    groqResponse = await aiops.trackedFetch(
+      { provider: "groq", model: "llama-3.3-70b-versatile", capability: "asset_listing_generate", module: "marketplace" },
+      "https://api.groq.com/openai/v1/chat/completions",
+      {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -111,7 +115,8 @@ export async function POST(req: NextRequest) {
         temperature: 0.6,
         max_tokens: 2500,
       }),
-    });
+    }
+    );
   } catch {
     return NextResponse.json(
       { error: "Failed to reach AI service. Please try again." },

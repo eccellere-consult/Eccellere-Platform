@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateText } from "@/lib/ai/gateway";
+import { labelled } from "@/lib/ai/gateway";
 import { prismaRepo } from "@/lib/tools/prismaRepo";
 import { completeTool, confirmOriginator, editTool, redraftTool } from "@/lib/tools/review";
 import { archiveTool, deleteTool, markReviewed, publishTool, restoreTool, setToolCategory, setToolPractice, unpublishTool } from "@/lib/tools/service";
@@ -75,13 +75,13 @@ export const POST = toolsGuard(async (req: NextRequest, ctx: Ctx) => {
         year: typeof body.year === "string" ? body.year : undefined,
       }));
     case "complete": {
-      const r = await completeTool(prismaRepo, slug, (a) => generateText(a));
+      const r = await completeTool(prismaRepo, slug, labelled("tool_complete", "tool_library"));
       return done("completed", r.tool, { added: r.added, notes: r.notes });
     }
     case "fix": {
       // "Fix with AI" (no instruction) corrects the listed problems; "Modify with AI" (an instruction) changes the page as asked
       const skill = await loadSkillInfo("draft");
-      const r = await fixTool(prismaRepo, slug, (a) => generateText(a), {
+      const r = await fixTool(prismaRepo, slug, labelled("tool_fix", "tool_library"), {
         instruction: typeof body.instruction === "string" ? body.instruction : "",
         skill: skill.isCustom ? skill.text : undefined,
       });

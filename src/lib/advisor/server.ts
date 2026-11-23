@@ -1,7 +1,7 @@
 /** Server-side wiring for the Advisor: the on/off switch, the protected-name list, the content it can search, and the AI gateway. */
 import { prisma } from "@/lib/prisma";
 import { prismaRepo } from "@/lib/tools/prismaRepo";
-import { generateText } from "@/lib/ai/gateway";
+import { labelled } from "@/lib/ai/gateway";
 import { buildCorpus, type LibraryChunk, type Passage } from "./knowledge";
 import type { Deps } from "./respond";
 
@@ -60,5 +60,5 @@ async function loadCorpus(): Promise<Passage[]> {
 
 export async function loadDeps(): Promise<Deps> {
   const [enabled, names, passages] = await Promise.all([advisorEnabled(), protectedNames(), loadCorpus()]);
-  return { enabled, protectedNames: names, corpus: passages, generate: (a) => generateText(a) };
+  return { enabled, protectedNames: names, corpus: passages, generate: labelled("advisor_answer", "advisor") };
 }

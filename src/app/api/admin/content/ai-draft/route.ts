@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { aiops } from "@/lib/aiops";
 
 export const dynamic = "force-dynamic";
 
@@ -83,7 +84,10 @@ export async function POST(req: NextRequest) {
 
   let response: Response;
   try {
-    response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    response = await aiops.trackedFetch(
+      { provider: "groq", model: "llama-3.3-70b-versatile", capability: "content_ai_draft", module: "content_admin" },
+      "https://api.groq.com/openai/v1/chat/completions",
+      {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -98,7 +102,8 @@ export async function POST(req: NextRequest) {
           { role: "user", content: userPrompt },
         ],
       }),
-    });
+    }
+    );
   } catch {
     return NextResponse.json(
       { error: "Failed to reach AI service." },
