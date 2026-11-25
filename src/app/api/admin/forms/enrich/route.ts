@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateText } from "@/lib/ai/gateway";
+import { labelled } from "@/lib/ai/gateway";
 import { prismaRepo } from "@/lib/tools/prismaRepo";
 import { ToolsError } from "@/lib/tools/service";
 import { fixTool } from "@/lib/tools/repair";
@@ -30,7 +30,7 @@ export const POST = toolsGuard(async (req: NextRequest) => {
   if (!before.gaps.length) return NextResponse.json({ applied: false, before: before.score, after: before.score, notes: ["Already meets the standard depth for its type."] });
   try {
     const skill = await loadSkillInfo("draft");
-    const r = await fixTool(prismaRepo, slug, (a) => generateText(a), {
+    const r = await fixTool(prismaRepo, slug, labelled("tool_enrich", "tool_library"), {
       instruction: enrichInstruction(row.classification.type, before.gaps, { areas: row.classification.areas, sectors: row.classification.sectors }),
       skill: skill.isCustom ? skill.text : undefined,
     });

@@ -5,6 +5,8 @@
  * database) hold toggles, model names and ordering, never secrets.
  */
 
+import type { AiCallEvent } from "../aiops/hook";
+
 export type ProviderId = "anthropic" | "openai" | "groq" | "xai";
 export type ProviderKind = "anthropic" | "openai-compatible";
 
@@ -147,6 +149,12 @@ export interface GenerateArgs {
   quality?: boolean;
   /** pictures to read (base64, no data: prefix). Only providers that can see pictures are tried when this is set. */
   images?: ImageInput[];
+  /** what kind of task this is (a short stable code, e.g. "form_build"); only used to label the AI Control Tower report, never sent to the provider */
+  capability?: string;
+  /** which part of the site the task belongs to (e.g. "form_builder"); label for the Control Tower report only */
+  module?: string;
+  /** internal: 1 when this call is the second try on the same provider */
+  retry?: number;
 }
 export interface ImageInput { mediaType: "image/png" | "image/jpeg" | "image/webp" | "image/gif"; data: string }
 /** For important work: the strongest providers first. The model is the admin's choice when set; otherwise the strongest Claude. */
@@ -160,6 +168,16 @@ export interface GenerateResult {
   model: string;
   /** "stop" | "length" | other provider value; undefined if the provider did not say */
   finishReason?: string;
+}
+
+/**
+ * Optional listener told about every finished provider call (the AI Control Tower hook, registered in ai/gateway.ts).
+ * It receives technical fields only (no prompt, no answer) and can never break a call.
+ */
+let aiCallObserver: ((e: AiCallEvent) => void) | null = null;
+export function setAiCallObserver(fn: ((e: AiCallEvent) => void) | null) { aiCallObserver = fn; }
+function emitAiCall(e: AiCallEvent) {
+  try { aiCallObserver?.(e); } catch { /* reporting must never break an AI call */ }
 }
 
 const JSON_ONLY = "\n\nReply with one valid JSON object only. No markdown fences, no text before or after it.";
@@ -186,6 +204,10 @@ export async function callProvider(
   }
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), a.timeoutMs ?? 25000);
+  const started = Date.now();
+  let status: AiCallEvent["status"] = "failed";
+  let errorCode: string | undefined = "network";
+  let usage: unknown;
   try {
     if (p.kind === "anthropic") {
       const res = await fetch(p.baseUrl, {
@@ -200,15 +222,18 @@ export async function callProvider(
         }),
       });
       if (!res.ok) {
+        errorCode = `http_${res.status}`;
         await recordHttp(a, p, res, key);
         return null;
       }
       const data = await res.json();
+      usage = data?.usage;
       if (a.finish) a.finish.reason = data.stop_reason === "max_tokens" ? "length" : data.stop_reason ?? undefined;
       const text = (data.content ?? [])
         .filter((b: { type: string }) => b.type === "text")
         .map((b: { text: string }) => b.text)
         .join("");
+      status = text ? "success" : "failed"; errorCode = text ? undefined : "empty_answer";
       return text || null;
     }
     const res = await fetch(p.baseUrl, {
@@ -225,17 +250,27 @@ export async function callProvider(
       }),
     });
     if (!res.ok) {
+      errorCode = `http_${res.status}`;
       await recordHttp(a, p, res, key);
       return null;
     }
     const data = await res.json();
+    usage = data?.usage;
     if (a.finish) a.finish.reason = data.choices?.[0]?.finish_reason ?? undefined;
-    return data.choices?.[0]?.message?.content ?? null;
+    const answer = data.choices?.[0]?.message?.content ?? null;
+    status = answer ? "success" : "failed"; errorCode = answer ? undefined : "empty_answer";
+    return answer;
   } catch (e) {
-    a.diag?.push(`${p.label}: ${(e as Error)?.name === "AbortError" ? "timed out" : "network error"}`);
+    const timedOut = (e as Error)?.name === "AbortError";
+    status = timedOut ? "timeout" : "failed"; errorCode = timedOut ? "timeout" : "network";
+    a.diag?.push(`${p.label}: ${timedOut ? "timed out" : "network error"}`);
     return null;
   } finally {
     clearTimeout(t);
+    emitAiCall({
+      provider: p.id, model, kind: p.kind, capability: a.capability, module: a.module,
+      status, errorCode, latencyMs: Date.now() - started, retryCount: a.retry ?? 0, usage,
+    });
   }
 }
 
@@ -263,7 +298,7 @@ export async function runProviders(
     if (!text && a.quality && model !== standard) {
       a.diag?.push(`${p.label}: ${model} did not answer, trying ${standard}`);
       usedModel = standard;
-      text = await callProvider(p, standard, { ...a, finish }, env);
+      text = await callProvider(p, standard, { ...a, finish, retry: 1 }, env);
     }
     if (text) {
       if (a.finish) a.finish.reason = finish.reason;

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ExtractError } from "@/lib/tools/extract";
-import { generateText } from "@/lib/ai/gateway";
+import { labelled } from "@/lib/ai/gateway";
 import { aiReady, toolsGuard, writeAuth } from "@/lib/tools/server";
 import { readSources, sourcePages } from "@/lib/forms/source";
 import { makeImageReader } from "@/lib/forms/image";
@@ -34,7 +34,7 @@ export const POST = toolsGuard(async (req: NextRequest) => {
   if (files.length) {
     try {
       // pictures are transcribed by a vision AI; without AI the reader is absent and a picture gets a plain-words refusal
-      const readImage = (await aiReady()) ? makeImageReader((a) => generateText(a)) : undefined;
+      const readImage = (await aiReady()) ? makeImageReader(labelled("form_image_reading", "form_builder")) : undefined;
       readings = await readSources(await Promise.all(files.map(async (f) => ({ name: f.name, data: Buffer.from(await f.arrayBuffer()) }))), { readImage });
     } catch (e) {
       if (e instanceof ExtractError) return NextResponse.json({ error: e.message, code: e.code }, { status: e.code === "TOO_LARGE" ? 413 : e.code === "UNSUPPORTED" ? 415 : 422 });
@@ -46,7 +46,7 @@ export const POST = toolsGuard(async (req: NextRequest) => {
   // What to search the catalogue with: the request, and for an upload the file names and its headings and first questions.
   const hints = elements.filter((e) => e.kind === "heading" || e.kind === "question").slice(0, 20).map((e) => e.text);
   const query = [request, ...readings.map((r) => r.fileName.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ")), ...hints].join(" ");
-  const found = await findTemplates({ request: query, candidates: await templateCandidates(), generate: (await aiReady()) ? (a) => generateText(a) : undefined });
+  const found = await findTemplates({ request: query, candidates: await templateCandidates(), generate: (await aiReady()) ? labelled("form_template_search", "form_builder") : undefined });
 
   const counts: Record<string, number> = {};
   for (const e of elements) counts[e.kind] = (counts[e.kind] ?? 0) + 1;

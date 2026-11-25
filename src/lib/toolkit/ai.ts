@@ -9,8 +9,8 @@ export type Generator = (a: { system: string; user: string; maxTokens: number; t
 
 /** Default generator uses the admin-selected provider(s). Loaded lazily so tests can inject a mock. */
 async function defaultGenerator(): Promise<Generator> {
-  const { generateText } = await import("@/lib/ai/gateway");
-  return generateText;
+  const { labelled } = await import("@/lib/ai/gateway");
+  return labelled("toolkit_draft", "toolkit");
 }
 async function isAvailable(gen?: Generator): Promise<boolean> {
   if (gen) return true;

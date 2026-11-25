@@ -111,6 +111,21 @@ These are read by the running app. **All are required** — missing any one will
 
 Canonical template: [.env.production.example](.env.production.example).
 
+### Optional: AI Control Tower (`AIOPS_ENDPOINT`, `AIOPS_KEY`)
+
+These two settings are **optional**. Left empty or missing, the site does nothing extra: no network call, no error, no log line.
+When both are set, every AI call the site makes reports technical fields only (provider, model, token counts, time, status, a task code)
+to the private Control Tower at `https://aiops.eccellere.co.in`. It never sends prompts, answers, names, e-mails, phone numbers or any cost.
+A slow or down Control Tower cannot slow or break the site (2-second limit, fire-and-forget).
+
+| Variable | Value |
+|---|---|
+| `AIOPS_ENDPOINT` | `https://aiops.eccellere.co.in/api/v1` |
+| `AIOPS_KEY` | the key made in the Control Tower under **Configuration → eccellere_co → Make the key** (shown once) |
+
+App code in the Control Tower: `eccellere_co`. Code: `src/lib/aiops/` (client file, hook), wired in `src/lib/ai/gateway.ts` and four direct calls.
+**After adding the two settings and redeploying, re-check ALL settings in the list above** (see §5 and §6: a Redeploy has wiped `SetEnv` lines before).
+
 ### Where they live on the server
 
 Hostinger stores these as `SetEnv` directives inside:
