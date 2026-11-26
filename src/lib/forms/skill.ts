@@ -79,7 +79,18 @@ Approximations you may make, and MUST report in "approximations": a date becomes
 
 ## 10. References for the level of depth expected
 These Eccellere pages show the quality bar: a framework page that explains the model, how to read it, when to use it and what it feeds (the Ansoff Matrix tool); a multi-step diagnostic with grouped dimensions, a five-point scale and instant results (the Growth Mindset Assessment); a maturity model by function (the Sourcing and Procurement operating-excellence model); a guided discovery workshop (the AI Discovery Studio). Match their clarity and usefulness; never copy their content.
+
+## 11. Method templates with connected steps (8D, A3, DMAIC, PDCA, root cause and corrective action forms)
+Many problem-solving and improvement documents are a chain: each step works on what the step before produced. Build the chain so the person never retypes an earlier answer.
+- One section per step of the method, in the document's order, with the document's own step names and numbers (for example "D4 Root cause analysis").
+- A step that repeats per item (each root cause, each corrective action, each team member) is a TABLE, not a set of numbered fields.
+- When a step works on the entries of an earlier table, give the column that names the earlier entry "optionsFrom": {"table": <earlier table key>, "col": <its column>}, on a TEXT column. Example: in D5 the "root_cause" column of the corrective actions table points at the D4 root causes table's "cause" column. The person picks from what they wrote; they can still type something new.
+- When a step needs an earlier answer in view (the problem statement in D4, the containment actions in D6), add "recall": [the earlier field or table keys] to that section. Recall only what the step really uses: one to four keys.
+- Links only point BACK to earlier steps. Never link a table to itself.
+- Tables in the document that are guidance (a list of the method's questions, a checklist of what good looks like, a worked example) become help text, select options or reading, not answer fields. The document's text is also kept with the form as background for the AI help, so the help text can stay short.
+- Checks and sign-offs at the end of a step (verified by, date, effective yes/no) are fields of that step.
 `;
+
 
 /** What the builder tells the AI to return in addition to the tool page itself. Fixed in code: the skill cannot change it. */
 export const FORM_EXTRAS = `

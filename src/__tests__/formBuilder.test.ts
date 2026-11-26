@@ -283,7 +283,7 @@ const base = { category: 'Strategy' as const, practice: 'Strategy' as never };
 describe('building a form', () => {
   it('builds a draft from a prompt, never published, with a blank originator and a unique slug', async () => {
     const calls: { system: string; user: string }[] = [];
-    const build = makeFormBuilder(deps(async (a: never) => { calls.push(a); return reply({ ...goodTool(), status: 'PUBLISHED', reference: { ...EXAMPLE_TOOL.reference, originator: 'Somebody', year: '1999' } }); }, ['supplier-review']));
+    const build = makeFormBuilder(deps(async (a: never) => { calls.push(a); return reply({ ...goodTool(), guidance: 'Invented by the AI', status: 'PUBLISHED', reference: { ...EXAMPLE_TOOL.reference, originator: 'Somebody', year: '1999' } }); }, ['supplier-review']));
     const out = await build({ ...base, request: 'A supplier review form for a small auto-parts business' });
     expect(out.kind).toBe('ok');
     if (out.kind !== 'ok') return;
@@ -293,6 +293,7 @@ describe('building a form', () => {
     expect(out.coverage).toBeNull();
     expect((out.tool.provenance as { formBuilder: { mode: string } }).formBuilder.mode).toBe('prompt');
     expect(calls[0].system).toContain('Eccellere form-builder skill');
+    expect((out.tool.definition as DeclarativeTool).guidance).toBeUndefined();
   });
 
   it('builds from an upload, labels the file as data, ignores instructions inside it, and reports coverage', async () => {
@@ -311,6 +312,8 @@ describe('building a form', () => {
     expect(out.coverage!.counts.proposed).toBe(1); // the AI cannot close it; a person must
     expect(out.tool.quality!.warnings.join(' ')).toMatch(/proposes leaving out 1 item/);
     expect(out.tool.quality!.warnings.join(' ')).toMatch(/Assumption: Audience/);
+    // the document's own words stay with the form as background for the AI help
+    expect((out.tool.definition as DeclarativeTool).guidance).toContain('What does success look like?');
     expect(modeOf({ readings: [reading] })).toBe('upload');
   });
 

@@ -97,6 +97,11 @@ export interface Column {
   levels?: Readonly<Record<string, readonly string[]>>;
   /** In the card layout, two long-text columns marked `half` that follow one another sit side by side instead of one under the other. */
   half?: boolean;
+  /**
+   * A linked text column: its suggested answers are the entries already made in a column of an EARLIER table (for example, each corrective
+   * action names the root cause it fixes). The person can pick one or type their own; the answer is saved as plain text.
+   */
+  optionsFrom?: { table: string; col: string };
   /** `computed` columns derive their text from the rest of the row (and the model's other values); they are not typed, saved or put in a template. */
   compute?: (row: Row, v: ModelValues) => string;
 }
@@ -164,6 +169,8 @@ export interface Section {
   parts: Part[];
   /** Reading from a source document, shown in place among the parts. */
   reading?: ReadingBlock[];
+  /** Keys of fields or tables from EARLIER sections, shown read-only at the top of this section so each step builds on the last. */
+  recall?: string[];
 }
 
 export type Tone = 'good' | 'warn' | 'bad' | 'neutral';

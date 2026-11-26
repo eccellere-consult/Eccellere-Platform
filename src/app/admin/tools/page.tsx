@@ -95,7 +95,8 @@ export default function AdminToolsPage() {
     const r = await fetch("/api/admin/tools/extract", { method: "POST", body: form });
     const d = await readJson(r);
     if (!r.ok) throw new Error(d.error ?? "Could not read that file.");
-    return `${d.text}${d.truncated ? "\n\n[Only the first part of the document was kept.]" : ""}`;
+    const scan = d.aiRead ? "[This PDF is a scan. Its text was read by AI, not copied from the file: check it against the original.]\n\n" : "";
+    return `${scan}${d.text}${d.truncated ? "\n\n[Only the first part of the document was kept.]" : ""}`;
   }
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {

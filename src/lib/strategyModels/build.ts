@@ -22,7 +22,7 @@ export const rating = (key: string, label: string, help: string, scale: Partial<
 export const num = (key: string, label: string, help: string, unit: string, example: string, extra: FieldExtra = {}): FieldPart =>
   ({ kind: 'field', key, label, type: 'number', help, example, unit, ...extra });
 
-type ColExtra = Partial<Pick<Column, 'unit' | 'options' | 'scale' | 'half'>>;
+type ColExtra = Partial<Pick<Column, 'unit' | 'options' | 'scale' | 'half' | 'optionsFrom'>>;
 
 /** Column constructors. */
 export const col = {

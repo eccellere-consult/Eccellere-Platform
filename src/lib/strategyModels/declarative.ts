@@ -69,7 +69,7 @@ export type Rule =
 // ── The declarative tool ─────────────────────────────────────────────────────────────────────────────────────────────
 
 export interface DeclField { kind: 'field'; key: string; label: string; type: FieldType; help: string; example?: string; options?: string[]; scale?: Partial<RatingScale>; unit?: string; display?: FieldDisplay }
-export interface DeclColumn { key: string; header: string; help: string; type: ColumnType; options?: string[]; scale?: Partial<RatingScale>; unit?: string; half?: boolean; rule?: Rule; display?: 'radio' | 'tick' | 'levels'; levels?: Record<string, string[]> }
+export interface DeclColumn { key: string; header: string; help: string; type: ColumnType; options?: string[]; scale?: Partial<RatingScale>; unit?: string; half?: boolean; rule?: Rule; display?: 'radio' | 'tick' | 'levels'; levels?: Record<string, string[]>; /** text columns only: suggested answers taken from a column of an earlier table */ optionsFrom?: { table: string; col: string } }
 export interface DeclTable {
   kind: 'table'; key: string; label: string; help: string; rowLabel: string; columns: DeclColumn[];
   fixedRows?: string[]; rowHints?: Record<string, string>; minRows?: number; maxRows?: number;
@@ -79,7 +79,7 @@ export interface DeclTable {
   board?: { spec: BoardSpec; regions?: string[]; statuses?: string[]; scale?: Partial<RatingScale> };
 }
 export type DeclPart = DeclField | DeclTable;
-export interface DeclSection { key: string; title: string; summary: string; parts: DeclPart[]; reading?: ReadingBlock[] }
+export interface DeclSection { key: string; title: string; summary: string; parts: DeclPart[]; reading?: ReadingBlock[]; /** keys of fields or tables from earlier sections, shown read-only at the top */ recall?: string[] }
 export interface DeclDerived { key: string; label: string; help?: string; rule: Rule }
 export interface DeclOutput { key: string; label: string; rule: Rule; conditional?: boolean }
 /** A worked example. It is optional and, when an AI drafted it, labelled as such; `analysis` is optional because an AI-drafted tool has no authored verdict. */
@@ -111,7 +111,14 @@ export interface DeclarativeTool {
   layout?: 'document';
   /** The source document itself, drawn as the page; its blanks are bound to the parts above. See document.ts. */
   document?: DocBlock[];
+  /**
+   * Reference text from the document the tool was built from (its method, steps, terms and tables), kept so the AI help can use it as
+   * background. Never shown as an answer, never treated as facts about the person's business, at most GUIDANCE_MAX characters.
+   */
+  guidance?: string;
 }
+
+export const GUIDANCE_MAX = 12_000;
 
 // ── Reading a rule ───────────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -330,7 +337,7 @@ function partOf(p: DeclPart, cm?: ComputedMap): Part {
       case 'select': return { ...col.select(c.key, c.header, c.help, c.options ?? []), ...(c.display ? { display: c.display } : {}), ...(c.display === 'levels' && c.levels ? { levels: c.levels } : {}) };
       case 'rating': return col.rating(c.key, c.header, c.help, c.scale ?? {});
       case 'computed': { const f = ruleFn(c.rule ?? { op: 'template', text: '' }, cm); return col.computed(c.key, c.header, c.help, (row, v) => f(row, v) ?? ''); }
-      default: return col.text(c.key, c.header, c.help, { half: c.half });
+      default: return col.text(c.key, c.header, c.help, { half: c.half, ...(c.optionsFrom ? { optionsFrom: c.optionsFrom } : {}) });
     }
   });
   return { ...table(p.key, p.label, p.help, p.rowLabel, columns, { fixed: p.fixedRows, hints: p.rowHints, min: p.minRows, max: p.maxRows }), ...(p.grid ? { grid: true } : {}) };
@@ -348,7 +355,7 @@ function computedMapOf(tool: DeclarativeTool): ComputedMap {
 
 export function interpret(tool: DeclarativeTool): ModelDefinition {
   const cm = computedMapOf(tool);
-  const sections: Section[] = tool.sections.map((s) => ({ ...section(s.key, s.title, s.summary, ...s.parts.map((p) => partOf(p, cm))), ...(s.reading?.length ? { reading: s.reading } : {}) }));
+  const sections: Section[] = tool.sections.map((s) => ({ ...section(s.key, s.title, s.summary, ...s.parts.map((p) => partOf(p, cm))), ...(s.reading?.length ? { reading: s.reading } : {}), ...(s.recall?.length ? { recall: s.recall } : {}) }));
   const derived: Derived[] = (tool.derived ?? []).map((d) => { const f = ruleFn(d.rule, cm); return { key: d.key, label: d.label, help: d.help, compute: (v) => f(undefined, v), tone: toneFn(d.rule, cm) }; });
   const outputs: Output[] = (tool.outputs ?? []).map((o) => { const f = ruleFn(o.rule, cm); return { key: o.key, label: o.label, compute: (v) => f(undefined, v), conditional: o.conditional }; });
   return { toolId: tool.slug, reference: tool.reference, sections, derived, outputs, analysisGuide: tool.analysisGuide };
@@ -369,6 +376,76 @@ const SNAKE = /^[a-z][a-z0-9_]*$/;
  * The checks a declarative tool must pass before it is published (errors block, warnings do not). They mirror what the content tests demand of a
  * hand-coded definition, plus the checks that stored data needs (every rule refers to something that exists).
  */
+// ── Linked steps ────────────────────────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * What each step may link to: a section's `recall` names fields or tables of EARLIER sections; a column's `optionsFrom` names a typed column
+ * of a table in an earlier section or earlier in the same section (never itself). Pointing forward or at something missing is an error.
+ */
+export function linkProblems(t: Pick<DeclarativeTool, 'sections'>): { path: string; message: string }[] {
+  const out: { path: string; message: string }[] = [];
+  const at = new Map<string, number>();
+  const cols = new Map<string, Set<string>>();
+  (t.sections ?? []).forEach((s, si) => (s.parts ?? []).forEach((p) => {
+    if (!at.has(p.key)) at.set(p.key, si);
+    if (p.kind === 'table' && !p.board) cols.set(p.key, new Set((p.columns ?? []).filter((c) => c.type !== 'computed').map((c) => c.key)));
+  }));
+  (t.sections ?? []).forEach((s, si) => {
+    for (const k of s.recall ?? []) {
+      const where = at.get(k);
+      if (where === undefined) out.push({ path: `sections[${si}].recall`, message: `recall names ${k}, which is not a field or table of this tool` });
+      else if (where >= si) out.push({ path: `sections[${si}].recall`, message: `recall names ${k}, which is not in an earlier step` });
+    }
+    (s.parts ?? []).forEach((p, pi) => {
+      if (p.kind !== 'table' || p.board) return;
+      (p.columns ?? []).forEach((c, ci) => {
+        if (!c.optionsFrom) return;
+        const path = `sections[${si}].parts[${pi}].columns[${ci}].optionsFrom`;
+        const where = at.get(c.optionsFrom.table);
+        if (c.type !== 'text') out.push({ path, message: `optionsFrom on ${c.key} can be used only on a text column` });
+        else if (c.optionsFrom.table === p.key) out.push({ path, message: `optionsFrom on ${c.key} cannot point at its own table` });
+        else if (where === undefined || !cols.get(c.optionsFrom.table)?.has(c.optionsFrom.col)) out.push({ path, message: `optionsFrom names ${c.optionsFrom.table}.${c.optionsFrom.col}, which is not a column of an earlier table` });
+        else if (where > si) out.push({ path, message: `optionsFrom names ${c.optionsFrom.table}, which comes in a later step` });
+      });
+    });
+  });
+  return out;
+}
+
+/** Links an AI drafted that point nowhere are removed (the step still works without them). Returns what was removed, in plain words. */
+export function dropBrokenLinks(t: DeclarativeTool): string[] {
+  const notes: string[] = [];
+  const known = new Set(t.sections.flatMap((s) => s.parts.map((p) => p.key)));
+  const before = new Set<string>();
+  for (const s of t.sections) {
+    if (s.recall) {
+      const keep = s.recall.filter((k) => before.has(k));
+      for (const k of s.recall) if (!before.has(k)) notes.push(`Removed a link to ${k} from "${s.title}": ${known.has(k) ? 'it is not in an earlier step' : 'there is no such field or table'}.`);
+      if (keep.length) s.recall = keep; else delete s.recall;
+    }
+    for (const p of s.parts) before.add(p.key);
+  }
+  for (const b of linkProblems(t)) {
+    const m = /^sections\[(\d+)\]\.parts\[(\d+)\]\.columns\[(\d+)\]/.exec(b.path);
+    if (!m) continue;
+    const p = t.sections[Number(m[1])]?.parts[Number(m[2])];
+    if (p?.kind === 'table' && p.columns[Number(m[3])]) { delete p.columns[Number(m[3])].optionsFrom; notes.push(`Removed a link that did not work: ${b.message}.`); }
+  }
+  return notes;
+}
+
+/** The suggested answers for a linked column: the distinct entries already made in the column it points at, in order. */
+export function linkedChoices(c: { optionsFrom?: { table: string; col: string } }, v: ModelValues): string[] {
+  if (!c.optionsFrom) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const r of v.tables[c.optionsFrom.table] ?? []) {
+    const x = (r[c.optionsFrom.col] ?? '').trim();
+    if (x && !seen.has(x.toLowerCase())) { seen.add(x.toLowerCase()); out.push(x); }
+  }
+  return out.slice(0, 100);
+}
+
 export function validateDeclarative(raw: unknown): Issue[] {
   const out: Issue[] = [];
   const err = (path: string, message: string) => out.push({ level: 'error', path, message });
@@ -457,6 +534,8 @@ export function validateDeclarative(raw: unknown): Issue[] {
       } else err(`${pp}.kind`, 'kind must be field or table');
     });
   });
+  for (const m of linkProblems(t as DeclarativeTool)) err(m.path, m.message);
+  if ((t.guidance ?? '').length > GUIDANCE_MAX) err('guidance', `guidance is at most ${GUIDANCE_MAX} characters`);
 
   // every rule must point at something that exists
   const checkExpr = (e: Expr | undefined, path: string, rowCols?: Set<string>): void => {
@@ -635,6 +714,8 @@ export function normaliseDeclarative(raw: unknown, ctx: { existingSlugs?: string
           d.levels = Object.fromEntries(Object.entries(r.levels as Record<string, unknown>).slice(0, READING_LIMITS.rows).map(([k, v]) => [k, (Array.isArray(v) ? v : []).slice(0, 12).map((x) => str(x).slice(0, READING_LIMITS.cell))]));
         }
         if (r.rule && typeof r.rule === 'object') d.rule = r.rule as Rule;
+        const of = r.optionsFrom as Record<string, unknown> | undefined;
+        if (of && typeof of === 'object' && str(of.table) && str(of.col)) d.optionsFrom = { table: snake(str(of.table)), col: snake(str(of.col)) };
         return d;
       });
       const t: DeclTable = { kind: 'table', key, label, help: str(q.help), rowLabel: str(q.rowLabel) || 'Row', columns: cols };
@@ -658,7 +739,8 @@ export function normaliseDeclarative(raw: unknown, ctx: { existingSlugs?: string
   const sections: DeclSection[] = (Array.isArray(o.sections) ? o.sections : []).filter((s) => s && typeof s === 'object').map((s, i) => {
     const q = s as Record<string, unknown>;
     const reading = cleanReading(q.reading);
-    return { key: str(q.key) || `section_${i + 1}`, title: str(q.title), summary: str(q.summary), parts: parts(q.parts), ...(reading.length ? { reading } : {}) };
+    const recall = strs(q.recall).map(snake).slice(0, 12);
+    return { key: str(q.key) || `section_${i + 1}`, title: str(q.title), summary: str(q.summary), parts: parts(q.parts), ...(reading.length ? { reading } : {}), ...(recall.length ? { recall } : {}) };
   });
   const r = (o.reference && typeof o.reference === 'object' ? o.reference : {}) as Record<string, unknown>;
   const slug = (str(o.slug) || str(o.name)).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
@@ -684,7 +766,9 @@ export function normaliseDeclarative(raw: unknown, ctx: { existingSlugs?: string
   }
   const l = (o.links ?? {}) as Record<string, unknown>;
   if (strs(l.buildsOn).length || strs(l.feeds).length) tool.links = { buildsOn: strs(l.buildsOn), feeds: strs(l.feeds) };
-  const issues = validateDeclarative(tool);
+  if (str(o.guidance)) tool.guidance = str(o.guidance).slice(0, GUIDANCE_MAX);
+  const linkNotes = dropBrokenLinks(tool);
+  const issues: Issue[] = [...validateDeclarative(tool), ...linkNotes.map((m) => ({ level: 'warn' as const, path: 'links', message: m }))];
   if (ctx.existingSlugs?.includes(tool.slug)) issues.push({ level: 'error', path: 'slug', message: `A tool with the slug ${tool.slug} already exists` });
   if (!(o.category && (TOOL_CATEGORIES as readonly string[]).includes(str(o.category)))) issues.push({ level: 'warn', path: 'category', message: 'The category was not one of the known ones and was set to other' });
   return { tool, issues };

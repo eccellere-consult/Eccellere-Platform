@@ -62,5 +62,7 @@ export function toRuntime(tool: ToolRecord): ToolRuntime | null {
 
 export function toAiTool(tool: ToolRecord): AiTool | null {
   const rt = toRuntime(tool);
-  return rt ? { name: tool.name, does: tool.does ?? '', analysisGuide: rt.analysisGuide, def: rt.def } : null;
+  if (!rt) return null;
+  const g = rt.code ? '' : ((tool.definition as DeclarativeTool).guidance ?? '');
+  return { name: tool.name, does: tool.does ?? '', analysisGuide: rt.analysisGuide, def: rt.def, ...(g ? { guidance: g } : {}) };
 }

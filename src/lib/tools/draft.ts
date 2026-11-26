@@ -6,7 +6,7 @@
  * What the AI is never trusted with: who invented the tool and when (always left blank), the tool's name and slug (taken
  * from the list), and whether it is good enough to publish (the quality gate and a person decide that).
  */
-import { normaliseDeclarative, type DeclarativeTool, type ToolCategory } from '@/lib/strategyModels/declarative';
+import { GUIDANCE_MAX, normaliseDeclarative, type DeclarativeTool, type ToolCategory } from '@/lib/strategyModels/declarative';
 import type { GenerateArgs, GenerateResult } from '@/lib/ai/providers';
 import type { DraftOutcome, DrafterFn } from './service';
 import { assess } from './standards';
@@ -141,14 +141,14 @@ SHAPE (JSON object; every key shown is allowed, nothing else):
      { "template": "steps" | "cycle", "title", "steps": [3 to 8 x {"name","hint"}] }
      { "template": "canvasGrid", "title", "cols", "rows", "boxes": [{"name","hint","col","row","colSpan","rowSpan"}] }
      { "template": "scale", "title", "levels": [3 to 7 x {"name","hint"}] }
-  "sections": [ { "key", "title", "summary", "parts": [ FIELD or TABLE ] } ],
+  "sections": [ { "key", "title", "summary", "recall": [optional: keys of fields or tables from EARLIER sections to show read-only at the top of this one], "parts": [ FIELD or TABLE ] } ],
   "derived": [ { "key", "label", "help", "rule" } ],
   "outputs": [ { "key", "label", "rule" } ]   (at least one),
   "links": { "buildsOn": [2 or 3 names of tools or inputs this one draws on], "feeds": [1 to 3 names of what it hands its result to] },
   "analysisGuide": "how an analyst should read a filled-in tool",
   "sample": REQUIRED, a short FICTIONAL worked example: { "scenario": "2 or 3 sentences", "values": { "<field key>": "text" }, "tables": { "<table key>": [ { "<column key>": "text" } ] } } using only the keys you defined above }
 FIELD: { "kind":"field", "key", "label", "type": text|longtext|select|rating|number, "help", "example", "options": [for select, 2+], "scale": {min,max,low,high} for rating, "unit": required for number }
-TABLE: { "kind":"table", "key", "label", "help", "rowLabel", "minRows", "maxRows", "fixedRows": [names, optional], "columns": [ { "key","header","help","type": text|longtext|number|select|rating|computed, "options","scale","unit","rule" (computed only) } ] }
+TABLE: { "kind":"table", "key", "label", "help", "rowLabel", "minRows", "maxRows", "fixedRows": [names, optional], "columns": [ { "key","header","help","type": text|longtext|number|select|rating|computed, "options","scale","unit","rule" (computed only), "optionsFrom": {"table": key of a table in an EARLIER section, "col": one of its columns} (text columns only, optional: the person picks from what they wrote there) } ] }
 RULES (the only calculations allowed; no code):
   { "op":"calc", "expr": EXPR, "format": int|dp1|dp2|pct }
   { "op":"weighted", "table", "value": column, "weight": column }
@@ -157,6 +157,7 @@ RULES (the only calculations allowed; no code):
   { "op":"template", "text": "words with {field_key} placeholders" }
   { "op":"quadrant", "x": EXPR, "y": EXPR, "midX", "midY", "names": [4 strings] }
 EXPR: a number, {"field": key}, {"cell": column key} (inside a computed column only), {"agg": sum|avg|min|max|count, "table", "col"}, or {"add":[EXPR..]}, {"mul":[..]}, {"sub":[EXPR,EXPR]}, {"div":[EXPR,EXPR]}.
+LINKED STEPS: use "recall" and "optionsFrom" only to point BACK to an earlier step, never forward or at the same table. Links that point nowhere are removed.
 Keys are snake_case and unique. Labels are plain words and unique.`.trim();
 
 const COMPACT_NOTE = 'The previous answer was too long and was cut off. Keep it short: 3 or 4 sections, 2 to 4 parts each, shorter help text.';
@@ -295,6 +296,18 @@ function buildPage(
   return { kind: 'built', tool, suggestion: readSuggestion(raw.originatorSuggestion), notes, confidence };
 }
 
+/**
+ * The parts of the administrator's context that came from an uploaded document ("[From file.pdf]" and what follows it, up to the next
+ * file), kept with the tool as reference for its AI help. The administrator's own notes typed before any file are left out.
+ */
+export function fileTextOfBrief(brief: string | null | undefined): string {
+  const b = (brief ?? '').replace(/\r\n/g, '\n');
+  const at = b.search(/^\[From [^\]\n]+\]\s*$/m);
+  if (at < 0) return '';
+  const text = b.slice(at).replace(/^\[This PDF is a scan\.[^\n]*\n*/gm, '').trim();
+  return text.length > GUIDANCE_MAX ? `${text.slice(0, GUIDANCE_MAX - 21).trimEnd()}\n[... cut for length]` : text;
+}
+
 function finalise(
   item: { name: string; category: string; groupName: string | null; practice?: string | null; brief?: string | null; slug: string },
   tool: DeclarativeTool,
@@ -307,6 +320,9 @@ function finalise(
   customSkill: boolean,
 ): DraftOutcome {
   const extra = [...notes];
+  // Only the uploaded document's text is kept as guidance; an AI-written guidance is never trusted as the source.
+  const guidance = fileTextOfBrief(item.brief);
+  if (guidance) tool.guidance = guidance; else delete tool.guidance;
   if (suggestion) extra.push(`AI suggests the originator is ${suggestion.name}${suggestion.year ? ` (${suggestion.year})` : ''}, confidence ${suggestion.confidence}. Check a source, then use it or enter your own.`);
   const quality = assess(tool, extra);
   return {

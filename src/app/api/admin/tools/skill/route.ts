@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { SKILL_TITLES, type SkillKind } from "@/lib/tools/skill";
+import { SKILL_KINDS, SKILL_TITLES } from "@/lib/tools/skill";
 import { audit, loadSkillInfo, readAuth, resetSkill, saveSkill, toolsGuard, writeAuth } from "@/lib/tools/server";
 
 export const dynamic = "force-dynamic";
 
-const KINDS: SkillKind[] = ["draft", "assist", "form"];
+const KINDS = SKILL_KINDS;
 
-/** GET /api/admin/tools/skill - both skill files: the text in use, whether it has been edited, and the built-in default. */
+/** GET /api/admin/tools/skill - every skill file: the text in use, whether it has been edited, and the built-in default. */
 export const GET = toolsGuard(async () => {
   const auth = await readAuth();
   if (auth.error) return auth.error;

@@ -149,6 +149,8 @@ export interface GenerateArgs {
   quality?: boolean;
   /** pictures to read (base64, no data: prefix). Only providers that can see pictures are tried when this is set. */
   images?: ImageInput[];
+  /** PDF files to read (base64, no data: prefix), e.g. a scanned PDF with no text inside. Only providers that can see pictures are tried. */
+  pdfs?: PdfInput[];
   /** what kind of task this is (a short stable code, e.g. "form_build"); only used to label the AI Control Tower report, never sent to the provider */
   capability?: string;
   /** which part of the site the task belongs to (e.g. "form_builder"); label for the Control Tower report only */
@@ -156,6 +158,7 @@ export interface GenerateArgs {
   /** internal: 1 when this call is the second try on the same provider */
   retry?: number;
 }
+export interface PdfInput { name: string; data: string }
 export interface ImageInput { mediaType: "image/png" | "image/jpeg" | "image/webp" | "image/gif"; data: string }
 /** For important work: the strongest providers first. The model is the admin's choice when set; otherwise the strongest Claude. */
 export const QUALITY_ORDER: ProviderId[] = ["anthropic", "openai"];
@@ -216,8 +219,12 @@ export async function callProvider(
         headers: { "Content-Type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
         body: JSON.stringify({
           model, max_tokens: a.maxTokens, system: a.json ? a.system + JSON_ONLY : a.system,
-          messages: [{ role: "user", content: a.images?.length
-            ? [...a.images.map((i) => ({ type: "image", source: { type: "base64", media_type: i.mediaType, data: i.data } })), { type: "text", text: a.user }]
+          messages: [{ role: "user", content: a.images?.length || a.pdfs?.length
+            ? [
+                ...(a.pdfs ?? []).map((d) => ({ type: "document", source: { type: "base64", media_type: "application/pdf", data: d.data } })),
+                ...(a.images ?? []).map((i) => ({ type: "image", source: { type: "base64", media_type: i.mediaType, data: i.data } })),
+                { type: "text", text: a.user },
+              ]
             : a.user }],
         }),
       });
@@ -243,8 +250,12 @@ export async function callProvider(
       body: JSON.stringify({
         // newer OpenAI models reject a temperature setting, so it is only sent to the other OpenAI-style providers
         model, ...(p.id === "openai" ? {} : { temperature: 0.3 }), max_tokens: a.maxTokens,
-        messages: [{ role: "system", content: a.json ? a.system + JSON_ONLY : a.system }, { role: "user", content: a.images?.length
-          ? [...a.images.map((i) => ({ type: "image_url", image_url: { url: `data:${i.mediaType};base64,${i.data}` } })), { type: "text", text: a.user }]
+        messages: [{ role: "system", content: a.json ? a.system + JSON_ONLY : a.system }, { role: "user", content: a.images?.length || a.pdfs?.length
+          ? [
+              ...(a.pdfs ?? []).map((d) => ({ type: "file", file: { filename: d.name, file_data: `data:application/pdf;base64,${d.data}` } })),
+              ...(a.images ?? []).map((i) => ({ type: "image_url", image_url: { url: `data:${i.mediaType};base64,${i.data}` } })),
+              { type: "text", text: a.user },
+            ]
           : a.user }],
         ...(a.json ? { response_format: { type: "json_object" } } : {}),
       }),
@@ -285,7 +296,7 @@ export async function runProviders(
       ? [...QUALITY_ORDER.map((id) => usable.find((p) => p.id === id)).filter((p): p is ProviderDef => !!p), ...usable.filter((p) => !QUALITY_ORDER.includes(p.id) && p.id !== "groq" && p.id !== "xai")]
       : usable;
   for (const p of order) {
-    if (a.images?.length && !VISION_PROVIDERS.includes(p.id)) { a.diag?.push(`${p.label}: cannot read pictures, skipped`); continue; }
+    if ((a.images?.length || a.pdfs?.length) && !VISION_PROVIDERS.includes(p.id)) { a.diag?.push(`${p.label}: cannot read pictures, skipped`); continue; }
     const chosen = !s.providers[p.id].model && !(env[p.envModel] ?? "").trim();
     const model = a.quality && chosen && (p.id === "anthropic" || p.id === "openai")
       ? (env[p.id === "anthropic" ? "ANTHROPIC_QUALITY_MODEL" : "OPENAI_QUALITY_MODEL"] ?? "").trim() || QUALITY_MODEL[p.id]
