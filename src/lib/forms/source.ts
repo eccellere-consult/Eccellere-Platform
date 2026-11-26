@@ -9,7 +9,7 @@
  * Safety: nothing in a file is executed. Excel formulas are read as text. The text of a file is data for the AI, never instructions.
  * Server code only.
  */
-import { docKindOf, extractDocumentText, legacyOfficeHint, ExtractError, type DocKind } from '@/lib/tools/extract';
+import { docKindOf, extractDocumentText, legacyOfficeHint, ExtractError, type DocKind, type ScannedReader } from '@/lib/tools/extract';
 import { IMAGE_NAME, MAX_IMAGE_BYTES, sniffImage, type ImageReader } from './image';
 import { loadXlsx } from '@/lib/spendAnalysis/xlsxLoader';
 import type { DocBlock } from '@/lib/strategyModels/document';
@@ -336,7 +336,7 @@ async function readPicture(fileName: string, buffer: Buffer, startAt: number, re
 }
 
 /** Reads one uploaded file into source elements. Throws ExtractError with a plain-English reason when the file cannot be used. */
-export async function readSource(fileName: string, buffer: Buffer, startAt = 0, opts: { readImage?: ImageReader } = {}): Promise<SourceReading> {
+export async function readSource(fileName: string, buffer: Buffer, startAt = 0, opts: { readImage?: ImageReader; readScanned?: ScannedReader } = {}): Promise<SourceReading> {
   if (IMAGE_NAME.test(fileName)) return readPicture(fileName, buffer, startAt, opts.readImage);
   const legacy = legacyOfficeHint(fileName);
   if (legacy) throw new ExtractError('UNSUPPORTED', legacy);
@@ -352,8 +352,9 @@ export async function readSource(fileName: string, buffer: Buffer, startAt = 0, 
     else if (ext === 'csv' || ext === 'tsv') fromDelimited(c, buffer.toString('utf8'), ext === 'tsv' ? '\t' : ',');
     else if (kind === 'text') fromLines(c, buffer.toString('utf8'));
     else {
-      const got = await extractDocumentText(fileName, buffer, undefined, { noLimit: true });
+      const got = await extractDocumentText(fileName, buffer, undefined, { noLimit: true, readScanned: opts.readScanned });
       fromLines(c, got.text);
+      if (got.aiRead) c.warn('This PDF is a scan with no text inside; its text was read by AI, not copied from the file. Check every item against the original before relying on it.');
       if (got.truncated) { c.truncated = true; c.warn('The document was longer than the reading limit; only the first part was read.'); }
       if (kind === 'pdf') c.warn('Positions in a PDF are line numbers in the extracted text, not page coordinates. Check tables and tick-boxes against the original.');
     }
@@ -362,7 +363,7 @@ export async function readSource(fileName: string, buffer: Buffer, startAt = 0, 
     throw new ExtractError('UNREADABLE', 'That file could not be read. It may be damaged or password-protected.');
   }
   if (c.elements.length < 2) {
-    throw new ExtractError('UNREADABLE', kind === 'pdf' ? 'No text could be read from that PDF. A scanned (picture-only) PDF needs OCR, which is not supported yet.' : 'No readable questions or fields were found in that file.');
+    throw new ExtractError('UNREADABLE', kind === 'pdf' ? 'No questions or fields could be read from that PDF. If it is a scan, try a clearer copy, or upload a Word or text version.' : 'No readable questions or fields were found in that file.');
   }
   // A Word file is also kept as a document. If that reading fails the element list above still gives a form, so it never blocks.
   let doc: DocBlock[] | undefined;
@@ -374,7 +375,7 @@ export async function readSource(fileName: string, buffer: Buffer, startAt = 0, 
 }
 
 /** Elements numbered across several files: E ids continue from one file to the next. */
-export async function readSources(files: { name: string; data: Buffer }[], opts: { readImage?: ImageReader } = {}): Promise<SourceReading[]> {
+export async function readSources(files: { name: string; data: Buffer }[], opts: { readImage?: ImageReader; readScanned?: ScannedReader } = {}): Promise<SourceReading[]> {
   const out: SourceReading[] = [];
   let n = 0;
   for (const f of files) {

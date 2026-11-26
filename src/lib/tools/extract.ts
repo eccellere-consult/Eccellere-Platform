@@ -44,7 +44,13 @@ const officeParser: Parser = async (buffer) => {
   return ast.toText();
 };
 
-export interface Extracted { text: string; chars: number; truncated: boolean; kind: DocKind }
+export interface Extracted { text: string; chars: number; truncated: boolean; kind: DocKind; /** true when a scanned PDF was read by AI, not copied from the file */ aiRead?: boolean }
+
+/** Reads a scanned (picture-only) PDF with AI; see scannedPdf.ts. */
+export type ScannedReader = (pdf: { name: string; data: Buffer }) => Promise<string | null>;
+
+export const SCANNED_PDF_NO_AI = 'No text could be read from that PDF. It looks like a scanned (picture-only) PDF. Reading it needs an AI provider that can see pages (Anthropic or OpenAI) with a key set; ask the administrator to check Admin > AI settings, or upload a Word or text version instead.';
+export const SCANNED_PDF_AI_FAILED = 'No text could be read from that PDF. It looks like a scanned (picture-only) PDF, and the AI could not read it either. Try a clearer scan, a smaller file, or a Word or text version.';
 
 /** Tidy text from a document: no control characters, no runs of blank lines, trimmed and capped. */
 export function tidy(text: string, noLimit = false): { text: string; truncated: boolean } {
@@ -56,7 +62,7 @@ export class ExtractError extends Error {
   constructor(public code: 'UNSUPPORTED' | 'TOO_LARGE' | 'UNREADABLE', message: string) { super(message); this.name = 'ExtractError'; }
 }
 
-export async function extractDocumentText(fileName: string, buffer: Buffer, parse: Parser = officeParser, opts: { noLimit?: boolean } = {}): Promise<Extracted> {
+export async function extractDocumentText(fileName: string, buffer: Buffer, parse: Parser = officeParser, opts: { noLimit?: boolean; readScanned?: ScannedReader } = {}): Promise<Extracted> {
   const legacy = legacyOfficeHint(fileName);
   if (legacy) throw new ExtractError('UNSUPPORTED', legacy);
   const kind = docKindOf(fileName);
@@ -69,9 +75,15 @@ export async function extractDocumentText(fileName: string, buffer: Buffer, pars
     throw new ExtractError('UNREADABLE', 'That file could not be read. It may be damaged or password-protected.');
   }
   const { text, truncated } = tidy(raw, opts.noLimit);
-  if (text.length < 20) {
-    throw new ExtractError('UNREADABLE', kind === 'pdf' ? 'No text could be read from that PDF. A scanned (picture-only) PDF needs OCR, which is not supported yet.' : 'No readable text was found in that file.');
+  if (text.length < 20 && kind === 'pdf') {
+    // a scanned PDF has pictures of pages and no text: let an AI that can see pages read it, when one is available
+    if (!opts.readScanned) throw new ExtractError('UNREADABLE', SCANNED_PDF_NO_AI);
+    const read = await opts.readScanned({ name: fileName, data: buffer }).catch(() => null);
+    const t = tidy(read ?? '', opts.noLimit);
+    if (t.text.length < 20) throw new ExtractError('UNREADABLE', SCANNED_PDF_AI_FAILED);
+    return { text: t.text, chars: t.text.length, truncated: t.truncated, kind, aiRead: true };
   }
+  if (text.length < 20) throw new ExtractError('UNREADABLE', 'No readable text was found in that file.');
   return { text, chars: text.length, truncated, kind };
 }
 
