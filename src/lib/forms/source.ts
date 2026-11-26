@@ -476,3 +476,20 @@ export function readingsFromElements(elements: readonly SourceElement[], warning
   const notes = warnings.filter((w): w is string => typeof w === 'string').map((w) => clean(w).slice(0, 300)).slice(0, 30);
   return [...byFile].map(([fileName, els], i) => ({ fileName, kind: 'text' as DocKind, elements: els, warnings: i === 0 ? notes : [], truncated: false }));
 }
+
+/**
+ * The document's own words, kept with the form as reference for the AI help (its method, steps, terms and tables), in reading order and
+ * at most `max` characters. Headings stand on their own line; list items and table rows keep their marks.
+ */
+export function guidanceFromReadings(readings: SourceReading[], max: number): string {
+  const lines: string[] = [];
+  for (const r of readings) {
+    for (const e of r.elements) {
+      const t = e.text.replace(/\s+/g, ' ').trim();
+      if (!t) continue;
+      lines.push(e.kind === 'heading' ? `\n${t}` : e.list ? `- ${t}` : t);
+    }
+  }
+  const all = lines.join('\n').trim();
+  return all.length > max ? `${all.slice(0, Math.max(0, max - 21)).trimEnd()}\n[... cut for length]` : all;
+}

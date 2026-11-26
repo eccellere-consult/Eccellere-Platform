@@ -3,6 +3,7 @@
  * lines then go through the same reader as a text file, so they become numbered source elements and the same coverage check applies.
  * The transcript is evidence to check, not truth: the page and the review screen both say it was read from a picture.
  */
+import { readerSystem } from './readSkill';
 import type { GenerateArgs, GenerateResult, ImageInput } from '@/lib/ai/providers';
 
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -31,10 +32,11 @@ Rules:
 - Reply with the transcript only, no commentary. If the picture is not a form, questionnaire, checklist or table, reply with exactly: NOT_A_FORM`;
 
 /** Builds the reader the Form Builder uses for pictures. `generate` must be the vision-capable gateway call. */
-export function makeImageReader(generate: Generate): ImageReader {
+export function makeImageReader(generate: Generate, skill?: string): ImageReader {
+  const system = skill?.trim() ? readerSystem(skill, 'If the picture is not a form, questionnaire, checklist or table, reply with exactly: NOT_A_FORM') : TRANSCRIBE_SYSTEM;
   return async (img) => {
     const res = await generate({
-      system: TRANSCRIBE_SYSTEM,
+      system,
       user: 'Transcribe this picture now.',
       maxTokens: 6000,
       timeoutMs: 90_000,

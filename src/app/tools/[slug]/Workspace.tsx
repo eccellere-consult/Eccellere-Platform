@@ -4,7 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle2, HelpCircle, Loader2, Sparkles, Undo2 } from "lucide-react";
 import { readJson } from "@/lib/toolkit/http";
 import { cn } from "@/lib/utils";
-import { interpret, type DeclarativeTool } from "@/lib/strategyModels/declarative";
+import { interpret, linkedChoices, type DeclarativeTool } from "@/lib/strategyModels/declarative";
+import { missingLinkedRows, recallItems } from "@/lib/strategyModels/links";
 import { cleanTable, completeness, computeDerived, computeOutputs, evalColumn, expandTable, fieldsFromValues, valuesFromFields, labelColumnKey } from "@/lib/strategyModels/values";
 import type { Column, FieldPart, ModelDefinition, ModelValues, Part, ReadingBlock, Row, Section, TablePart } from "@/lib/strategyModels/types";
 import { loadModelDefinition } from "@/lib/strategyModels/groups";
@@ -58,12 +59,41 @@ function Cell({ col, row, values, onChange, id }: { col: Column; row: Row; value
   );
   else if (col.type === "rating" && col.scale) control = <Rating label={col.header} scale={col.scale} value={v} onChange={onChange} />;
   else if (col.type === "longtext") control = <textarea id={id} rows={3} className={input} value={v} onChange={(e) => onChange(e.target.value)} />;
-  else control = <input id={id} className={cn(input, col.type === "number" && "max-w-[160px]")} inputMode={col.type === "number" ? "decimal" : undefined} value={v} onChange={(e) => onChange(e.target.value)} />;
+  else control = <input id={id} className={cn(input, col.type === "number" && "max-w-[160px]")} inputMode={col.type === "number" ? "decimal" : undefined} value={v} onChange={(e) => onChange(e.target.value)} list={col.optionsFrom ? `${id}-choices` : undefined} />;
+  const choices = col.optionsFrom ? linkedChoices(col, values) : [];
   return (
     <div className={cn(col.type === "longtext" && "basis-full", col.type === "text" && "min-w-[220px] flex-1")}>
       <label htmlFor={id} className={cellLabel} title={col.help}>{col.header}{col.unit ? ` (${col.unit})` : ""}{legend}</label>
       <div className="mt-1.5">{control}</div>
+      {col.optionsFrom && <><Choices id={`${id}-choices`} items={choices} /><span className="no-print mt-1 block text-[11px] text-ink-light">{choices.length ? "Pick from your earlier answers, or type your own." : "Your earlier answers appear here as choices once you fill them in."}</span></>}
     </div>
+  );
+}
+
+/** The suggested answers of a linked column, offered by the browser as the person types. */
+function Choices({ id, items }: { id: string; items: string[] }) {
+  return <datalist id={id}>{items.map((x) => <option key={x} value={x} />)}</datalist>;
+}
+
+/** Earlier answers a step builds on, shown read-only at its top so the person does not have to scroll back. */
+function Recall({ items }: { items: { key: string; label: string; lines: string[] }[] }) {
+  if (!items.length) return null;
+  return (
+    <aside className="mt-4 border-l-2 border-eccellere-gold bg-eccellere-cream/60 px-4 py-3" aria-label="From earlier steps">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-eccellere-gold-deep">From earlier steps</p>
+      <dl className="mt-2 space-y-2">
+        {items.map((it) => (
+          <div key={it.key}>
+            <dt className="text-xs font-semibold text-eccellere-ink">{it.label}</dt>
+            <dd className="mt-0.5 text-sm text-ink-mid">
+              {!it.lines.length ? <span className="text-ink-light">Not filled in yet.</span>
+                : it.lines.length === 1 ? it.lines[0]
+                : <ul className="list-disc space-y-0.5 pl-4">{it.lines.map((x, i) => <li key={i}>{x}</li>)}</ul>}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </aside>
   );
 }
 
@@ -461,7 +491,23 @@ function WorkspaceInner({ slug, def, toolName, sample, doc, paper }: { slug: str
     if (c.type === "select") return <select id={id} aria-label={label} className={input} value={v} onChange={(e) => onChange(e.target.value)}><option value="">Choose…</option>{(c.options ?? []).map((o) => <option key={o}>{o}</option>)}</select>;
     if (c.type === "rating" && c.scale) return <Rating label={label} scale={c.scale} value={v} onChange={onChange} />;
     if (c.type === "longtext") return written(<textarea id={id} aria-label={label} rows={2} className={cn(input, "min-w-[180px]")} value={v} onChange={(e) => onChange(e.target.value)} />, v, 2);
+    if (c.optionsFrom) return written(<><input id={id} aria-label={label} className={cn(input, "min-w-[120px]")} value={v} onChange={(e) => onChange(e.target.value)} list={`${id}-choices`} /><Choices id={`${id}-choices`} items={linkedChoices(c, shown)} /></>, v);
     return written(<input id={id} aria-label={label} className={cn(input, c.type === "number" ? "min-w-[90px]" : "min-w-[120px]")} inputMode={c.type === "number" ? "decimal" : undefined} value={v} onChange={(e) => onChange(e.target.value)} />, v);
+  };
+
+  /** "Add a row for each …": one click starts a row for every entry of the earlier table this one links to that has no row yet. */
+  const addForEach = (t: TablePart, rows: Row[]) => {
+    if (blank) return null;
+    const miss = missingLinkedRows(t, shown);
+    if (!miss) return null;
+    const from = t.columns.find((c) => c.key === miss.col);
+    const filled = rows.filter((r) => Object.values(r).some((x) => (x ?? "").trim()));
+    return (
+      <button type="button" className={cn(BTN_LINE, "no-print mt-3 ml-2 px-3 py-1.5 text-xs")} title={miss.values.join(", ")}
+        onClick={() => setRows(t, [...filled, ...miss.values.map((x) => ({ [miss.col]: x }))])}>
+        + Add a {t.rowLabel.toLowerCase()} for each {(from?.header ?? "earlier entry").toLowerCase()} not yet listed ({miss.values.length})
+      </button>
+    );
   };
 
   const renderGrid = (t: TablePart, id: string, badge: React.ReactNode) => {
@@ -522,6 +568,7 @@ function WorkspaceInner({ slug, def, toolName, sample, doc, paper }: { slug: str
         {!t.fixedRows && rows.length < t.maxRows && (
           <button type="button" className={cn(BTN_LINE, "no-print mt-3 px-3 py-1.5 text-xs")} onClick={() => setRows(t, [...rows, {}])}>+ Add a {t.rowLabel.toLowerCase()}</button>
         )}
+        {addForEach(t, rows)}
       </div>
     );
   };
@@ -562,6 +609,7 @@ function WorkspaceInner({ slug, def, toolName, sample, doc, paper }: { slug: str
         {!t.fixedRows && rows.length < t.maxRows && (
           <button type="button" className={cn(BTN_LINE, "mt-3 px-3 py-1.5 text-xs")} onClick={() => setRows(t, [...rows, {}])}>+ Add a {t.rowLabel.toLowerCase()}</button>
         )}
+        {addForEach(t, rows)}
       </div>
     );
   };
@@ -571,6 +619,7 @@ function WorkspaceInner({ slug, def, toolName, sample, doc, paper }: { slug: str
     const inline = (s.reading ?? []).filter((b) => !b.place);
     return (
       <>
+        <Recall items={recallItems(def, s, shown)} />
         {s.parts.map((p) => (
           <div key={p.key}>
             {inline.filter((b) => b.before === p.key).map((b, i) => <Reading key={i} b={b} />)}

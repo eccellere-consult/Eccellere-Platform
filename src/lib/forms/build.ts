@@ -8,7 +8,7 @@
  * What the AI is never trusted with: the tool's slug, the originator and year (left blank), the review state (always a draft), and
  * whether every source element made it into the form (checked in code, see reconcile.ts). Nothing is published from here.
  */
-import { keepDocumentLayout, normaliseDeclarative, type DeclarativeTool } from '@/lib/strategyModels/declarative';
+import { GUIDANCE_MAX, keepDocumentLayout, normaliseDeclarative, type DeclarativeTool } from '@/lib/strategyModels/declarative';
 export { keepDocumentLayout };
 import type { GenerateArgs, GenerateResult } from '@/lib/ai/providers';
 import { EXAMPLE_TOOL, SCHEMA_NOTES, declarativeCategory, extractJson } from '@/lib/tools/draft';
@@ -19,7 +19,7 @@ import { slugify, type MarketCategory } from '@/lib/tools/service';
 import type { Practice } from '@/lib/tools/practice';
 import type { ToolInput } from '@/lib/tools/repo';
 import { DEFAULT_FORM_SKILL, FORM_EXTRAS } from './skill';
-import { pagePlanText, renderForPrompt, sourcePages, type SourceReading } from './source';
+import { guidanceFromReadings, pagePlanText, renderForPrompt, sourcePages, type SourceReading } from './source';
 import { coverageErrors, coverageWarnings, reconcile, type Coverage } from './reconcile';
 import { dropBrokenResults } from '@/lib/tools/repair';
 import { depthOf } from '@/lib/tools/depth';
@@ -169,6 +169,10 @@ export function makeFormBuilder(deps: BuilderDeps) {
     // The hash of the source text lets a later build say "this file was already used". File names stay out of the stored definition.
     const hash = elements.length ? slideHash(elements.map((e) => e.text).join('\n')) : undefined;
     tool.source = { draftedBy: 'ai', draftedAt: now().toISOString(), ...(hash ? { hash } : {}) };
+    // The source document's own words stay with the form as background for the AI help. Without a document, only what the form was
+    // based on is kept: a guidance the AI wrote itself is never trusted as the source.
+    const guidance = req.readings?.length ? guidanceFromReadings(req.readings, GUIDANCE_MAX) : (req.base?.tool.guidance ?? '');
+    if (guidance) tool.guidance = guidance; else delete tool.guidance;
 
     const notes: string[] = [];
     const removedResults = dropBrokenResults(tool);

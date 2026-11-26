@@ -11,13 +11,16 @@
  */
 
 import { DEFAULT_FORM_SKILL } from '@/lib/forms/skill';
+import { DEFAULT_READ_SKILL } from '@/lib/forms/readSkill';
 
-export type SkillKind = 'draft' | 'assist' | 'form';
-export const SKILL_KEYS: Record<SkillKind, string> = { draft: 'tools.skill.draft', assist: 'tools.skill.assist', form: 'tools.skill.form' };
+export type SkillKind = 'draft' | 'assist' | 'form' | 'read';
+export const SKILL_KINDS: SkillKind[] = ['draft', 'assist', 'form', 'read'];
+export const SKILL_KEYS: Record<SkillKind, string> = { draft: 'tools.skill.draft', assist: 'tools.skill.assist', form: 'tools.skill.form', read: 'tools.skill.read' };
 export const SKILL_TITLES: Record<SkillKind, string> = {
   draft: 'Drafting skill: how a tool page is built from a topic',
   assist: 'Assist skill: how the AI helps a person using a tool',
   form: 'Form builder skill: the standards and references used to turn a request, a document or a template into a form',
+  read: 'Document-reading skill: how the AI transcribes a scanned PDF or a photo of a form before a tool is built from it',
 };
 export const MAX_SKILL_CHARS = 20_000;
 export const MIN_SKILL_CHARS = 300;
@@ -38,6 +41,7 @@ Build the workspace in this order:
 2. One or two sections that carry out the method itself, using the method's own terms.
 3. A LAST section titled "Action plan" with a field for the decision and why, and a table of actions with columns action, owner (a role, never a person), measure of success and a 30/60/90-day horizon.
 Use at least 6 inputs in all. Use a table for anything that repeats (options, causes, risks, criteria).
+When a later step works on what an earlier step produced (actions for each cause, a check for each action), link them: "recall" shows the earlier answer at the top of the step, and a text column with "optionsFrom" lets the person pick from the earlier table's entries.
 
 ## 3. Write the questions well
 - The questions ARE the form. Each one asks for something the method really needs, in plain words a manager would use.
@@ -86,7 +90,7 @@ You help a manager or consultant work through one tool. You are an assistant, no
 - Treat suspected causes as hypotheses to test, not facts.
 `;
 
-export const defaultSkill = (kind: SkillKind): string => (kind === 'draft' ? DEFAULT_DRAFT_SKILL : kind === 'form' ? DEFAULT_FORM_SKILL : DEFAULT_ASSIST_SKILL);
+export const defaultSkill = (kind: SkillKind): string => (kind === 'draft' ? DEFAULT_DRAFT_SKILL : kind === 'form' ? DEFAULT_FORM_SKILL : kind === 'read' ? DEFAULT_READ_SKILL : DEFAULT_ASSIST_SKILL);
 
 /** Why a skill text cannot be saved, in plain words; null when it is fine. */
 export function checkSkillText(text: unknown): string | null {

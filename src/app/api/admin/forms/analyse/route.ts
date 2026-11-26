@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ExtractError } from "@/lib/tools/extract";
 import { labelled } from "@/lib/ai/gateway";
-import { aiReady, toolsGuard, writeAuth } from "@/lib/tools/server";
+import { aiReady, loadSkillText, toolsGuard, writeAuth } from "@/lib/tools/server";
 import { readSources, sourcePages } from "@/lib/forms/source";
 import { makeImageReader } from "@/lib/forms/image";
 import { makeScannedPdfReader } from "@/lib/tools/scannedPdf";
@@ -36,9 +36,10 @@ export const POST = toolsGuard(async (req: NextRequest) => {
     try {
       // pictures are transcribed by a vision AI; without AI the reader is absent and a picture gets a plain-words refusal
       const ai = await aiReady();
-      const readImage = ai ? makeImageReader(labelled("form_image_reading", "form_builder")) : undefined;
+      const readSkill = ai ? await loadSkillText("read").catch(() => undefined) : undefined;
+      const readImage = ai ? makeImageReader(labelled("form_image_reading", "form_builder"), readSkill) : undefined;
       // a scanned PDF has no text inside; a model that can see pages reads it, and the reading says so
-      const readScanned = ai ? makeScannedPdfReader(labelled("scanned_pdf_reading", "form_builder")) : undefined;
+      const readScanned = ai ? makeScannedPdfReader(labelled("scanned_pdf_reading", "form_builder"), readSkill) : undefined;
       readings = await readSources(await Promise.all(files.map(async (f) => ({ name: f.name, data: Buffer.from(await f.arrayBuffer()) }))), { readImage, readScanned });
     } catch (e) {
       if (e instanceof ExtractError) return NextResponse.json({ error: e.message, code: e.code }, { status: e.code === "TOO_LARGE" ? 413 : e.code === "UNSUPPORTED" ? 415 : 422 });
