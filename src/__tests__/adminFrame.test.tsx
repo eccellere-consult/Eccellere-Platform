@@ -18,6 +18,8 @@ describe('the admin menu catalogue (the guard)', () => {
     const screens = fs.readdirSync(root, { withFileTypes: true })
       .filter((d) => d.isDirectory())
       .flatMap((d) => [d.name, ...fs.readdirSync(path.join(root, d.name), { withFileTypes: true }).filter((x) => x.isDirectory()).map((x) => `${d.name}/${x.name}`)])
+      // A detail page such as /admin/specialists/[id] is opened from its list, not the menu; its breadcrumb is the list's entry.
+      .filter((rel) => !rel.split('/').some((part) => part.startsWith('[')))
       .filter((rel) => fs.existsSync(path.join(root, rel, 'page.tsx')))
       .map((rel) => `/admin/${rel}`);
     const listed = ADMIN_ITEMS.map((i) => i.href);
@@ -28,6 +30,7 @@ describe('the admin menu catalogue (the guard)', () => {
     expect(activeItem('/admin')?.label).toBe('Dashboard');
     expect(activeItem('/admin/forms')?.label).toBe('Build');
     expect(activeItem('/admin/forms/classify')?.label).toBe('Classify and deepen');
+    expect(activeItem('/admin/specialists/abc123')?.label).toBe('Specialists');
     expect(activeItem('/admin/tools')?.group.stages).toBe(true);
     expect(activeItem('/admin/users')?.group.stages).toBeUndefined();
   });
