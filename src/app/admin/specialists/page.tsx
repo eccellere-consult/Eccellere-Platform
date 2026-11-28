@@ -2,9 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Search, ChevronLeft, Filter, CheckCircle, Clock, XCircle, Star, Loader2, RefreshCw } from "lucide-react";
+import { Search, ChevronLeft, Filter, CheckCircle, Clock, XCircle, Star, Loader2, RefreshCw, HelpCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
 
 // One sample row shown only when no real specialists have registered yet
 const SAMPLE_SPECIALIST = {
@@ -40,6 +39,7 @@ type Specialist = {
 const statusConfig: Record<string, { color: string; icon: typeof CheckCircle }> = {
   active:   { color: "bg-eccellere-teal/10 text-eccellere-teal",  icon: CheckCircle },
   pending:  { color: "bg-eccellere-gold/10 text-eccellere-gold",  icon: Clock },
+  "needs info": { color: "bg-eccellere-gold/10 text-eccellere-gold-deep", icon: HelpCircle },
   inactive: { color: "bg-ink-light/10 text-ink-light",            icon: XCircle },
 };
 
@@ -49,7 +49,6 @@ export default function AdminSpecialists() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   const fetchSpecialists = useCallback(async () => {
     setLoading(true);
@@ -67,21 +66,6 @@ export default function AdminSpecialists() {
   }, []);
 
   useEffect(() => { fetchSpecialists(); }, [fetchSpecialists]);
-
-  async function handleAction(id: string, action: "approve" | "reject") {
-    setActionLoading(id + action);
-    try {
-      const res = await fetch("/api/admin/specialists", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, action }),
-      });
-      if (!res.ok) throw new Error("Action failed");
-    } finally {
-      setActionLoading(null);
-      await fetchSpecialists();
-    }
-  }
 
   const isSampleOnly = specialists.length === 0 && !loading && !error;
   const displaySpecialists: Specialist[] = isSampleOnly ? [SAMPLE_SPECIALIST] : specialists;
@@ -160,7 +144,7 @@ export default function AdminSpecialists() {
               </div>
               <div className="flex items-center gap-2">
                 <Filter className="h-4 w-4 text-ink-light" />
-                {["all", "active", "pending", "inactive"].map((s) => (
+                {["all", "pending", "needs info", "active", "inactive"].map((s) => (
                   <button
                     key={s}
                     onClick={() => setFilterStatus(s)}
@@ -225,31 +209,18 @@ export default function AdminSpecialists() {
                       <span className="ml-auto font-mono text-eccellere-gold">{spec.earnings}</span>
                     </div>
 
-                    {!spec.isSample && spec.status === "pending" && (
-                      <div className="mt-3 flex gap-2">
-                        <Button
-                          size="sm"
-                          className="flex-1 text-xs"
-                          disabled={actionLoading !== null}
-                          onClick={() => handleAction(spec.id, "approve")}
-                        >
-                          {actionLoading === spec.id + "approve"
-                            ? <Loader2 className="h-3 w-3 animate-spin" />
-                            : "Approve"}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="flex-1 text-xs"
-                          disabled={actionLoading !== null}
-                          onClick={() => handleAction(spec.id, "reject")}
-                        >
-                          {actionLoading === spec.id + "reject"
-                            ? <Loader2 className="h-3 w-3 animate-spin" />
-                            : "Reject"}
-                        </Button>
-                      </div>
-                    )}
+                    {/* Approve / Reject now happen on the review screen, after the admin has seen the full profile. */}
+                    <Link
+                      href={`/admin/specialists/${encodeURIComponent(spec.id)}`}
+                      className={cn(
+                        "mt-3 block rounded-md px-3 py-2 text-center text-xs font-medium not-italic transition-colors",
+                        spec.status === "pending" || spec.status === "needs info"
+                          ? "bg-eccellere-ink text-white hover:bg-eccellere-ink/90"
+                          : "border border-eccellere-ink/10 text-ink-mid hover:bg-eccellere-cream"
+                      )}
+                    >
+                      {spec.status === "pending" || spec.status === "needs info" ? "Review profile and decide" : "View profile"}
+                    </Link>
                   </div>
                 );
               })}
